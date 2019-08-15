@@ -1,6 +1,4 @@
-//#include <algorithm>
 #include <iostream>
-#include <thread>
 
 #include "json.hpp"
 
@@ -29,9 +27,17 @@ auto CGridSite::CreateStorageElement(std::string&& name) -> CStorageElement*
 CRucio::CRucio()
 {
     mFiles.reserve(150000);
+    for(std::size_t i = 0; i<NUM_REPEAR_THREADS; ++i)
+        mThreads[i].reset(new std::thread(&CRucio::ReaperWorker, this, i));
 }
 
-CRucio::~CRucio() = default;
+CRucio::~CRucio()
+{
+    mAreThreadsRunning = false;
+    mStartCondition.notify_all();
+    for(std::size_t i = 0; i<NUM_REPEAR_THREADS; ++i)
+        mThreads[i]->join();
+}
 
 auto CRucio::CreateFile(const std::uint32_t size, const TickType expiresAt) -> SFile*
 {
@@ -46,37 +52,63 @@ auto CRucio::CreateGridSite(const std::uint32_t multiLocationIdx, std::string&& 
     return newSite;
 }
 
-auto CRucio::RunReaper(const TickType now) -> std::size_t
+void printTS(std::size_t i, const std::string& n)
 {
-    const std::size_t numFiles = mFiles.size();
-    constexpr std::size_t numThreads = 16;
+    static std::mutex coutMutex;
+    std::unique_lock<std::mutex> lock(coutMutex);
+    std::cout<<i<<" "<<n<<std::endl;
+}
 
-    if(numFiles < numThreads)
-        return 0;
-
-    std::unique_ptr<std::thread> threads[numThreads];
-
-    auto worker = [now, numThreads](std::size_t tIdx, std::vector<std::unique_ptr<SFile>>* files) {
-        const float numElementsPerThread = files->size() / static_cast<float>(numThreads);
-        const std::size_t lastIdx = numElementsPerThread * (tIdx + 1);
-        for(std::size_t i = numElementsPerThread * tIdx; i < lastIdx; ++i)
+void CRucio::ReaperWorker(const std::size_t threadIdx)
+{
+    TickType lastNow = 0;
+    auto waitFunc = [&]{return (lastNow < mReaperWorkerNow) || !mAreThreadsRunning;};
+    while(mAreThreadsRunning)
+    {
         {
-            std::unique_ptr<SFile>& curFile = (*files)[i];
-            if(curFile->mExpiresAt <= now)
+            std::unique_lock<std::mutex> lock(mConditionMutex);
+            mStartCondition.wait(lock, waitFunc);
+        }
+
+        if(!mAreThreadsRunning)
+            return;
+
+        const float numElementsPerThread = mFiles.size() / static_cast<float>(NUM_REPEAR_THREADS);
+        const auto lastIdx = static_cast<std::size_t>(numElementsPerThread * (threadIdx + 1));
+        for(std::size_t i = numElementsPerThread * threadIdx; i < lastIdx; ++i)
+        {
+            std::unique_ptr<SFile>& curFile = mFiles[i];
+            if(curFile->mExpiresAt <= mReaperWorkerNow)
             {
-                curFile->Remove(now);
+                curFile->Remove(mReaperWorkerNow);
                 curFile.reset(nullptr);
             }
             else
-                curFile->RemoveExpiredReplicas(now);
+                curFile->RemoveExpiredReplicas(mReaperWorkerNow);
         }
-    };
 
-    for (std::size_t i=0; i<numThreads; ++i)
-        threads[i].reset(new std::thread(worker, i, &mFiles));
-    for (std::size_t i=0; i<numThreads; ++i)
-        threads[i]->join();
+        lastNow = mReaperWorkerNow;
+        if((--mNumWorkingReapers) == 0)
+            mFinishCondition.notify_one();
+    }
+}
 
+auto CRucio::RunReaper(const TickType now) -> std::size_t
+{
+    const std::size_t numFiles = mFiles.size();
+    if(numFiles < NUM_REPEAR_THREADS)
+        return 0;
+
+    assert(mReaperWorkerNow < now);
+
+    {
+        std::unique_lock<std::mutex> lock(mConditionMutex);
+        mReaperWorkerNow = now;
+        mNumWorkingReapers = NUM_REPEAR_THREADS;
+        mStartCondition.notify_all();
+        auto waitFunc = [this]{return mNumWorkingReapers == 0;};
+        mFinishCondition.wait(lock, waitFunc);
+    }
 
     std::size_t frontIdx = 0;
     std::size_t backIdx = numFiles - 1;
