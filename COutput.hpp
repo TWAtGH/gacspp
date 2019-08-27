@@ -1,50 +1,15 @@
 #pragma once
 
 #include <atomic>
-#include <filesystem>
 #include <memory>
 #include <string>
 #include <thread>
 #include <vector>
 
+#include "IDatabase.hpp"
+
+
 #define OUTPUT_BUF_SIZE 8192
-
-struct sqlite3;
-struct sqlite3_stmt;
-
-
-class IBindableValue
-{
-public:
-    virtual bool Bind(sqlite3_stmt* stmt, int idx) = 0;
-};
-
-
-class CInsertStatements
-{
-protected:
-    std::size_t mPreparedStatementIdx = 0;
-    std::vector<std::unique_ptr<IBindableValue>> mValues;
-
-public:
-    CInsertStatements(std::size_t preparedStatementIdx, std::size_t numReserve=0);
-
-    inline auto GetPreparedStatementIdx() const -> std::size_t
-    {return mPreparedStatementIdx;}
-
-    bool IsEmpty() const
-    {return mValues.empty();}
-
-    void AddValue(double value);
-    void AddValue(int value);
-    void AddValue(std::uint32_t value);
-    void AddValue(std::uint64_t value);
-    void AddValue(const std::string& value);
-    void AddValue(std::string&& value);
-
-    auto BindAndInsert(sqlite3_stmt* const stmt) -> std::size_t;
-};
-
 
 class COutput
 {
@@ -56,12 +21,9 @@ private:
 
     std::atomic_size_t mConsumerIdx = 0;
     std::atomic_size_t mProducerIdx = 0;
-    std::unique_ptr<CInsertStatements> mStatementsBuffer[OUTPUT_BUF_SIZE];
+    std::unique_ptr<IInsertValuesContainer> mInsertQueriesBuffer[OUTPUT_BUF_SIZE];
 
-    sqlite3* mDB = nullptr;
-    std::vector<sqlite3_stmt*> mPreparedStatements;
-
-    std::filesystem::path mDBFilePath;
+    std::shared_ptr<IDatabase> mDB;
 
 public:
     COutput(const COutput&) = delete;
@@ -72,17 +34,18 @@ public:
     ~COutput();
 
     static auto GetRef() -> COutput&;
-    static void LogCallback(void* data, int errorCode, const char* errorMessage);
 
-    bool Initialise(const std::filesystem::path& dbFilePath, bool keepInMemory);
+    bool Initialise(const std::string& options);
     bool StartConsumer();
     void Shutdown();
 
-    auto AddPreparedSQLStatement(const std::string& queryString) -> std::size_t;
-    bool CreateTable(const std::string& tableName, const std::string& column);
-    bool InsertRow(const std::string& tableName, const std::string& row);
+    auto CreatePreparedInsert(const std::string& queryTpl, char wildcard) -> std::shared_ptr<IPreparedInsert>;
+    bool CreateTable(const std::string& tableName, const std::string& columns);
+    bool CreateTable(const std::string& tableName, const std::vector<std::string>& columns);
+    bool InsertRow(const std::string& tableName, const std::string& values);
+    bool InsertRow(const std::string& tableName, const std::vector<std::string>& values);
 
-    void QueueInserts(std::unique_ptr<CInsertStatements>&& statements);
+    void QueueInserts(std::unique_ptr<IInsertValuesContainer>&& queriesContainer);
 
     void ConsumerThread();
 };

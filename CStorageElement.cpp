@@ -7,9 +7,7 @@
 #include "SFile.hpp"
 
 
-
-std::size_t CStorageElement::mOutputQueryIdx = 0;
-
+std::shared_ptr<IPreparedInsert> CStorageElement::outputReplicaInsertQuery = nullptr;
 
 CStorageElement::CStorageElement(std::string&& name, ISite* const site)
 	: mId(GetNewId()),

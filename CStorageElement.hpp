@@ -13,11 +13,13 @@ class ISite;
 struct SFile;
 struct SReplica;
 
+class IPreparedInsert;
+
 
 class CStorageElement
 {
 public:
-    static std::size_t mOutputQueryIdx;
+    static std::shared_ptr<IPreparedInsert> outputReplicaInsertQuery;
 
 	CStorageElement(std::string&& name, ISite* const site);
     CStorageElement(CStorageElement&&) = default;

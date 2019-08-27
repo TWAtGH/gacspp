@@ -17,7 +17,7 @@ struct SReplica;
 class CDataGenerator : public CScheduleable
 {
 private:
-    std::size_t mOutputQueryIdx;
+    std::shared_ptr<IPreparedInsert> mOutputFileInsertQuery;
 
     IBaseSim* mSim;
 
@@ -69,7 +69,7 @@ public:
 class CTransferManager : public CScheduleable
 {
 private:
-    std::size_t mOutputQueryIdx;
+    std::shared_ptr<IPreparedInsert> mOutputTransferInsertQuery;
 
     TickType mLastUpdated = 0;
     std::uint32_t mTickFreq;
@@ -108,7 +108,7 @@ public:
 class CFixedTimeTransferManager : public CScheduleable
 {
 private:
-    std::size_t mOutputQueryIdx;
+    std::shared_ptr<IPreparedInsert> mOutputTransferInsertQuery;
 
     TickType mLastUpdated = 0;
     std::uint32_t mTickFreq;

@@ -21,7 +21,7 @@ CDataGenerator::CDataGenerator(IBaseSim* sim, const std::uint32_t tickFreq, cons
       mSim(sim),
       mTickFreq(tickFreq)
 {
-    mOutputQueryIdx = COutput::GetRef().AddPreparedSQLStatement("INSERT INTO Files VALUES(?, ?, ?, ?);");
+    mOutputFileInsertQuery = COutput::GetRef().CreatePreparedInsert("INSERT INTO Files VALUES(?, ?, ?, ?);", '?');
 }
 
 void CDataGenerator::OnUpdate(const TickType now)
@@ -67,8 +67,9 @@ auto CDataGenerator::CreateFilesAndReplicas(const std::uint32_t numFiles, const 
 
     assert(numReplicasPerFile <= numStorageElements);
 
-    auto fileInsertStmts = std::make_unique<CInsertStatements>(mOutputQueryIdx, numFiles * 4);
-    auto replicaInsertStmts = std::make_unique<CInsertStatements>(CStorageElement::mOutputQueryIdx, numFiles * numReplicasPerFile * 2);
+    std::unique_ptr<IInsertValuesContainer> fileInsertQueries = mOutputFileInsertQuery->CreateValuesContainer(numFiles * 4);
+    std::unique_ptr<IInsertValuesContainer> replicaInsertQueries = CStorageElement::outputReplicaInsertQuery->CreateValuesContainer(numFiles * numReplicasPerFile * 2);
+
     std::uniform_int_distribution<std::uint32_t> rngSampler(0, numStorageElements);
     std::uint64_t bytesOfFilesGen = 0;
     for(std::uint32_t i = 0; i < numFiles; ++i)
@@ -78,10 +79,10 @@ auto CDataGenerator::CreateFilesAndReplicas(const std::uint32_t numFiles, const 
 
         SFile* const file = mSim->mRucio->CreateFile(fileSize, now + lifetime);
 
-        fileInsertStmts->AddValue(file->GetId());
-        fileInsertStmts->AddValue(now);
-        fileInsertStmts->AddValue(now + lifetime);
-        fileInsertStmts->AddValue(fileSize);
+        fileInsertQueries->AddValue(file->GetId());
+        fileInsertQueries->AddValue(now);
+        fileInsertQueries->AddValue(now + lifetime);
+        fileInsertQueries->AddValue(fileSize);
 
         bytesOfFilesGen += fileSize;
 
@@ -93,17 +94,17 @@ auto CDataGenerator::CreateFilesAndReplicas(const std::uint32_t numFiles, const 
             auto r = (*selectedElementIt)->CreateReplica(file);
             r->Increase(fileSize, now);
             r->mExpiresAt = now + (lifetime / numReplicasPerFile);
-            replicaInsertStmts->AddValue(r->GetId());
-            replicaInsertStmts->AddValue(file->GetId());
-            replicaInsertStmts->AddValue((*selectedElementIt)->GetId());
-            replicaInsertStmts->AddValue(now);
-            replicaInsertStmts->AddValue(r->mExpiresAt);
+            replicaInsertQueries->AddValue(r->GetId());
+            replicaInsertQueries->AddValue(file->GetId());
+            replicaInsertQueries->AddValue((*selectedElementIt)->GetId());
+            replicaInsertQueries->AddValue(now);
+            replicaInsertQueries->AddValue(r->mExpiresAt);
             std::iter_swap(selectedElementIt, reverseRSEIt);
 			++reverseRSEIt;
         }
     }
-    COutput::GetRef().QueueInserts(std::move(fileInsertStmts));
-    COutput::GetRef().QueueInserts(std::move(replicaInsertStmts));
+    COutput::GetRef().QueueInserts(std::move(fileInsertQueries));
+    COutput::GetRef().QueueInserts(std::move(replicaInsertQueries));
     return bytesOfFilesGen;
 }
 
@@ -190,7 +191,7 @@ CTransferManager::CTransferManager(const std::uint32_t tickFreq, const TickType 
       mTickFreq(tickFreq)
 {
     mActiveTransfers.reserve(1024*1024);
-    mOutputQueryIdx = COutput::GetRef().AddPreparedSQLStatement("INSERT INTO Transfers VALUES(?, ?, ?, ?, ?);");
+    mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("INSERT INTO Transfers VALUES(?, ?, ?, ?, ?);", '?');
 }
 
 void CTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcReplica, std::shared_ptr<SReplica> dstReplica, const TickType now)
@@ -213,7 +214,7 @@ void CTransferManager::OnUpdate(const TickType now)
 
     std::size_t idx = 0;
     std::uint64_t summedTraffic = 0;
-    auto outputs = std::make_unique<CInsertStatements>(mOutputQueryIdx, 6 + mActiveTransfers.size());
+    std::unique_ptr<IInsertValuesContainer> transferInsertQueries = mOutputTransferInsertQuery->CreateValuesContainer(6 + mActiveTransfers.size());
 
     while (idx < mActiveTransfers.size())
     {
@@ -239,11 +240,11 @@ void CTransferManager::OnUpdate(const TickType now)
 
         if(dstReplica->IsComplete())
         {
-            outputs->AddValue(GetNewId());
-            outputs->AddValue(srcReplica->GetId());
-            outputs->AddValue(dstReplica->GetId());
-            outputs->AddValue(transfer.mStartTick);
-            outputs->AddValue(now);
+            transferInsertQueries->AddValue(GetNewId());
+            transferInsertQueries->AddValue(srcReplica->GetId());
+            transferInsertQueries->AddValue(dstReplica->GetId());
+            transferInsertQueries->AddValue(transfer.mStartTick);
+            transferInsertQueries->AddValue(now);
 
             ++mNumCompletedTransfers;
             mSummedTransferDuration += now - transfer.mStartTick;
@@ -257,7 +258,7 @@ void CTransferManager::OnUpdate(const TickType now)
         ++idx;
     }
 
-    COutput::GetRef().QueueInserts(std::move(outputs));
+    COutput::GetRef().QueueInserts(std::move(transferInsertQueries));
 
     mUpdateDurationSummed += std::chrono::high_resolution_clock::now() - curRealtime;
     mNextCallTick = now + mTickFreq;
@@ -282,7 +283,7 @@ CFixedTimeTransferManager::CFixedTimeTransferManager(const std::uint32_t tickFre
       mTickFreq(tickFreq)
 {
     mActiveTransfers.reserve(1024*1024);
-    mOutputQueryIdx = COutput::GetRef().AddPreparedSQLStatement("INSERT INTO Transfers VALUES(?, ?, ?, ?, ?);");
+    mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("INSERT INTO Transfers VALUES(?, ?, ?, ?, ?);", '?');
 }
 
 void CFixedTimeTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcReplica, std::shared_ptr<SReplica> dstReplica, const TickType now, const TickType duration)
@@ -307,7 +308,7 @@ void CFixedTimeTransferManager::OnUpdate(const TickType now)
 
     std::size_t idx = 0;
     std::uint64_t summedTraffic = 0;
-    auto outputs = std::make_unique<CInsertStatements>(mOutputQueryIdx, 6 + mActiveTransfers.size());
+    auto transferInsertQueries = mOutputTransferInsertQuery->CreateValuesContainer(6 + mActiveTransfers.size());
 
     while (idx < mActiveTransfers.size())
     {
@@ -331,11 +332,11 @@ void CFixedTimeTransferManager::OnUpdate(const TickType now)
 
         if(dstReplica->IsComplete())
         {
-            outputs->AddValue(GetNewId());
-            outputs->AddValue(srcReplica->GetId());
-            outputs->AddValue(dstReplica->GetId());
-            outputs->AddValue(transfer.mStartTick);
-            outputs->AddValue(now);
+            transferInsertQueries->AddValue(GetNewId());
+            transferInsertQueries->AddValue(srcReplica->GetId());
+            transferInsertQueries->AddValue(dstReplica->GetId());
+            transferInsertQueries->AddValue(transfer.mStartTick);
+            transferInsertQueries->AddValue(now);
 
             ++mNumCompletedTransfers;
             mSummedTransferDuration += now - transfer.mStartTick;
@@ -349,7 +350,7 @@ void CFixedTimeTransferManager::OnUpdate(const TickType now)
         ++idx;
     }
 
-    COutput::GetRef().QueueInserts(std::move(outputs));
+    COutput::GetRef().QueueInserts(std::move(transferInsertQueries));
 
     mUpdateDurationSummed += std::chrono::high_resolution_clock::now() - curRealtime;
     mNextCallTick = now + mTickFreq;
@@ -399,7 +400,7 @@ void CUniformTransferGen::OnUpdate(const TickType now)
     const std::uint32_t numToCreate = mTransferNumGen->GetNumToCreate(rngEngine, numActive, now);
     const std::uint32_t numToCreatePerRSE = static_cast<std::uint32_t>( numToCreate/static_cast<double>(mSrcStorageElements.size()) );
 
-    auto replicaInsertStmts = std::make_unique<CInsertStatements>(CStorageElement::mOutputQueryIdx, numToCreate * 2);
+    std::unique_ptr<IInsertValuesContainer> replicaInsertQueries = CStorageElement::outputReplicaInsertQuery->CreateValuesContainer(numToCreate * 2);
 
     std::uint32_t totalTransfersCreated = 0;
     for(CStorageElement* srcStorageElement : mSrcStorageElements)
@@ -420,11 +421,11 @@ void CUniformTransferGen::OnUpdate(const TickType now)
                 std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(file);
                 if(newReplica != nullptr)
                 {
-                    replicaInsertStmts->AddValue(newReplica->GetId());
-                    replicaInsertStmts->AddValue(file->GetId());
-                    replicaInsertStmts->AddValue(dstStorageElement->GetId());
-                    replicaInsertStmts->AddValue(now);
-                    replicaInsertStmts->AddValue(newReplica->mExpiresAt);
+                    replicaInsertQueries->AddValue(newReplica->GetId());
+                    replicaInsertQueries->AddValue(file->GetId());
+                    replicaInsertQueries->AddValue(dstStorageElement->GetId());
+                    replicaInsertQueries->AddValue(now);
+                    replicaInsertQueries->AddValue(newReplica->mExpiresAt);
                     mTransferMgr->CreateTransfer(curReplica, newReplica, now);
                     ++numCreated;
                 }
@@ -436,7 +437,7 @@ void CUniformTransferGen::OnUpdate(const TickType now)
         totalTransfersCreated += numCreated;
     }
 
-    COutput::GetRef().QueueInserts(std::move(replicaInsertStmts));
+    COutput::GetRef().QueueInserts(std::move(replicaInsertQueries));
 
     //std::cout<<"["<<now<<"]\nnumActive: "<<numActive<<"\nnumToCreate: "<<numToCreate<<"\ntotalCreated: "<<numToCreatePerRSE<<std::endl;
     mUpdateDurationSummed += std::chrono::high_resolution_clock::now() - curRealtime;
@@ -471,7 +472,7 @@ void CExponentialTransferGen::OnUpdate(const TickType now)
     const std::uint32_t numActive = static_cast<std::uint32_t>(mTransferMgr->GetNumActiveTransfers());
     const std::uint32_t numToCreate = mTransferNumGen->GetNumToCreate(rngEngine, numActive, now);
 
-    auto replicaInsertStmts = std::make_unique<CInsertStatements>(CStorageElement::mOutputQueryIdx, numToCreate * 2);
+    std::unique_ptr<IInsertValuesContainer> replicaInsertQueries = CStorageElement::outputReplicaInsertQuery->CreateValuesContainer(numToCreate * 2);
 
     for(std::uint32_t totalTransfersCreated=0; totalTransfersCreated<numToCreate; ++totalTransfersCreated)
     {
@@ -492,11 +493,11 @@ void CExponentialTransferGen::OnUpdate(const TickType now)
                     std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(file);
                     if(newReplica != nullptr)
                     {
-                        replicaInsertStmts->AddValue(newReplica->GetId());
-                        replicaInsertStmts->AddValue(file->GetId());
-                        replicaInsertStmts->AddValue(dstStorageElement->GetId());
-                        replicaInsertStmts->AddValue(now);
-                        replicaInsertStmts->AddValue(newReplica->mExpiresAt);
+                        replicaInsertQueries->AddValue(newReplica->GetId());
+                        replicaInsertQueries->AddValue(file->GetId());
+                        replicaInsertQueries->AddValue(dstStorageElement->GetId());
+                        replicaInsertQueries->AddValue(now);
+                        replicaInsertQueries->AddValue(newReplica->mExpiresAt);
                         mTransferMgr->CreateTransfer(curReplica, newReplica, now);
                         wasTransferCreated = true;
                         break;
@@ -512,7 +513,7 @@ void CExponentialTransferGen::OnUpdate(const TickType now)
         }
     }
 
-    COutput::GetRef().QueueInserts(std::move(replicaInsertStmts));
+    COutput::GetRef().QueueInserts(std::move(replicaInsertQueries));
     //std::cout<<"["<<now<<"]: numActive: "<<numActive<<"; numToCreate: "<<numToCreate<<std::endl;
 
     mUpdateDurationSummed += std::chrono::high_resolution_clock::now() - curRealtime;
@@ -548,7 +549,7 @@ void CSrcPrioTransferGen::OnUpdate(const TickType now)
     const std::uint32_t numActive = static_cast<std::uint32_t>(mTransferMgr->GetNumActiveTransfers());
     const std::uint32_t numToCreate = mTransferNumGen->GetNumToCreate(rngEngine, numActive, now);
 
-    auto replicaInsertStmts = std::make_unique<CInsertStatements>(CStorageElement::mOutputQueryIdx, numToCreate * 2);
+    std::unique_ptr<IInsertValuesContainer> replicaInsertQueries = CStorageElement::outputReplicaInsertQuery->CreateValuesContainer(numToCreate * 2);
     std::uint32_t flexCreationLimit = numToCreate;
     for(std::uint32_t totalTransfersCreated=0; totalTransfersCreated< flexCreationLimit; ++totalTransfersCreated)
     {
@@ -611,11 +612,11 @@ void CSrcPrioTransferGen::OnUpdate(const TickType now)
                     }
                 }
             }
-            replicaInsertStmts->AddValue(newReplica->GetId());
-            replicaInsertStmts->AddValue(fileToTransfer->GetId());
-            replicaInsertStmts->AddValue(dstStorageElement->GetId());
-            replicaInsertStmts->AddValue(now);
-            replicaInsertStmts->AddValue(newReplica->mExpiresAt);
+            replicaInsertQueries->AddValue(newReplica->GetId());
+            replicaInsertQueries->AddValue(fileToTransfer->GetId());
+            replicaInsertQueries->AddValue(dstStorageElement->GetId());
+            replicaInsertQueries->AddValue(now);
+            replicaInsertQueries->AddValue(newReplica->mExpiresAt);
 
             mTransferMgr->CreateTransfer(bestSrcReplica, newReplica, now);
         }
@@ -625,7 +626,7 @@ void CSrcPrioTransferGen::OnUpdate(const TickType now)
         }
     }
 
-    COutput::GetRef().QueueInserts(std::move(replicaInsertStmts));
+    COutput::GetRef().QueueInserts(std::move(replicaInsertQueries));
     //std::cout<<"["<<now<<"]: numActive: "<<numActive<<"; numToCreate: "<<numToCreate<<std::endl;
 
     mUpdateDurationSummed += std::chrono::high_resolution_clock::now() - curRealtime;
@@ -655,7 +656,7 @@ void CJobSlotTransferGen::OnUpdate(const TickType now)
     std::uniform_int_distribution<std::size_t> fileRndSelector(0, allFiles.size() - 1);
 
 
-    auto replicaInsertStmts = std::make_unique<CInsertStatements>(CStorageElement::mOutputQueryIdx, 512);
+    std::unique_ptr<IInsertValuesContainer> replicaInsertQueries = CStorageElement::outputReplicaInsertQuery->CreateValuesContainer(512);
     for(auto& dstInfo : mDstInfo)
     {
         CStorageElement* const dstStorageElement = dstInfo.first;
@@ -675,7 +676,7 @@ void CJobSlotTransferGen::OnUpdate(const TickType now)
             usedSlots += schedule[idx].second;
             idx += 1;
         }
- 
+
         assert(numMaxSlots >= usedSlots);
 
         // todo: consider mTickFreq
@@ -741,11 +742,11 @@ void CJobSlotTransferGen::OnUpdate(const TickType now)
                         }
                     }
                 }
-                replicaInsertStmts->AddValue(newReplica->GetId());
-                replicaInsertStmts->AddValue(fileToTransfer->GetId());
-                replicaInsertStmts->AddValue(dstStorageElement->GetId());
-                replicaInsertStmts->AddValue(now);
-                replicaInsertStmts->AddValue(newReplica->mExpiresAt);
+                replicaInsertQueries->AddValue(newReplica->GetId());
+                replicaInsertQueries->AddValue(fileToTransfer->GetId());
+                replicaInsertQueries->AddValue(dstStorageElement->GetId());
+                replicaInsertQueries->AddValue(now);
+                replicaInsertQueries->AddValue(newReplica->mExpiresAt);
 
                 mTransferMgr->CreateTransfer(bestSrcReplica, newReplica, now, 60);
                 newJobs.second += 1;
@@ -759,7 +760,7 @@ void CJobSlotTransferGen::OnUpdate(const TickType now)
             schedule.push_back(newJobs);
     }
 
-    COutput::GetRef().QueueInserts(std::move(replicaInsertStmts));
+    COutput::GetRef().QueueInserts(std::move(replicaInsertQueries));
     //std::cout<<"["<<now<<"]: numActive: "<<numActive<<"; numToCreate: "<<numToCreate<<std::endl;
 
     mUpdateDurationSummed += std::chrono::high_resolution_clock::now() - curRealtime;

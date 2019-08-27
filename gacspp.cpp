@@ -1,3 +1,4 @@
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -26,10 +27,11 @@ int main()
     }
 
     {
+
+        /*
         bool keepInMemory = false;
         std::filesystem::path outputBaseDirPath = std::filesystem::current_path() / "output" / "";
         std::filesystem::create_directories(outputBaseDirPath);
-
 
         std::stringstream filenameTimePrefix;
         auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
@@ -72,8 +74,8 @@ int main()
             std::cout<<"DB in memory"<<std::endl;
         if(!outputFilePath.empty())
             std::cout<<"Output file: "<<outputFilePath<<std::endl;
-
-        if(!output.Initialise(outputFilePath, keepInMemory))
+*/
+        if(!output.Initialise(""))
         {
             std::cout << "Failed initialising output component" << std::endl;
             return 1;
