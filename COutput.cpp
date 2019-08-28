@@ -4,6 +4,8 @@
 #include <iomanip>
 #include <sstream>
 
+#include <iostream>
+
 #include "constants.h"
 #include "COutput.hpp"
 #include "CDatabasePSQL.hpp"
@@ -20,12 +22,31 @@ COutput::~COutput()
     Shutdown();
 }
 
-bool COutput::Initialise(const std::string& params)
+bool COutput::Initialise(const std::string& params, const std::size_t insertQueryBufferLen)
 {
     assert(mDB == nullptr);
     mDB = std::make_shared<psql::CDatabase>();
 
-    return mDB->Open(params);
+    if(mDB->Open(params))
+    {
+        if(!mDB->BeginTransaction())
+            return false;
+
+        for(const std::string& query : mInitQueries)
+        {
+            if(!mDB->ExecuteQuery(query))
+                return false;
+        }
+
+        if(!mDB->EndTransaction())
+            return false;
+
+        mInitQueries.clear();
+        mInsertQueriesBuffer.resize(insertQueryBufferLen);
+
+        return true;
+    }
+    return false;
 }
 
 bool COutput::StartConsumer()
@@ -45,7 +66,17 @@ void COutput::Shutdown()
     if(mConsumerThread.joinable())
         mConsumerThread.join();
 
-    mDB->Close();
+    if(mDB)
+    {
+        mDB->BeginTransaction();
+        for(const std::string& query : mShutdownQueries)
+            mDB->ExecuteQuery(query);
+        mDB->EndTransaction();
+        mShutdownQueries.clear();
+
+        mDB->Close();
+        mDB = nullptr;
+    }
 }
 
 auto COutput::CreatePreparedInsert(const std::string& queryTpl, char wildcard) -> std::shared_ptr<IPreparedInsert>
@@ -91,12 +122,13 @@ bool COutput::InsertRow(const std::string& tableName, const std::vector<std::str
 void COutput::QueueInserts(std::unique_ptr<IInsertValuesContainer>&& queriesContainer)
 {
     assert(queriesContainer != nullptr);
+    const std::size_t bufLen = mInsertQueriesBuffer.size();
 
-    std::size_t newProducerIdx = (mProducerIdx + 1) % OUTPUT_BUF_SIZE;
+    std::size_t newProducerIdx = (mProducerIdx + 1) % bufLen;
     while(newProducerIdx == mConsumerIdx)
     {
         assert(mIsConsumerRunning);
-        newProducerIdx = (mProducerIdx + 1) % OUTPUT_BUF_SIZE;
+        newProducerIdx = (mProducerIdx + 1) % bufLen;
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     mInsertQueriesBuffer[mProducerIdx] = std::move(queriesContainer);
@@ -107,31 +139,18 @@ void COutput::ConsumerThread()
 {
     mDB->BeginTransaction();
 
-    std::size_t numInsertedCurTransaction = 0;
+    const std::size_t bufLen = mInsertQueriesBuffer.size();
     while(mIsConsumerRunning || (mConsumerIdx != mProducerIdx))
     {
         while(mConsumerIdx != mProducerIdx)
         {
-            if(numInsertedCurTransaction > 25000)
-            {
-                mDB->CommitAndBeginTransaction();
-                numInsertedCurTransaction = 0;
-            }
-
-            numInsertedCurTransaction += mInsertQueriesBuffer[mConsumerIdx]->InsertValues();
+            mInsertQueriesBuffer[mConsumerIdx]->InsertValues();
 
             mInsertQueriesBuffer[mConsumerIdx] = nullptr;
-            mConsumerIdx = (mConsumerIdx + 1) % OUTPUT_BUF_SIZE;
+            mConsumerIdx = (mConsumerIdx + 1) % bufLen;
         }
 
-        // try to use time while buf is empty by commiting the transactionn
-        if(numInsertedCurTransaction > 1000)
-        {
-            mDB->CommitAndBeginTransaction();
-            numInsertedCurTransaction = 0;
-        }
-        else
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
 
     mDB->EndTransaction();

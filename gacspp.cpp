@@ -14,68 +14,62 @@ int main()
 {
     COutput& output = COutput::GetRef();
 
+    const std::filesystem::path configDirPath = std::filesystem::current_path() / "config";
     nlohmann::json configJson;
     {
-        const std::string configFilePath(std::filesystem::current_path() / "config" / "simconfig.json");
-        std::ifstream configFileStream(configFilePath);
+        const std::filesystem::path baseConfigFilePath = configDirPath / "simconfig.json";
+        std::ifstream configFileStream(baseConfigFilePath.string());
         if(!configFileStream)
-        {
-            std::cout << "Unable to locate config file: " << configFilePath << std::endl;
-        }
+            std::cout << "Unable to locate config file: " << baseConfigFilePath << std::endl;
         else
             configFileStream >> configJson;
     }
 
     {
-
-        /*
-        bool keepInMemory = false;
-        std::filesystem::path outputBaseDirPath = std::filesystem::current_path() / "output" / "";
-        std::filesystem::create_directories(outputBaseDirPath);
-
-        std::stringstream filenameTimePrefix;
-        auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-        filenameTimePrefix << std::put_time(std::localtime(&now), "%y%j_%H%M%S");
-
-        std::string outputFilename;
-
+        std::size_t insertQueryBufferLen = 250000;
+        std::string dbConnString;
+        std::filesystem::path dbInitFilePath;
         auto outputConfig = configJson.find("output");
         if(outputConfig != configJson.end())
         {
-            auto prop = outputConfig->find("keepInMemory");
+            auto prop = outputConfig->find("dbConnString");
             if(prop != outputConfig->end())
-                if(prop->is_boolean())
-                    keepInMemory = prop->get<bool>();
+                dbConnString = prop->get<std::string>();
 
-            prop = outputConfig->find("baseDirPath");
+            prop = outputConfig->find("dbInitFileName");
             if(prop != outputConfig->end())
-            {
-                outputBaseDirPath = prop->get<std::string>();
-                outputBaseDirPath /= "";
-            }
+                dbInitFilePath = (configDirPath / prop->get<std::string>());
 
-            prop = outputConfig->find("filenamePrefix");
+            prop = outputConfig->find("insertQueryBufferLen");
             if(prop != outputConfig->end())
-                filenameTimePrefix.str(prop->get<std::string>());
-
-            prop = outputConfig->find("filename");
-            if(prop != outputConfig->end())
-                outputFilename = prop->get<std::string>();
+                insertQueryBufferLen = prop->get<std::size_t>();
         }
 
-        std::filesystem::path outputFilePath;
-        if(!outputFilename.empty())
+        if(!dbInitFilePath.empty())
         {
-            keepInMemory = true;
-            outputFilePath = outputBaseDirPath / (filenameTimePrefix.str() + outputFilename);
-        }
+            nlohmann::json dbInitJson;
+            std::ifstream dbInitFileStream(dbInitFilePath.string());
+            if(!dbInitFileStream)
+                std::cout << "Unable to open db init file: " << dbInitFilePath << std::endl;
+            else
+                dbInitFileStream >> dbInitJson;
 
-        if (keepInMemory)
-            std::cout<<"DB in memory"<<std::endl;
-        if(!outputFilePath.empty())
-            std::cout<<"Output file: "<<outputFilePath<<std::endl;
-*/
-        if(!output.Initialise(""))
+            for(auto& [key, value] : dbInitJson.items())
+            {
+                std::vector<std::string>* container = nullptr;
+                if(key == "init")
+                    container = &(output.mInitQueries);
+                else if(key == "shutdown")
+                    container = &(output.mShutdownQueries);
+                else
+                    continue;
+
+                for(auto& query : value)
+                    container->emplace_back(query.get<std::string>());
+            }
+        }
+        
+        if(!output.Initialise(dbConnString, insertQueryBufferLen))
         {
             std::cout << "Failed initialising output component" << std::endl;
             return 1;
@@ -90,12 +84,16 @@ int main()
     }
     std::cout<<"MaxTick="<<maxTick<<std::endl;
 
+    std::cout<<"Setting up sim..."<<std::endl;
     //auto sim = std::make_unique<CSimpleSim>();
     auto sim = std::make_unique<CAdvancedSim>();
     sim->SetupDefaults();
 
+    std::cout<<"Running sim..."<<std::endl;
     output.StartConsumer();
     sim->Run(maxTick);
+
+    std::cout<<"Finalising database..."<<std::endl;
     output.Shutdown();
 
 	int a;

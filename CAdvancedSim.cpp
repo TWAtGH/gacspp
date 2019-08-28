@@ -21,44 +21,9 @@ void CAdvancedSim::SetupDefaults()
     // init output db
     ////////////////////////////
     std::stringstream dbIn;
-    bool ok = false;
+    bool ok = true;
 
-    ok = output.CreateTable("Sites", "id BIGINT PRIMARY KEY, name varchar(64), locationName varchar(32), cloudName varchar(32)");
-    assert(ok);
-
-    ok = output.CreateTable("StorageElements", "id BIGINT PRIMARY KEY, siteId BIGINT, name varchar(64), FOREIGN KEY(siteId) REFERENCES Sites(id)");
-    assert(ok);
-
-    ok = output.CreateTable("LinkSelectors", "id BIGINT PRIMARY KEY, srcSiteId BIGINT, dstSiteId BIGINT, FOREIGN KEY(srcSiteId) REFERENCES Sites(id), FOREIGN KEY(dstSiteId) REFERENCES Sites(id)");
-    assert(ok);
-
-    ok = output.CreateTable("Files", "id BIGINT PRIMARY KEY, createdAt BIGINT, expiredAt BIGINT, filesize INTEGER");
-    assert(ok);
-
-    dbIn.str(std::string());
-    dbIn << "id BIGINT PRIMARY KEY,"
-         << "fileId BIGINT,"
-         << "storageElementId BIGINT,"
-         << "createdAt BIGINT,"
-         << "expiredAt BIGINT,"
-         << "FOREIGN KEY(fileId) REFERENCES Files(id),"
-         << "FOREIGN KEY(storageElementId) REFERENCES StorageElements(id)";
-    ok = output.CreateTable("Replicas", dbIn.str());
-    assert(ok);
-
-    dbIn.str(std::string());
-    dbIn << "id BIGINT PRIMARY KEY,"
-         << "srcReplicaId BIGINT,"
-         << "dstReplicaId BIGINT,"
-         << "startTick BIGINT,"
-         << "endTick BIGINT,"
-         << "FOREIGN KEY(srcReplicaId) REFERENCES Replicas(id),"
-         << "FOREIGN KEY(dstReplicaId) REFERENCES Replicas(id)";
-    ok = output.CreateTable("Transfers", dbIn.str());
-    assert(ok);
-
-    //CStorageElement::mOutputQueryIdx = output.AddPreparedSQLStatement("INSERT INTO Replicas VALUES(?, ?, ?, ?, ?);");
-    CStorageElement::outputReplicaInsertQuery = output.CreatePreparedInsert("INSERT INTO Replicas VALUES(?, ?, ?, ?, ?);", '?');
+    CStorageElement::outputReplicaInsertQuery = output.CreatePreparedInsert("INSERT INTO Replicas VALUES(?, ?, ?, ?, ?)", '?');
 
 
     ////////////////////////////

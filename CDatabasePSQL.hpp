@@ -26,6 +26,7 @@ public:
     ~CResult();
 
     operator bool() const;
+    std::string str() const;
 };
 
 class CDatabase;

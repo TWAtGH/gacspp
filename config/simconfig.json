@@ -1,6 +1,9 @@
 {
 "output": {
+    "queryBufferLen": 2000000,
     "keepInMemory": true,
-    "filename": "-output.db"
+    "filename": "-output.db",
+    "dbConnString": "dbname=gacspp user=postgres password=xxx",
+    "dbInitFileName": "psql_init_default.json"
     }
 }

@@ -3,6 +3,8 @@
 
 #include "CDatabasePSQL.hpp"
 
+#include <iostream>
+
 namespace psql
 {
 
@@ -38,6 +40,11 @@ CResult::operator bool() const
             return true;
     }
     return false;
+}
+
+std::string CResult::str() const
+{
+    return std::string(PQresultErrorMessage(mResult));
 }
 
 
@@ -94,6 +101,8 @@ auto CInsertValuesContainer::InsertValues() -> std::size_t
     if(mValues.empty() && (mNumParameters == 0))
     {
         CResult res(PQexecPrepared(dbConnection, mID.c_str(), 0, nullptr, nullptr, nullptr, 0));
+        if(!res)
+            std::cout<<"Insertion of row failed:"<<std::endl<<res.str()<<std::endl;
         return 1;
     }
 
@@ -101,11 +110,18 @@ auto CInsertValuesContainer::InsertValues() -> std::size_t
     assert((mValues.size() % mNumParameters) == 0);
 
     std::vector<const char*> paramValues(mNumParameters);
-    for(std::size_t i=0; i<mValues.size(); ++i)
+    for(std::size_t i=0; i<mValues.size(); i+=mNumParameters)
     {
         for(std::size_t j=0; j<mNumParameters; ++j)
-            paramValues.push_back(mValues[i+j].c_str());
+            paramValues[j] = mValues[i+j].c_str();
         CResult res(PQexecPrepared(dbConnection, mID.c_str(), mNumParameters, paramValues.data(), nullptr, nullptr, 0));
+        if(!res)
+        {
+            std::cout<<"Insertion of row failed: VALUES("<<paramValues[0];
+            for(std::size_t j=1; j<mNumParameters; ++j)
+                std::cout << ", " << paramValues[j];
+            std::cout<<std::endl<<res.str()<<std::endl;
+        }
     }
 
     return (mValues.size() / mNumParameters);
@@ -146,6 +162,8 @@ bool CDatabase::Close()
 bool CDatabase::ExecuteQuery(const std::string& query)
 {
     CResult res(PQexec(mConnection, query.c_str()));
+    if(!res)
+        std::cout<<"Query failed:"<<std::endl<<query<<std::endl<<res.str()<<std::endl;
     return (res == true);
 }
 
@@ -167,8 +185,11 @@ auto CDatabase::PrepareInsert(const std::shared_ptr<IDatabase>& db, const std::s
     }
 
     std::shared_ptr<CPreparedInsert> preparedInsert;
-    if(CResult(PQprepare(mConnection, id.c_str(), queryTplStream.str().c_str(), numParameters, nullptr)))
+    CResult res(PQprepare(mConnection, id.c_str(), queryTplStream.str().c_str(), numParameters, nullptr));
+    if(res)
         preparedInsert = std::make_shared<CPreparedInsert>(db, std::move(id), numParameters);
+    else
+        std::cout<<"Preparing query failed:"<<std::endl<<queryTplStream.str()<<std::endl<<res.str()<<std::endl;
 
     return preparedInsert;
 }

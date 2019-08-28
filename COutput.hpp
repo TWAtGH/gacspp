@@ -9,7 +9,6 @@
 #include "IDatabase.hpp"
 
 
-#define OUTPUT_BUF_SIZE 8192
 
 class COutput
 {
@@ -21,11 +20,14 @@ private:
 
     std::atomic_size_t mConsumerIdx = 0;
     std::atomic_size_t mProducerIdx = 0;
-    std::unique_ptr<IInsertValuesContainer> mInsertQueriesBuffer[OUTPUT_BUF_SIZE];
+    std::vector<std::unique_ptr<IInsertValuesContainer>> mInsertQueriesBuffer;
 
     std::shared_ptr<IDatabase> mDB;
 
 public:
+    std::vector<std::string> mInitQueries;
+    std::vector<std::string> mShutdownQueries;
+
     COutput(const COutput&) = delete;
     COutput& operator=(const COutput&) = delete;
     COutput(const COutput&&) = delete;
@@ -35,7 +37,7 @@ public:
 
     static auto GetRef() -> COutput&;
 
-    bool Initialise(const std::string& options);
+    bool Initialise(const std::string& options, const std::size_t insertQueryBufferLen);
     bool StartConsumer();
     void Shutdown();
 
