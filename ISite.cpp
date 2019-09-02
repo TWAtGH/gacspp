@@ -7,11 +7,10 @@
 
 
 
-ISite::ISite(const std::uint32_t multiLocationIdx, std::string&& name, std::string&& locationName)
+ISite::ISite(std::string&& name, std::string&& locationName)
 	: mId(GetNewId()),
       mName(std::move(name)),
-      mLocationName(std::move(locationName)),
-      mMultiLocationIdx(multiLocationIdx)
+      mLocationName(std::move(locationName))
 {}
 
 ISite::~ISite() = default;

@@ -9,12 +9,6 @@
 
 
 
-CGridSite::CGridSite(const std::uint32_t multiLocationIdx, std::string&& name, std::string&& locationName)
-	: ISite(multiLocationIdx, std::move(name), std::move(locationName))
-{
-	mStorageElements.reserve(8);
-}
-
 auto CGridSite::CreateStorageElement(std::string&& name) -> CStorageElement*
 {
     CStorageElement* newStorageElement = new CStorageElement(std::move(name), this);
@@ -45,9 +39,9 @@ auto CRucio::CreateFile(const std::uint32_t size, const TickType expiresAt) -> S
     mFiles.emplace_back(newFile);
     return newFile;
 }
-auto CRucio::CreateGridSite(const std::uint32_t multiLocationIdx, std::string&& name, std::string&& locationName) -> CGridSite*
+auto CRucio::CreateGridSite(std::string&& name, std::string&& locationName) -> CGridSite*
 {
-    CGridSite* newSite = new CGridSite(multiLocationIdx, std::move(name), std::move(locationName));
+    CGridSite* newSite = new CGridSite(std::move(name), std::move(locationName));
     mGridSites.emplace_back(newSite);
     return newSite;
 }
@@ -151,27 +145,21 @@ bool CRucio::TryConsumeConfig(const json& json)
         {
             for(const auto& siteJson : value)
             {
-                std::unique_ptr<std::uint32_t> multiLocationIdx;
                 std::string siteName, siteLocation;
                 nlohmann::json storageElementsJson;
+                std::unordered_map<std::string, std::string> customConfig;
                 for(const auto& [siteJsonKey, siteJsonValue] : siteJson.items())
                 {
-                    if(siteJsonKey == "multiLocationIdx")
-                        multiLocationIdx = std::make_unique<std::uint32_t>(siteJsonValue.get<std::uint32_t>());
-                    else if(siteJsonKey == "name")
+                    if(siteJsonKey == "name")
                         siteName = siteJsonValue.get<std::string>();
                     else if(siteJsonKey == "location")
                         siteLocation = siteJsonValue.get<std::string>();
                     else if(siteJsonKey == "storageElements")
                         storageElementsJson = siteJsonValue;
+                    else if(siteJsonValue.type() == json::value_t::string)
+                        customConfig[siteJsonKey.get<std::string>()] = siteJsonValue.get<std::string>();
                     else
-                        std::cout << "Ignoring unknown attribute while loading sites: " << siteJsonKey << std::endl;
-                }
-
-                if(multiLocationIdx == nullptr)
-                {
-                    std::cout << "Couldn't find multiLocationIdx attribute of site" << std::endl;
-                    continue;
+                        customConfig[siteJsonKey.get<std::string>()] = siteJsonValue.dump();
                 }
 
                 if (siteName.empty())
@@ -187,7 +175,8 @@ bool CRucio::TryConsumeConfig(const json& json)
                 }
 
                 std::cout << "Adding site " << siteName << " in " << siteLocation << std::endl;
-                CGridSite *site = CreateGridSite(*multiLocationIdx, std::move(siteName), std::move(siteLocation));
+                CGridSite *site = CreateGridSite(std::move(siteName), std::move(siteLocation));
+                site->mCustomConfig = std::move(customConfig);
 
                 if (storageElementsJson.empty())
                 {

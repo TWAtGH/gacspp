@@ -139,6 +139,10 @@ auto CPreparedInsert::CreateValuesContainer(std::size_t numReserveValues) -> std
 }
 
 
+CDatabase::~CDatabase()
+{
+    Close();
+}
 
 bool CDatabase::Open(const std::string& params)
 {

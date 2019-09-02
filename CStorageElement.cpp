@@ -15,6 +15,13 @@ CStorageElement::CStorageElement(std::string&& name, ISite* const site)
 	  mSite(site)
 {}
 
+CStorageElement::~CStorageElement() = default;
+
+void CStorageElement::OnOperation(const OPERATION op)
+{
+    (void)op;
+}
+
 auto CStorageElement::CreateReplica(SFile* const file) -> std::shared_ptr<SReplica>
 {
     const auto result = mFileIds.insert(file->GetId());

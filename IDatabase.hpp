@@ -17,6 +17,8 @@ public:
         : mDB(db)
     {}
 
+    virtual ~IInsertValuesContainer() = default;
+
     virtual void AddValue(double value) = 0;
     virtual void AddValue(int value) = 0;
     virtual void AddValue(std::uint32_t value) = 0;
@@ -38,6 +40,8 @@ public:
         : mDB(db), mNumParameters(numParameters)
     {}
 
+    virtual ~IPreparedInsert() = default;
+
     virtual auto CreateValuesContainer(std::size_t numReserveValues=0) -> std::unique_ptr<IInsertValuesContainer> = 0;
 
     auto GetNumParameters() const -> std::size_t
@@ -47,6 +51,8 @@ public:
 class IDatabase
 {
 public:
+    virtual ~IDatabase() = default;
+
     virtual bool Open(const std::string& params) = 0;
     virtual bool Close() = 0;
 

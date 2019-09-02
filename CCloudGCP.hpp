@@ -13,12 +13,16 @@ namespace gcp
 	private:
         CRegion* mRegion;
         TickType mTimeLastCostUpdate = 0;
-        double mCosts = 0;
+        double mStorageCosts = 0;
+        double mOperationCosts = 0;
 
 	public:
 
 		CBucket(std::string&& name, CRegion* region);
 		CBucket(CBucket&&) = default;
+
+        virtual void OnOperation(const CStorageElement::OPERATION op) final;
+
 		virtual void OnIncreaseReplica(std::uint64_t amount, TickType now) final;
 		virtual void OnRemoveReplica(const SReplica* replica, TickType now) final;
 
@@ -29,7 +33,7 @@ namespace gcp
 	{
 	public:
 
-		CRegion(const std::uint32_t multiLocationIdx, std::string&& name, std::string&& locationName, const std::uint32_t numJobSlots, const double storagePrice, std::string&& skuId);
+		CRegion(std::string&& name, std::string&& locationName, const std::uint32_t multiLocationIdx, const double storagePrice, std::string&& skuId);
 
 		auto CreateStorageElement(std::string&& name) -> CBucket* final;
 		double CalculateStorageCosts(TickType now);
@@ -43,9 +47,6 @@ namespace gcp
     private:
 		std::string mSKUId;
 		double mStoragePrice = 0;
-
-    public:
-        std::uint32_t mNumJobSlots = 0;
 	};
 
 	class CCloud final : public IBaseCloud

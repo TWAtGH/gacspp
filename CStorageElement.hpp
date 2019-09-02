@@ -19,6 +19,15 @@ class IPreparedInsert;
 class CStorageElement
 {
 public:
+    enum OPERATION
+    {
+        INSERT,
+        GET,
+        CREATE_TRANSFER,
+        DELETE,
+        CUSTOM
+    };
+
     static std::shared_ptr<IPreparedInsert> outputReplicaInsertQuery;
 
 	CStorageElement(std::string&& name, ISite* const site);
@@ -28,8 +37,12 @@ public:
     CStorageElement(CStorageElement const&) = delete;
     CStorageElement& operator=(CStorageElement const&) = delete;
 
-	auto CreateReplica(SFile* file) -> std::shared_ptr<SReplica>;
+    virtual ~CStorageElement();
 
+
+    virtual void OnOperation(const OPERATION op);
+
+	virtual auto CreateReplica(SFile* file) -> std::shared_ptr<SReplica>;
     virtual void OnIncreaseReplica(const std::uint64_t amount, const TickType now);
     virtual void OnRemoveReplica(const SReplica* replica, const TickType now, bool needLock=true);
 

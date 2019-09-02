@@ -69,8 +69,9 @@ private:
     PGconn* mConnection;
     std::size_t mNumPreparerdQueries = 0;
 
-
 public:
+    ~CDatabase();
+    
     virtual bool Open(const std::string& params);
     virtual bool Close();
 

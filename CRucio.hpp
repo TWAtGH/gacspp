@@ -20,9 +20,11 @@ struct SFile;
 class CGridSite : public ISite
 {
 public:
+    using ISite::ISite;
+
 	std::vector<std::unique_ptr<CStorageElement>> mStorageElements;
 
-	CGridSite(const std::uint32_t multiLocationIdx, std::string&& name, std::string&& locationName);
+	CGridSite(std::string&& name, std::string&& locationName);
 	CGridSite(CGridSite&&) = default;
 	CGridSite& operator=(CGridSite&&) = default;
 
@@ -53,7 +55,7 @@ public:
     ~CRucio();
 
     auto CreateFile(const std::uint32_t size, const TickType expiresAt) -> SFile*;
-    auto CreateGridSite(const std::uint32_t multiLocationIdx, std::string&& name, std::string&& locationName) -> CGridSite*;
+    auto CreateGridSite(std::string&& name, std::string&& locationName) -> CGridSite*;
     auto RunReaper(const TickType now) -> std::size_t;
     void ReaperWorker(const std::size_t threadIdx);
 
