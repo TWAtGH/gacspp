@@ -55,7 +55,7 @@ public:
     ~CRucio();
 
     auto CreateFile(const std::uint32_t size, const TickType expiresAt) -> SFile*;
-    auto CreateGridSite(std::string&& name, std::string&& locationName) -> CGridSite*;
+    auto CreateGridSite(std::string&& name, std::string&& locationName, const std::uint8_t multiLocationIdx) -> CGridSite*;
     auto RunReaper(const TickType now) -> std::size_t;
     void ReaperWorker(const std::size_t threadIdx);
 

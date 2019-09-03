@@ -21,7 +21,7 @@ class CStorageElement;
 class ISite
 {
 public:
-	ISite(std::string&& name, std::string&& locationName);
+	ISite(std::string&& name, std::string&& locationName, const std::uint8_t multiLocationIdx);
 	virtual ~ISite();
 
 	ISite(ISite&&) = default;
@@ -46,6 +46,8 @@ public:
     {return mName;}
     inline auto GetLocationName() const -> const std::string&
     {return mLocationName;}
+    inline auto GetMultiLocationIdx() const -> std::uint8_t
+    {return mMultiLocationIdx;}
 
     std::vector<std::unique_ptr<CLinkSelector>> mLinkSelectors;
 
@@ -53,6 +55,7 @@ private:
 	IdType mId;
     std::string mName;
     std::string mLocationName;
+    std::uint8_t mMultiLocationIdx;
 
 protected:
 	std::unordered_map<IdType, std::size_t> mDstSiteIdToLinkSelectorIdx;

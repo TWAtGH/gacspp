@@ -33,7 +33,7 @@ namespace gcp
 	{
 	public:
 
-		CRegion(std::string&& name, std::string&& locationName, const std::uint32_t multiLocationIdx, const double storagePrice, std::string&& skuId);
+		CRegion(std::string&& name, std::string&& locationName, const std::uint8_t multiLocationIdx, const double storagePrice, std::string&& skuId);
 
 		auto CreateStorageElement(std::string&& name) -> CBucket* final;
 		double CalculateStorageCosts(TickType now);
@@ -54,10 +54,9 @@ namespace gcp
 	public:
 		using IBaseCloud::IBaseCloud;
 
-		auto CreateRegion(const std::uint32_t multiLocationIdx,
-                          std::string&& name,
+		auto CreateRegion(std::string&& name,
                           std::string&& locationName,
-                          const std::uint32_t numJobSlots,
+                          const std::uint8_t multiLocationIdx,
                           const double storagePrice,
                           std::string&& skuId) -> CRegion* final;
 
