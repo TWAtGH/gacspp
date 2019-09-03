@@ -64,15 +64,22 @@ void COutput::Shutdown()
 {
     mIsConsumerRunning = false;
     if(mConsumerThread.joinable())
-        mConsumerThread.join();
+	{
+		std::cout << "Waiting for last inserts..." << std::endl;
+		mConsumerThread.join();
+	}
 
     if(mDB)
     {
-        mDB->BeginTransaction();
-        for(const std::string& query : mShutdownQueries)
-            mDB->ExecuteQuery(query);
-        mDB->EndTransaction();
-        mShutdownQueries.clear();
+		if(!mShutdownQueries.empty())
+		{
+			std::cout << "Executing post sim queries..." << std::endl;
+			mDB->BeginTransaction();
+			for(const std::string& query : mShutdownQueries)
+				mDB->ExecuteQuery(query);
+			mDB->EndTransaction();
+			mShutdownQueries.clear();
+		}
 
         mDB->Close();
         mDB = nullptr;

@@ -3,7 +3,7 @@
     "insertQueryBufferLen": 8192,
     "keepInMemory": true,
     "filename": "-output.db",
-    "dbConnString": "dbname=gacspp user=postgres password=xxx",
+    "dbConnectionFile": "psql_connection.json",
     "dbInitFileName": "psql_init_default.json"
     }
 }

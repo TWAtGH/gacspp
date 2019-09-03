@@ -144,7 +144,7 @@ void CAdvancedSim::SetupDefaults()
         {
             x2cTransferGen->mSrcStorageElementIdToPrio[bucket->GetId()] = 1;
             //x2cTransferGen->mDstStorageElements.push_back(bucket.get());
-            CJobSlotTransferGen::SJobSlotInfo jobslot = {std::stoi(region->mCustomConfig["numJobSlots"]), {}};
+            CJobSlotTransferGen::SJobSlotInfo jobslot = {static_cast<std::uint32_t>(std::stoi(region->mCustomConfig["numJobSlots"])), {}};
             x2cTransferGen->mDstInfo.push_back( std::make_pair(bucket.get(), jobslot) );
         }
     }

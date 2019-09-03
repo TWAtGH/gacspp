@@ -28,14 +28,23 @@ int main()
 
     {
         std::size_t insertQueryBufferLen = 250000;
-        std::string dbConnString;
+        std::string dbConnectionString;
         std::filesystem::path dbInitFilePath;
         auto outputConfig = configJson.find("output");
         if(outputConfig != configJson.end())
         {
-            auto prop = outputConfig->find("dbConnString");
+            auto prop = outputConfig->find("dbConnectionFile");
             if(prop != outputConfig->end())
-                dbConnString = prop->get<std::string>();
+			{
+				const std::filesystem::path dbConnectionFilePath = (configDirPath / prop->get<std::string>());
+				std::ifstream dbConnectionFileStream(dbConnectionFilePath.string());
+				nlohmann::json dbConnectionFileJson;
+				if (!dbConnectionFileStream)
+					std::cout << "Unable to locate db connection file: " << dbConnectionFilePath.string() << std::endl;
+				else
+					dbConnectionFileStream >> dbConnectionFileJson;
+				dbConnectionString = dbConnectionFileJson["connectionStr"].get<std::string>();
+			}
 
             prop = outputConfig->find("dbInitFileName");
             if(prop != outputConfig->end())
@@ -70,7 +79,7 @@ int main()
             }
         }
 
-        if(!output.Initialise(dbConnString, insertQueryBufferLen))
+        if(!output.Initialise(dbConnectionString, insertQueryBufferLen))
         {
             std::cout << "Failed initialising output component" << std::endl;
             return 1;
