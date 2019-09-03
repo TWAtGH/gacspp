@@ -7,6 +7,19 @@
 
 namespace gcp
 {
+    class CCloudBill : public ICloudBill
+    {
+    private:
+        double mStorageCost;
+        double mNetworkCost;
+        double mTraffic;
+        double mOperationCost;
+
+    public:
+        CCloudBill(double storageCost, double networkCost, double traffic, double operationCost);
+        virtual std::string ToString() const final;
+    };
+
 	class CRegion;
 	class CBucket : public CStorageElement
 	{
@@ -27,6 +40,7 @@ namespace gcp
 		virtual void OnRemoveReplica(const SReplica* replica, TickType now) final;
 
 		double CalculateStorageCosts(TickType now);
+        double CalculateOperationCosts(TickType now);
 	};
 
 	class CRegion : public ISite
@@ -37,6 +51,7 @@ namespace gcp
 
 		auto CreateStorageElement(std::string&& name) -> CBucket* final;
 		double CalculateStorageCosts(TickType now);
+		double CalculateOperationCosts(TickType now);
 		double CalculateNetworkCosts(double& sumUsedTraffic, std::uint64_t& sumDoneTransfers);
 
 		inline auto GetStoragePrice() const -> double
@@ -60,7 +75,7 @@ namespace gcp
                           const double storagePrice,
                           std::string&& skuId) -> CRegion* final;
 
-		auto ProcessBilling(TickType now) -> std::pair<double, std::pair<double, double>> final;
+		auto ProcessBilling(TickType now) -> std::unique_ptr<ICloudBill> final;
 		void SetupDefaultCloud() final;
 
         bool TryConsumeConfig(const nlohmann::json& json) final;

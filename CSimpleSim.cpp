@@ -51,7 +51,7 @@ void CSimpleSim::SetupDefaults()
     assert(ok);
 
     //CStorageElement::mOutputQueryIdx = output.AddPreparedSQLStatement("INSERT INTO Replicas VALUES(?, ?);");
-    CStorageElement::outputReplicaInsertQuery = output.CreatePreparedInsert("INSERT INTO Replicas VALUES(?, ?);", '?');
+    CStorageElement::outputReplicaInsertQuery = output.CreatePreparedInsert("INSERT INTO Replicas VALUES(?, ?);", 2, '?');
 
 
     ////////////////////////////

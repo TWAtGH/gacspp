@@ -12,6 +12,7 @@
 
 int main()
 {
+    const auto startTime = std::chrono::high_resolution_clock::now();
     COutput& output = COutput::GetRef();
 
     const std::filesystem::path configDirPath = std::filesystem::current_path() / "config";
@@ -68,7 +69,7 @@ int main()
                     container->emplace_back(query.get<std::string>());
             }
         }
-        
+
         if(!output.Initialise(dbConnString, insertQueryBufferLen))
         {
             std::cout << "Failed initialising output component" << std::endl;
@@ -95,6 +96,9 @@ int main()
 
     std::cout<<"Finalising database..."<<std::endl;
     output.Shutdown();
+
+    const auto runTime = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - startTime);
+    std::cout<<"Simulation took "<<runTime.count()<<"s"<<std::endl;
 
 	int a;
 	std::cin >> a;

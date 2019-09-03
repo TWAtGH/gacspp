@@ -21,7 +21,8 @@ CDataGenerator::CDataGenerator(IBaseSim* sim, const std::uint32_t tickFreq, cons
       mSim(sim),
       mTickFreq(tickFreq)
 {
-    mOutputFileInsertQuery = COutput::GetRef().CreatePreparedInsert("INSERT INTO Files VALUES(?, ?, ?, ?);", '?');
+    //mOutputFileInsertQuery = COutput::GetRef().CreatePreparedInsert("INSERT INTO Files VALUES(?, ?, ?, ?);", '?');
+    mOutputFileInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Files(id, createdAt, expiredAt, filesize) FROM STDIN with(FORMAT csv);", 4, '?');
 }
 
 void CDataGenerator::OnUpdate(const TickType now)
@@ -145,7 +146,7 @@ void CBillingGenerator::OnUpdate(const TickType now)
     summary << caption << std::endl;
     summary << std::string(caption.length(), '=') << std::endl;
 
-    summary << "-Grid2Cloud Link Stats-" << std::endl;
+    summary << "-Grid2Cloud Number of transfers per link-" << std::endl;
     for(auto& srcGridSite : mSim->mRucio->mGridSites)
     {
         summary << srcGridSite->GetName() << std::endl;
@@ -161,11 +162,8 @@ void CBillingGenerator::OnUpdate(const TickType now)
     for(auto& cloud : mSim->mClouds)
     {
         summary << std::endl;
-        summary<<cloud->GetName()<<" - Billing for Month "<<SECONDS_TO_MONTHS(now)<<":\n";
-        auto res = cloud->ProcessBilling(now);
-        summary << "\tStorage: " << res.first << " CHF" << std::endl;
-        summary << "\tNetwork: " << res.second.first << " CHF" << std::endl;
-        summary << "\tNetwork: " << res.second.second << " GiB" << std::endl;
+        summary<<cloud->GetName()<<" - Billing for Month "<<static_cast<std::uint32_t>(SECONDS_TO_MONTHS(now))<<":\n";
+        summary << cloud->ProcessBilling(now)->ToString();
     }
 
     summary << std::string(caption.length(), '=') << std::endl;
@@ -191,13 +189,15 @@ CTransferManager::CTransferManager(const std::uint32_t tickFreq, const TickType 
       mTickFreq(tickFreq)
 {
     mActiveTransfers.reserve(1024*1024);
-    mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("INSERT INTO Transfers VALUES(?, ?, ?, ?, ?);", '?');
+    //mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("INSERT INTO Transfers VALUES(?, ?, ?, ?, ?);", '?');
+    mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Transfers(id, srcReplicaId, dstReplicaId, startTick, endTick) FROM STDIN with(FORMAT csv);", 5, '?');
 }
 
 void CTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcReplica, std::shared_ptr<SReplica> dstReplica, const TickType now)
 {
     assert(mActiveTransfers.size() < mActiveTransfers.capacity());
 
+    srcReplica->GetStorageElement()->OnOperation(CStorageElement::GET);
     ISite* const srcSite = srcReplica->GetStorageElement()->GetSite();
     ISite* const dstSite = dstReplica->GetStorageElement()->GetSite();
     CLinkSelector* const linkSelector = srcSite->GetLinkSelector(dstSite);
@@ -283,13 +283,15 @@ CFixedTimeTransferManager::CFixedTimeTransferManager(const std::uint32_t tickFre
       mTickFreq(tickFreq)
 {
     mActiveTransfers.reserve(1024*1024);
-    mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("INSERT INTO Transfers VALUES(?, ?, ?, ?, ?);", '?');
+    //mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("INSERT INTO Transfers VALUES(?, ?, ?, ?, ?);", '?');
+    mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Transfers(id, srcReplicaId, dstReplicaId, startTick, endTick) FROM STDIN with(FORMAT csv);", 5, '?');
 }
 
 void CFixedTimeTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcReplica, std::shared_ptr<SReplica> dstReplica, const TickType now, const TickType duration)
 {
     assert(mActiveTransfers.size() < mActiveTransfers.capacity());
 
+    srcReplica->GetStorageElement()->OnOperation(CStorageElement::GET);
     ISite* const srcSite = srcReplica->GetStorageElement()->GetSite();
     ISite* const dstSite = dstReplica->GetStorageElement()->GetSite();
     CLinkSelector* const linkSelector = srcSite->GetLinkSelector(dstSite);

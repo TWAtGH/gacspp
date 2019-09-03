@@ -23,7 +23,8 @@ void CAdvancedSim::SetupDefaults()
     std::stringstream dbIn;
     bool ok = true;
 
-    CStorageElement::outputReplicaInsertQuery = output.CreatePreparedInsert("INSERT INTO Replicas VALUES(?, ?, ?, ?, ?)", '?');
+    //CStorageElement::outputReplicaInsertQuery = output.CreatePreparedInsert("INSERT INTO Replicas VALUES(?, ?, ?, ?, ?)", '?');
+    CStorageElement::outputReplicaInsertQuery = output.CreatePreparedInsert("COPY Replicas(id, fileId, storageElementId, createdAt, expiredAt) FROM STDIN with(FORMAT csv);", 5, '?');
 
 
     ////////////////////////////

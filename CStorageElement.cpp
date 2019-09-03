@@ -33,6 +33,8 @@ auto CStorageElement::CreateReplica(SFile* const file) -> std::shared_ptr<SRepli
     file->mReplicas.emplace_back(newReplica);
     mReplicas.emplace_back(newReplica);
 
+    OnOperation(INSERT);
+
     return newReplica;
 }
 
@@ -67,4 +69,5 @@ void CStorageElement::OnRemoveReplica(const SReplica* const replica, const TickT
         mReplicas[idxToDelete] = lastReplica;
     }
     mReplicas.pop_back();
+    OnOperation(DELETE);
 }

@@ -1,6 +1,7 @@
 #include <cassert>
 #include <iomanip>
 #include <iostream>
+#include <sstream>
 
 #include "json.hpp"
 
@@ -12,6 +13,25 @@
 
 namespace gcp
 {
+
+    CCloudBill::CCloudBill(double storageCost, double networkCost, double traffic, double operationCost)
+        : mStorageCost(storageCost),
+          mNetworkCost(networkCost),
+          mTraffic(traffic),
+          mOperationCost(operationCost)
+    {}
+
+    std::string CCloudBill::ToString() const
+    {
+        std::stringstream res;
+        res << std::fixed << std::setprecision(2);
+        res << std::setw(12) << "Storage: " << mStorageCost << " CHF" << std::endl;
+        res << std::setw(12) << "Network: " << mNetworkCost << " CHF (" << mTraffic << " GiB)" << std::endl;
+        res << std::setw(12) << "Operations: " << mOperationCost << " CHF" << std::endl;
+        return res.str();
+    }
+
+
     CBucket::CBucket(std::string&& name, CRegion* region)
         : CStorageElement(std::move(name), region),
           mRegion(region)
@@ -23,10 +43,10 @@ namespace gcp
         switch(op)
         {
             case CStorageElement::INSERT:
-                mOperationCosts += 0.05;
+                mOperationCosts += 0.000005;
             break;
             case CStorageElement::GET:
-                mOperationCosts += 0.004;
+                mOperationCosts += 0.0000004;
             break;
             default: break;
         }
@@ -66,6 +86,14 @@ namespace gcp
         return costs;
     }
 
+    double CBucket::CalculateOperationCosts(TickType now)
+    {
+        (void)now;
+        double costs = mOperationCosts;
+        mOperationCosts = 0;
+        return costs;
+    }
+
 
 
     static double CalculateNetworkCostsRecursive(std::uint64_t traffic, CLinkSelector::PriceInfoType::const_iterator curLevelIt, const CLinkSelector::PriceInfoType::const_iterator &endIt, std::uint64_t prevThreshold = 0)
@@ -100,6 +128,14 @@ namespace gcp
 	    return regionStorageCosts;
     }
 
+    double CRegion::CalculateOperationCosts(TickType now)
+    {
+	    double regionOperationCosts = 0;
+	    for (const std::unique_ptr<CBucket>& bucket : mStorageElements)
+		    regionOperationCosts += bucket->CalculateOperationCosts(now);
+	    return regionOperationCosts;
+    }
+
     double CRegion::CalculateNetworkCosts(double& sumUsedTraffic, std::uint64_t& sumDoneTransfers)
     {
 	    double regionNetworkCosts = 0;
@@ -130,9 +166,10 @@ namespace gcp
 	    return newRegion;
     }
 
-    auto CCloud::ProcessBilling(TickType now) -> std::pair<double, std::pair<double, double>>
+    auto CCloud::ProcessBilling(TickType now) -> std::unique_ptr<ICloudBill>
     {
 	    double totalStorageCosts = 0;
+	    double totalOperationCosts = 0;
 	    double totalNetworkCosts = 0;
         double sumUsedTraffic = 0;
         std::uint64_t sumDoneTransfer = 0;
@@ -141,11 +178,13 @@ namespace gcp
 		    auto region = dynamic_cast<CRegion*>(site.get());
 		    assert(region != nullptr);
 		    const double regionStorageCosts = region->CalculateStorageCosts(now);
+		    const double regionOperationCosts = region->CalculateOperationCosts(now);
 		    const double regionNetworkCosts = region->CalculateNetworkCosts(sumUsedTraffic, sumDoneTransfer);
 		    totalStorageCosts += regionStorageCosts;
+		    totalOperationCosts += regionOperationCosts;
 		    totalNetworkCosts += regionNetworkCosts;
 	    }
-        return { totalStorageCosts, {totalNetworkCosts, sumUsedTraffic } };
+        return std::make_unique<CCloudBill>(totalStorageCosts, totalNetworkCosts, sumUsedTraffic, totalOperationCosts);
     }
 
     void CCloud::SetupDefaultCloud()

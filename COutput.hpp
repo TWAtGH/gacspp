@@ -41,7 +41,7 @@ public:
     bool StartConsumer();
     void Shutdown();
 
-    auto CreatePreparedInsert(const std::string& queryTpl, char wildcard) -> std::shared_ptr<IPreparedInsert>;
+    auto CreatePreparedInsert(const std::string& queryTpl, const std::size_t numWildcards, char wildcard) -> std::shared_ptr<IPreparedInsert>;
     bool CreateTable(const std::string& tableName, const std::string& columns);
     bool CreateTable(const std::string& tableName, const std::vector<std::string>& columns);
     bool InsertRow(const std::string& tableName, const std::string& values);

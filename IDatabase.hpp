@@ -26,6 +26,10 @@ public:
     virtual void AddValue(const std::string& value) = 0;
     virtual void AddValue(std::string&& value) = 0;
 
+    virtual bool IsEmpty() const = 0;
+    virtual bool IsMergingSupported() const = 0;
+    virtual bool MergeIfPossible(std::unique_ptr<IInsertValuesContainer>& other) = 0;
+
     virtual auto InsertValues() -> std::size_t = 0;
 };
 
@@ -57,7 +61,7 @@ public:
     virtual bool Close() = 0;
 
     virtual bool ExecuteQuery(const std::string& query) = 0;
-    virtual auto PrepareInsert(const std::shared_ptr<IDatabase>& db, const std::string& queryTpl, char wildcard) -> std::shared_ptr<IPreparedInsert> = 0;
+    virtual auto PrepareInsert(const std::shared_ptr<IDatabase>& db, const std::string& queryTpl, std::size_t numWildcards, char wildcard) -> std::shared_ptr<IPreparedInsert> = 0;
 
     virtual bool BeginTransaction() = 0;
     virtual bool CommitAndBeginTransaction() = 0;

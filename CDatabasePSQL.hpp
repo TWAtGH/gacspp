@@ -1,6 +1,6 @@
 #pragma once
 
-#include <vector>
+#include <sstream>
 
 #include <libpq-fe.h>
 
@@ -37,7 +37,8 @@ class CInsertValuesContainer : public IInsertValuesContainer
 private:
     std::string mID;
     std::size_t mNumParameters;
-    std::vector<std::string> mValues;
+    //std::vector<std::string> mValues;
+    std::string mValues;
 
 public:
     CInsertValuesContainer(const std::shared_ptr<IDatabase>& db, const std::string& id, std::size_t numParameters, std::size_t numReserveValues=0);
@@ -48,6 +49,12 @@ public:
     virtual void AddValue(std::uint64_t value);
     virtual void AddValue(const std::string& value);
     virtual void AddValue(std::string&& value);
+
+    virtual bool IsEmpty() const
+    {return mValues.empty();}
+    virtual bool IsMergingSupported() const
+    {return true;}
+    virtual bool MergeIfPossible(std::unique_ptr<IInsertValuesContainer>& other);
 
     virtual auto InsertValues() -> std::size_t;
 };
@@ -71,12 +78,12 @@ private:
 
 public:
     ~CDatabase();
-    
+
     virtual bool Open(const std::string& params);
     virtual bool Close();
 
     virtual bool ExecuteQuery(const std::string& query);
-    virtual auto PrepareInsert(const std::shared_ptr<IDatabase>& db, const std::string& queryTpl, char wildcard) -> std::shared_ptr<IPreparedInsert>;
+    virtual auto PrepareInsert(const std::shared_ptr<IDatabase>& db, const std::string& queryTpl, std::size_t numWildcards, char wildcard) -> std::shared_ptr<IPreparedInsert>;
 
     virtual bool BeginTransaction();
     virtual bool CommitAndBeginTransaction();

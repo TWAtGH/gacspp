@@ -11,7 +11,11 @@
 
 class ISite;
 
-
+class ICloudBill
+{
+public:
+    virtual std::string ToString() const = 0;
+};
 
 class IBaseCloud : public IConfigConsumer
 {
@@ -30,7 +34,7 @@ public:
                               double storagePriceCHF,
                               std::string&& skuId) -> ISite* = 0;
 
-	virtual auto ProcessBilling(TickType now) -> std::pair<double, std::pair<double, double>> = 0;
+	virtual auto ProcessBilling(TickType now) -> std::unique_ptr<ICloudBill> = 0;
 	virtual void SetupDefaultCloud() = 0;
 
 	inline auto GetName() const -> const std::string&

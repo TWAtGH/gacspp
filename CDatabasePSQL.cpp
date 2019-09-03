@@ -36,7 +36,7 @@ CResult::operator bool() const
     if(mResult)
     {
         const auto status = PQresultStatus(mResult);
-        if(status == PGRES_COMMAND_OK || status == PGRES_TUPLES_OK)
+        if(status == PGRES_COMMAND_OK || status == PGRES_TUPLES_OK || status == PGRES_COPY_IN)
             return true;
     }
     return false;
@@ -53,40 +53,58 @@ CInsertValuesContainer::CInsertValuesContainer(const std::shared_ptr<IDatabase>&
       mID(id),
       mNumParameters(numParameters)
 {
-    if(numReserveValues > 0)
-        mValues.reserve(numReserveValues);
+    //if(numReserveValues > 0)
+        //mValues.reserve(numReserveValues);
 }
 
 void CInsertValuesContainer::AddValue(double value)
 {
-    mValues.emplace_back(std::move(std::to_string(value)));
+    //mValues.emplace_back(std::move(std::to_string(value)));
+    mValues += (std::to_string(value) + ",");
 }
 
 void CInsertValuesContainer::AddValue(int value)
 {
-    mValues.emplace_back(std::move(std::to_string(value)));
+    //mValues.emplace_back(std::move(std::to_string(value)));
+    mValues += (std::to_string(value) + ",");
 }
 
 void CInsertValuesContainer::AddValue(std::uint32_t value)
 {
-    mValues.emplace_back(std::move(std::to_string(value)));
+    //mValues.emplace_back(std::move(std::to_string(value)));
+    mValues += (std::to_string(value) + ",");
 }
 
 void CInsertValuesContainer::AddValue(std::uint64_t value)
 {
-    mValues.emplace_back(std::move(std::to_string(value)));
+    //mValues.emplace_back(std::move(std::to_string(value)));
+    mValues += (std::to_string(value) + ",");
 }
 
 void CInsertValuesContainer::AddValue(const std::string& value)
 {
-    mValues.emplace_back(value);
+    //mValues.emplace_back(value);
+    mValues += (value + ",");
 }
 
 void CInsertValuesContainer::AddValue(std::string&& value)
 {
-    mValues.emplace_back(value);
+    //mValues.emplace_back(value);
+    mValues += (std::move(value) + ",");
 }
 
+bool CInsertValuesContainer::MergeIfPossible(std::unique_ptr<IInsertValuesContainer>& other)
+{
+    CInsertValuesContainer* otherCasted = dynamic_cast<CInsertValuesContainer*>(other.get());
+    if(!otherCasted)
+        return false;
+    if(mID != otherCasted->mID)
+        return false;
+    if(!otherCasted->mValues.empty())
+        mValues += std::move(otherCasted->mValues);
+    other.reset(nullptr);
+    return true;
+}
 
 auto CInsertValuesContainer::InsertValues() -> std::size_t
 {
@@ -105,11 +123,57 @@ auto CInsertValuesContainer::InsertValues() -> std::size_t
             std::cout<<"Insertion of row failed:"<<std::endl<<res.str()<<std::endl;
         return 1;
     }
+    else if(mValues.empty())
+        return 0;
 
     assert(mNumParameters > 0);
-    assert((mValues.size() % mNumParameters) == 0);
+    //assert((mValues.size() % mNumParameters) == 0);
 
-    std::vector<const char*> paramValues(mNumParameters);
+    CResult res(PQexecPrepared(dbConnection, mID.c_str(), 0, nullptr, nullptr, nullptr, 0));
+    if(!res)
+    {
+        std::cout<<"Bulk insertion failed:"<<std::endl<<res.str()<<std::endl;
+        return 0;
+    }
+
+    /*std::string data(mValues[0]);
+    std::size_t i=1;
+    for(; i<mNumParameters; ++i)
+        data += ("," + mValues[i]);
+    for(; i<mValues.size(); i+=mNumParameters)
+    {
+        data += ('\n' + mValues[i]);
+        for(std::size_t j=1; j<mNumParameters; ++j)
+            data += (',' + mValues[i+j]);
+    }*/
+    std::size_t curDelimCnt = 0;
+    //for(std::size_t i = 0;i<mValues.length();++i)
+    for(auto& c : mValues)
+    {
+        if(c == ',')
+        {
+            curDelimCnt = (curDelimCnt + 1) % mNumParameters;
+            if(curDelimCnt == 0)
+                c = '\n';
+        }
+    }
+
+    int resQueue = PQputCopyData(dbConnection, mValues.c_str(), mValues.length());
+    int resEnd = PQputCopyEnd(dbConnection, nullptr);
+    if(resQueue != 1)
+        std::cout<<"Queing data failed: "<<resQueue<<std::endl;
+    if(resEnd == 1)
+    {
+        res = CResult(PQgetResult(dbConnection));
+        if(!res)
+        {
+            std::cout<<"Getting results after copy end failed:"<<std::endl<<res.str()<<std::endl;
+            return 0;
+        }
+    }
+    else
+        std::cout<<"Copy end failed: "<<resEnd<<std::endl;
+    /*std::vector<const char*> paramValues(mNumParameters);
     for(std::size_t i=0; i<mValues.size(); i+=mNumParameters)
     {
         for(std::size_t j=0; j<mNumParameters; ++j)
@@ -122,8 +186,7 @@ auto CInsertValuesContainer::InsertValues() -> std::size_t
                 std::cout << ", " << paramValues[j];
             std::cout<<std::endl<<res.str()<<std::endl;
         }
-    }
-
+    }*/
     return (mValues.size() / mNumParameters);
 }
 
@@ -171,7 +234,7 @@ bool CDatabase::ExecuteQuery(const std::string& query)
     return (res == true);
 }
 
-auto CDatabase::PrepareInsert(const std::shared_ptr<IDatabase>& db, const std::string& queryTpl, char wildcard) -> std::shared_ptr<IPreparedInsert>
+auto CDatabase::PrepareInsert(const std::shared_ptr<IDatabase>& db, const std::string& queryTpl, std::size_t numWildcards, char wildcard) -> std::shared_ptr<IPreparedInsert>
 {
     std::string id = std::to_string(++mNumPreparerdQueries);
 
@@ -189,9 +252,9 @@ auto CDatabase::PrepareInsert(const std::shared_ptr<IDatabase>& db, const std::s
     }
 
     std::shared_ptr<CPreparedInsert> preparedInsert;
-    CResult res(PQprepare(mConnection, id.c_str(), queryTplStream.str().c_str(), numParameters, nullptr));
+    CResult res(PQprepare(mConnection, id.c_str(), queryTplStream.str().c_str(), numWildcards, nullptr));
     if(res)
-        preparedInsert = std::make_shared<CPreparedInsert>(db, std::move(id), numParameters);
+        preparedInsert = std::make_shared<CPreparedInsert>(db, std::move(id), numWildcards);
     else
         std::cout<<"Preparing query failed:"<<std::endl<<queryTplStream.str()<<std::endl<<res.str()<<std::endl;
 

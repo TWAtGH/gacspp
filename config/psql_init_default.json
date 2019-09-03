@@ -1,5 +1,5 @@
 {
-"_init":[
+"init":[
     "DROP TABLE IF EXISTS Sites, StorageElements, LinkSelectors, Files, Replicas, Transfers CASCADE;",
     "CREATE TABLE Sites (id BIGINT, name varchar(64), locationName varchar(32), cloudName varchar(32));",
     "CREATE TABLE StorageElements (id BIGINT, siteId BIGINT, name varchar(64));",
@@ -8,7 +8,7 @@
     "CREATE TABLE Replicas (id BIGINT, fileId BIGINT, storageElementId BIGINT, createdAt BIGINT, expiredAt BIGINT);",
     "CREATE TABLE Transfers (id BIGINT, srcReplicaId BIGINT, dstReplicaId BIGINT, startTick BIGINT, endTick BIGINT);"
 ],
-"init":[
+"_init":[
     "DROP TABLE IF EXISTS Sites, StorageElements, LinkSelectors, Files, Replicas, Transfers CASCADE;",
     "CREATE TABLE Sites (id BIGINT PRIMARY KEY, name varchar(64), locationName varchar(32), cloudName varchar(32));",
     "CREATE TABLE StorageElements (id BIGINT PRIMARY KEY, siteId BIGINT, name varchar(64), FOREIGN KEY(siteId) REFERENCES Sites(id));",
@@ -18,7 +18,7 @@
     "CREATE TABLE Transfers (id BIGINT PRIMARY KEY, srcReplicaId BIGINT, dstReplicaId BIGINT, startTick BIGINT, endTick BIGINT, FOREIGN KEY(srcReplicaId) REFERENCES Replicas(id), FOREIGN KEY(dstReplicaId) REFERENCES Replicas(id));"
 ],
 
-"_shutdown":[
+"shutdown":[
     "ALTER TABLE Sites ADD PRIMARY KEY(id);",
     "ALTER TABLE StorageElements ADD PRIMARY KEY(id), ADD FOREIGN KEY(siteId) REFERENCES Sites(id);",
     "ALTER TABLE LinkSelectors ADD PRIMARY KEY(id), ADD FOREIGN KEY(srcSiteId) REFERENCES Sites(id), ADD FOREIGN KEY(dstSiteId) REFERENCES Sites(id);",

@@ -79,11 +79,10 @@ void COutput::Shutdown()
     }
 }
 
-auto COutput::CreatePreparedInsert(const std::string& queryTpl, char wildcard) -> std::shared_ptr<IPreparedInsert>
+auto COutput::CreatePreparedInsert(const std::string& queryTpl, const std::size_t numWildcards, char wildcard) -> std::shared_ptr<IPreparedInsert>
 {
     assert(mDB != nullptr);
-    return mDB->PrepareInsert(mDB, queryTpl, wildcard);
-
+    return mDB->PrepareInsert(mDB, queryTpl, numWildcards, wildcard);
 }
 
 
@@ -122,6 +121,9 @@ bool COutput::InsertRow(const std::string& tableName, const std::vector<std::str
 void COutput::QueueInserts(std::unique_ptr<IInsertValuesContainer>&& queriesContainer)
 {
     assert(queriesContainer != nullptr);
+    if(queriesContainer->IsEmpty())
+        return;
+
     const std::size_t bufLen = mInsertQueriesBuffer.size();
 
     std::size_t newProducerIdx = (mProducerIdx + 1) % bufLen;
@@ -137,18 +139,34 @@ void COutput::QueueInserts(std::unique_ptr<IInsertValuesContainer>&& queriesCont
 
 void COutput::ConsumerThread()
 {
+    constexpr std::size_t mergeLimit = 4096;
     mDB->BeginTransaction();
 
     const std::size_t bufLen = mInsertQueriesBuffer.size();
     while(mIsConsumerRunning || (mConsumerIdx != mProducerIdx))
     {
-        while(mConsumerIdx != mProducerIdx)
+        std::vector<std::unique_ptr<IInsertValuesContainer>> mergedContainers;
+        std::size_t numMerged = 0;
+        while((mConsumerIdx != mProducerIdx) && (numMerged<mergeLimit))
         {
-            mInsertQueriesBuffer[mConsumerIdx]->InsertValues();
-
-            mInsertQueriesBuffer[mConsumerIdx] = nullptr;
+            std::unique_ptr<IInsertValuesContainer> curContainer = std::move(mInsertQueriesBuffer[mConsumerIdx]);
             mConsumerIdx = (mConsumerIdx + 1) % bufLen;
+
+            if(curContainer->IsMergingSupported())
+            {
+                bool wasMerged = false;
+                for(std::size_t i=0; i<mergedContainers.size() && !wasMerged; ++i)
+                    wasMerged = mergedContainers[i]->MergeIfPossible(curContainer);
+                if(!wasMerged)
+                    mergedContainers.emplace_back(std::move(curContainer));
+                ++numMerged;
+            }
+            else
+                curContainer->InsertValues();
         }
+
+        for(std::unique_ptr<IInsertValuesContainer>& curContainer : mergedContainers)
+            curContainer->InsertValues();
 
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
