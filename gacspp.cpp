@@ -9,6 +9,8 @@
 #include "COutput.hpp"
 #include "CSimpleSim.hpp"
 
+using nlohmann::json;
+
 
 int main()
 {
@@ -16,7 +18,7 @@ int main()
     COutput& output = COutput::GetRef();
 
     const std::filesystem::path configDirPath = std::filesystem::current_path() / "config";
-    nlohmann::json configJson;
+    json configJson;
     {
         const std::filesystem::path baseConfigFilePath = configDirPath / "simconfig.json";
         std::ifstream configFileStream(baseConfigFilePath.string());
@@ -38,7 +40,7 @@ int main()
 			{
 				const std::filesystem::path dbConnectionFilePath = (configDirPath / prop->get<std::string>());
 				std::ifstream dbConnectionFileStream(dbConnectionFilePath.string());
-				nlohmann::json dbConnectionFileJson;
+				json dbConnectionFileJson;
 				if (!dbConnectionFileStream)
 					std::cout << "Unable to locate db connection file: " << dbConnectionFilePath.string() << std::endl;
 				else
@@ -57,7 +59,7 @@ int main()
 
         if(!dbInitFilePath.empty())
         {
-            nlohmann::json dbInitJson;
+            json dbInitJson;
             std::ifstream dbInitFileStream(dbInitFilePath.string());
             if(!dbInitFileStream)
                 std::cout << "Unable to open db init file: " << dbInitFilePath << std::endl;

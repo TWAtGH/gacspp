@@ -7,8 +7,6 @@
 
 #include "IConfigConsumer.hpp"
 
-namespace fs = std::filesystem;
-
 
 
 class CConfigLoader
@@ -16,7 +14,7 @@ class CConfigLoader
 private:
     CConfigLoader() = default;
 
-    fs::path mCurrentDirectory;
+    std::filesystem::path mCurrentDirectory;
 
 public:
     std::unordered_set<std::string> mLoadedFiles;
@@ -30,6 +28,6 @@ public:
 
     static auto GetRef() -> CConfigLoader&;
 
-    bool TryLoadConfig(const fs::path& path);
+    bool TryLoadConfig(const std::filesystem::path& path);
     bool TryLoadConfig(const json& jsonRoot);
 };

@@ -2,12 +2,11 @@
 
 #include "json_fwd.hpp"
 
-using json = nlohmann::json;
-
+using nlohmann::json;
 
 
 class IConfigConsumer
 {
 public:
-    virtual bool TryConsumeConfig(const json& json) = 0;
+    virtual bool TryConsumeConfig(const json& config) = 0;
 };

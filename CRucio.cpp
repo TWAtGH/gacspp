@@ -133,10 +133,10 @@ auto CRucio::RunReaper(const TickType now) -> std::size_t
     return numFiles - mFiles.size();
 }
 
-bool CRucio::TryConsumeConfig(const json& json)
+bool CRucio::TryConsumeConfig(const json& config)
 {
-    json::const_iterator rootIt = json.find("rucio");
-    if( rootIt == json.cend() )
+    json::const_iterator rootIt = config.find("rucio");
+    if( rootIt == config.cend() )
         return false;
 
     for( const auto& [key, value] : rootIt.value().items() )
@@ -147,7 +147,7 @@ bool CRucio::TryConsumeConfig(const json& json)
             {
                 std::unique_ptr<std::uint8_t> multiLocationIdx;
                 std::string siteName, siteLocation;
-                nlohmann::json storageElementsJson;
+                json storageElementsJson;
                 std::unordered_map<std::string, std::string> customConfig;
                 for(const auto& [siteJsonKey, siteJsonValue] : siteJson.items())
                 {

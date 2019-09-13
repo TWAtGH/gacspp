@@ -24,14 +24,15 @@ namespace gcp
 	class CBucket : public CStorageElement
 	{
 	private:
-        CRegion* mRegion;
         TickType mTimeLastCostUpdate = 0;
         double mStorageCosts = 0;
         double mOperationCosts = 0;
 
 	public:
+        std::vector<std::pair<std::uint32_t, std::int32_t>> mStorageRates;
 
-		CBucket(std::string&& name, CRegion* region);
+        using CStorageElement::CStorageElement;
+
 		CBucket(CBucket&&) = default;
 
         virtual void OnOperation(const CStorageElement::OPERATION op) final;
@@ -39,29 +40,23 @@ namespace gcp
 		virtual void OnIncreaseReplica(std::uint64_t amount, TickType now) final;
 		virtual void OnRemoveReplica(const SReplica* replica, TickType now) final;
 
-		double CalculateStorageCosts(TickType now);
-        double CalculateOperationCosts(TickType now);
+		auto CalculateStorageCosts(TickType now) -> double;
+        auto CalculateOperationCosts(TickType now) -> double;
+
+        auto GetCurStoragePrice() const -> double;
 	};
 
 	class CRegion : public ISite
 	{
 	public:
-
-		CRegion(std::string&& name, std::string&& locationName, const std::uint8_t multiLocationIdx, const double storagePrice, std::string&& skuId);
+        using ISite::ISite;
 
 		auto CreateStorageElement(std::string&& name) -> CBucket* final;
 		double CalculateStorageCosts(TickType now);
 		double CalculateOperationCosts(TickType now);
 		double CalculateNetworkCosts(double& sumUsedTraffic, std::uint64_t& sumDoneTransfers);
 
-		inline auto GetStoragePrice() const -> double
-		{return mStoragePrice;}
-
         std::vector<std::unique_ptr<CBucket>> mStorageElements;
-
-    private:
-		std::string mSKUId;
-		double mStoragePrice = 0;
 	};
 
 	class CCloud final : public IBaseCloud
@@ -69,15 +64,21 @@ namespace gcp
 	public:
 		using IBaseCloud::IBaseCloud;
 
+        virtual ~CCloud();
+
 		auto CreateRegion(std::string&& name,
                           std::string&& locationName,
-                          const std::uint8_t multiLocationIdx,
-                          const double storagePrice,
-                          std::string&& skuId) -> CRegion* final;
+                          const std::uint8_t multiLocationIdx) -> CRegion* final;
 
 		auto ProcessBilling(TickType now) -> std::unique_ptr<ICloudBill> final;
 		void SetupDefaultCloud() final;
 
-        bool TryConsumeConfig(const nlohmann::json& json) final;
+        bool TryConsumeConfig(const json& config) final;
+
+    private:
+        json* mSKUSettings = nullptr;
+
+        void LoadBaseSettingsJson(const json& config);
+        void InitBucketBySKUId(CBucket* bucket, const std::string& skuId);
 	};
 }

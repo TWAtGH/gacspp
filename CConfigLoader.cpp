@@ -29,7 +29,7 @@ bool CConfigLoader::TryLoadConfig(const json& jsonRoot)
                 std::cout << resultIt->dump(JSON_DUMP_SPACES) << std::endl;
                 continue;
             }
-            fs::path curPathBefore = mCurrentDirectory;
+            std::filesystem::path curPathBefore = mCurrentDirectory;
             wasConsumed = TryLoadConfig(mCurrentDirectory / resultIt.value().get<std::string>());
             mCurrentDirectory = curPathBefore;
         }
@@ -50,7 +50,7 @@ bool CConfigLoader::TryLoadConfig(const json& jsonRoot)
     return true;
 }
 
-bool CConfigLoader::TryLoadConfig(const fs::path& path)
+bool CConfigLoader::TryLoadConfig(const std::filesystem::path& path)
 {
     auto insertResult = mLoadedFiles.insert(path.string());
     if(!insertResult.second)

@@ -30,9 +30,7 @@ public:
 
 	virtual auto CreateRegion(std::string&& name,
                               std::string&& locationName,
-                              const std::uint8_t multiLocationIdx,
-                              double storagePriceCHF,
-                              std::string&& skuId) -> ISite* = 0;
+                              const std::uint8_t multiLocationIdx) -> ISite* = 0;
 
 	virtual auto ProcessBilling(TickType now) -> std::unique_ptr<ICloudBill> = 0;
 	virtual void SetupDefaultCloud() = 0;

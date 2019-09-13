@@ -1,4 +1,6 @@
 #include <cassert>
+#include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -13,7 +15,6 @@
 
 namespace gcp
 {
-
     CCloudBill::CCloudBill(double storageCost, double networkCost, double traffic, double operationCost)
         : mStorageCost(storageCost),
           mNetworkCost(networkCost),
@@ -31,11 +32,6 @@ namespace gcp
         return res.str();
     }
 
-
-    CBucket::CBucket(std::string&& name, CRegion* region)
-        : CStorageElement(std::move(name), region),
-          mRegion(region)
-    {}
 
     void CBucket::OnOperation(const CStorageElement::OPERATION op)
     {
@@ -56,7 +52,7 @@ namespace gcp
     {
         if (now > mTimeLastCostUpdate)
         {
-            mStorageCosts += BYTES_TO_GiB(mUsedStorage) * mRegion->GetStoragePrice() * SECONDS_TO_MONTHS((now - mTimeLastCostUpdate));
+            mStorageCosts += BYTES_TO_GiB(mUsedStorage) * GetCurStoragePrice() * SECONDS_TO_MONTHS((now - mTimeLastCostUpdate));
             mTimeLastCostUpdate = now;
         }
         CStorageElement::OnIncreaseReplica(amount, now);
@@ -67,17 +63,17 @@ namespace gcp
         std::unique_lock<std::mutex> lock(mReplicaRemoveMutex);
         if (now > mTimeLastCostUpdate)
         {
-            mStorageCosts += BYTES_TO_GiB(mUsedStorage) * mRegion->GetStoragePrice() * SECONDS_TO_MONTHS((now - mTimeLastCostUpdate));
+            mStorageCosts += BYTES_TO_GiB(mUsedStorage) * GetCurStoragePrice() * SECONDS_TO_MONTHS((now - mTimeLastCostUpdate));
             mTimeLastCostUpdate = now;
         }
         CStorageElement::OnRemoveReplica(replica, now, false);
     }
 
-    double CBucket::CalculateStorageCosts(TickType now)
+    auto CBucket::CalculateStorageCosts(TickType now) -> double
     {
         if (now > mTimeLastCostUpdate)
         {
-            mStorageCosts += BYTES_TO_GiB(mUsedStorage) * mRegion->GetStoragePrice() * SECONDS_TO_MONTHS((now - mTimeLastCostUpdate));
+            mStorageCosts += BYTES_TO_GiB(mUsedStorage) * GetCurStoragePrice() * SECONDS_TO_MONTHS((now - mTimeLastCostUpdate));
             mTimeLastCostUpdate = now;
         }
 
@@ -86,12 +82,20 @@ namespace gcp
         return costs;
     }
 
-    double CBucket::CalculateOperationCosts(TickType now)
+    auto CBucket::CalculateOperationCosts(TickType now) -> double
     {
         (void)now;
         double costs = mOperationCosts;
         mOperationCosts = 0;
         return costs;
+    }
+
+    auto CBucket::GetCurStoragePrice() const -> double
+    {
+        std::size_t rateIdx = 0;
+        while( (rateIdx < mStorageRates.size()) && (mUsedStorage > mStorageRates[rateIdx].first) )
+            ++rateIdx;
+        return static_cast<double>(mStorageRates[rateIdx].second) / 1000000000.0;
     }
 
 
@@ -106,12 +110,6 @@ namespace gcp
 	    const double lowerLevelCosts = CalculateNetworkCostsRecursive(traffic - threshold, nextLevelIt, endIt, curLevelIt->first);
 	    return (BYTES_TO_GiB(threshold) * curLevelIt->second) + lowerLevelCosts;
     }
-
-    CRegion::CRegion(std::string&& name, std::string&& locationName, const std::uint8_t multiLocationIdx, const double storagePrice, std::string&& skuId)
-	    : ISite(std::move(name), std::move(locationName), multiLocationIdx),
-	      mSKUId(std::move(skuId)),
-	      mStoragePrice(storagePrice)
-    {}
 
     auto CRegion::CreateStorageElement(std::string&& name) -> CBucket*
     {
@@ -155,13 +153,20 @@ namespace gcp
 
 
 
+    CCloud::~CCloud()
+    {
+        if(mSKUSettings)
+        {
+            delete mSKUSettings;
+            mSKUSettings = nullptr;
+        }
+    }
+
     auto CCloud::CreateRegion(  std::string&& name,
                                 std::string&& locationName,
-                                const std::uint8_t multiLocationIdx,
-                                const double storagePrice,
-                                std::string&& skuId) -> CRegion*
+                                const std::uint8_t multiLocationIdx) -> CRegion*
     {
-	    CRegion* newRegion = new CRegion(std::move(name), std::move(locationName), multiLocationIdx, storagePrice, std::move(skuId));
+	    CRegion* newRegion = new CRegion(std::move(name), std::move(locationName), multiLocationIdx);
 	    mRegions.emplace_back(newRegion);
 	    return newRegion;
     }
@@ -323,21 +328,43 @@ namespace gcp
 	    }
     }
 
-    bool CCloud::TryConsumeConfig(const nlohmann::json& json)
+    bool CCloud::TryConsumeConfig(const json& config)
     {
-        nlohmann::json::const_iterator rootIt = json.find("gcp");
-        if(rootIt == json.cend())
+        json::const_iterator rootIt = config.find("gcp");
+        if(rootIt == config.cend())
             return false;
-        for( const auto& [key, value] : rootIt.value().items() )
+
+        json gcpConfJson = rootIt.value();
+
+        {
+            json::const_iterator baseSettingsFilesPropIt = gcpConfJson.find("baseSettingsFiles");
+            if(baseSettingsFilesPropIt != gcpConfJson.cend())
+            {
+                for(const json& baseSettingsFileJson : baseSettingsFilesPropIt.value())
+                {
+                    std::filesystem::path baseSettingsFilePath = std::filesystem::current_path() / "config" / baseSettingsFileJson.get<std::string>();
+                    std::ifstream baseSettingsFile(baseSettingsFilePath.string());
+                    if(baseSettingsFile)
+                    {
+                        json baseSettingsJson;
+                        baseSettingsFile >> baseSettingsJson;
+                        LoadBaseSettingsJson(baseSettingsJson);
+                    }
+                    else
+                        std::cout << "Unable to load base settings file: " << baseSettingsFilePath.string() << std::endl;
+                }
+            }
+        }
+
+        for( const auto& [key, value] : gcpConfJson.items() )
         {
             if( key == "regions" )
             {
                 for(const auto& regionJson : value)
                 {
                     std::unique_ptr<std::uint8_t> multiLocationIdx;
-                    std::string regionName, regionLocation, skuId;
-                    double price = 0;
-                    nlohmann::json bucketsJson;
+                    std::string regionName, regionLocation;
+                    json bucketsJson;
                     std::unordered_map<std::string, std::string> customConfig;
                     for(const auto& [regionJsonKey, regionJsonValue] : regionJson.items())
                     {
@@ -349,10 +376,6 @@ namespace gcp
                             multiLocationIdx = std::make_unique<std::uint8_t>(regionJsonValue.get<std::uint8_t>());
                         else if(regionJsonKey == "buckets")
                             bucketsJson = regionJsonValue;
-                        else if(regionJsonKey == "price")
-                            price = regionJsonValue.get<double>();
-                        else if(regionJsonKey == "skuId")
-                            skuId = regionJsonValue.get<std::string>();
                         else if(regionJsonValue.type() == json::value_t::string)
                             customConfig[regionJsonKey] = regionJsonValue.get<std::string>();
                         else
@@ -378,7 +401,7 @@ namespace gcp
                     }
 
                     std::cout << "Adding region " << regionName << " in " << regionLocation << std::endl;
-            	    CRegion *region = CreateRegion(std::move(regionName), std::move(regionLocation), *multiLocationIdx, price, std::move(skuId));
+            	    CRegion *region = CreateRegion(std::move(regionName), std::move(regionLocation), *multiLocationIdx);
                     region->mCustomConfig = std::move(customConfig);
 
                     if (bucketsJson.empty())
@@ -389,11 +412,13 @@ namespace gcp
 
                     for(const auto& bucketJson : bucketsJson)
                     {
-                        std::string bucketName;
+                        std::string bucketName, skuId;
                         for(const auto& [bucketJsonKey, bucketJsonValue] : bucketJson.items())
                         {
                             if(bucketJsonKey == "name")
                                 bucketName = bucketJsonValue.get<std::string>();
+                            else if(bucketJsonKey == "skuId")
+                                skuId = bucketJsonValue.get<std::string>();
                             else
                                 std::cout << "Ignoring unknown attribute while loading bucket: " << bucketJsonKey << std::endl;
                         }
@@ -404,12 +429,97 @@ namespace gcp
                             continue;
                         }
 
+                        if (skuId.empty())
+                        {
+                            std::cout << "Couldn't find skuId attribute of bucket" << std::endl;
+                            continue;
+                        }
+
                         std::cout << "Adding bucket " << bucketName << std::endl;
-                        region->CreateStorageElement(std::move(bucketName));
+                        CBucket* bucket = region->CreateStorageElement(std::move(bucketName));
+                        InitBucketBySKUId(bucket, skuId);
                     }
                 }
             }
         }
         return true;
+    }
+
+    void CCloud::LoadBaseSettingsJson(const json& config)
+    {
+        json::const_iterator skuPropIt = config.find("skus");
+        if(skuPropIt == config.cend())
+        {
+            std::cout<<"Cannot load base settings"<<std::endl;
+            return;
+        }
+        mSKUSettings = new json;
+        for(const auto& skuJson : skuPropIt.value())
+        {
+            json::const_iterator skuIdPropIt = skuJson.find("skuId");
+            if(skuIdPropIt == skuJson.cend())
+            {
+                std::cout<<"Ignoring object without SKU ID"<<std::endl;
+                continue;
+            }
+            std::string skuId = skuIdPropIt.value().get<std::string>();
+            if(mSKUSettings->count(skuId) > 0)
+            {
+                std::cout<<"Ignoring second object for same SKU ID: "<<skuId<<std::endl;
+                continue;
+            }
+            (*mSKUSettings)[skuId] = skuJson;
+        }
+    }
+
+    void CCloud::InitBucketBySKUId(CBucket* bucket, const std::string& skuId)
+    {
+        //todo: remove this func and use CreateStorageElement() with a factory object
+        const json* prop = mSKUSettings;
+        json::const_iterator propIt;
+
+        //<skuID> -> pricingInfo -> pricingExpression -> tieredRates: startUsageAmount; unitPrice -> nanos
+        std::vector<std::string> keys({skuId, "pricingInfo", "pricingExpression", "tieredRates"});
+
+        for(const std::string& propName : keys)
+        {
+            while(prop->is_array())
+                prop = &((*prop)[0]);
+
+            propIt = prop->find(propName);
+            if(propIt == prop->cend())
+            {
+                std::cout<<"Couldn't find property \""<<propName;
+                std::cout<<"\" for SKU ID \""<<skuId;
+                std::cout<<"\" while setting up bucket: "<<bucket->GetName()<<std::endl;
+                return;
+            }
+            prop = &(propIt.value());
+        }
+
+        for(const json& rateJson : (*prop))
+        {
+            std::uint32_t startUsageAmount = 0;
+            std::int32_t nanoPrice = 0;
+            propIt = rateJson.find("startUsageAmount");
+            if(propIt != rateJson.cend())
+                startUsageAmount = propIt.value().get<std::uint32_t>();
+            else
+                std::cout<<"Couldn't find prop startUsageAmount for SKU ID: "<<skuId<<std::endl;
+
+            propIt = rateJson.find("unitPrice");
+            if(propIt != rateJson.cend())
+            {
+                const json& unitPriceJson = propIt.value();
+                propIt = unitPriceJson.find("nanos");
+                if(propIt != unitPriceJson.cend())
+                    nanoPrice = propIt.value().get<std::int32_t>();
+                else
+                    std::cout<<"Couldn't find prop nanos for SKU ID: "<<skuId<<std::endl;
+            }
+            else
+                std::cout<<"Couldn't find prop unitPrice for SKU ID: "<<skuId<<std::endl;
+            bucket->mStorageRates.emplace_back(startUsageAmount, nanoPrice);
+        }
     }
 }
