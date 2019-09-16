@@ -8,9 +8,9 @@
 
 
 
-auto CGridSite::CreateStorageElement(std::string&& name) -> CStorageElement*
+auto CGridSite::CreateStorageElement(std::string&& name, const TickType accessLatency) -> CStorageElement*
 {
-    CStorageElement* newStorageElement = new CStorageElement(std::move(name), this);
+    CStorageElement* newStorageElement = new CStorageElement(std::move(name), accessLatency, this);
     mStorageElements.emplace_back(newStorageElement);
     return newStorageElement;
 }
@@ -43,13 +43,6 @@ auto CRucio::CreateGridSite(std::string&& name, std::string&& locationName, cons
     CGridSite* newSite = new CGridSite(std::move(name), std::move(locationName), multiLocationIdx);
     mGridSites.emplace_back(newSite);
     return newSite;
-}
-
-void printTS(std::size_t i, const std::string& n)
-{
-    static std::mutex coutMutex;
-    std::unique_lock<std::mutex> lock(coutMutex);
-    std::cout<<i<<" "<<n<<std::endl;
 }
 
 void CRucio::ReaperWorker(const std::size_t threadIdx)
@@ -160,7 +153,8 @@ bool CRucio::LoadConfig(const json& config)
 						{
 							try
 							{
-								site->CreateStorageElement(storageElementJson.at("name").get<std::string>());
+								site->CreateStorageElement(storageElementJson.at("name").get<std::string>(),
+                                                           storageElementJson.at("accessLatency").get<TickType>());
 							}
 							catch (const json::out_of_range& error)
 							{

@@ -31,7 +31,7 @@ public:
 	CGridSite(CGridSite const&) = delete;
 	CGridSite& operator=(CGridSite const&) = delete;
 
-	auto CreateStorageElement(std::string&& name) -> CStorageElement*;
+	auto CreateStorageElement(std::string&& name, const TickType accessLatency) -> CStorageElement*;
 };
 
 class CRucio : public IConfigConsumer

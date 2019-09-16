@@ -71,11 +71,15 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
 		std::cout << "Failed to load clouds cfg: " << error.what() << std::endl;
 	}
 
+    std::unordered_map<std::string, ISite*> nameToSite;
 	std::stringstream dbIn;
 	bool ok = true;
     //add all grid sites and storage elements to output DB (before links)
     for(const std::unique_ptr<CGridSite>& gridSite : mRucio->mGridSites)
     {
+        assert(nameToSite.count(gridSite->GetName()) == 0);
+        nameToSite[gridSite->GetName()] = gridSite.get();
+
         dbIn.str(std::string());
         dbIn << gridSite->GetId() << ","
              << "'" << gridSite->GetName() << "',"
@@ -88,7 +92,8 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
             dbIn.str(std::string());
             dbIn << storageElement->GetId() << ","
                  << gridSite->GetId() << ","
-                 << "'" << storageElement->GetName() << "'";
+                 << "'" << storageElement->GetName() << "',"
+                 << storageElement->GetAccessLatency();
             ok = ok && output.InsertRow("StorageElements", dbIn.str());
         }
     }
@@ -98,6 +103,9 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
     {
         for(const std::unique_ptr<ISite>& cloudSite : cloud->mRegions)
         {
+            assert(nameToSite.count(cloudSite->GetName()) == 0);
+            nameToSite[cloudSite->GetName()] = cloudSite.get();
+
             auto region = dynamic_cast<gcp::CRegion*>(cloudSite.get());
             dbIn.str(std::string());
             dbIn << region->GetId() << ","
@@ -111,40 +119,69 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
                 dbIn.str(std::string());
                 dbIn << bucket->GetId() << ","
                      << region->GetId() << ","
-                     << "'" << bucket->GetName() << "'";
+                     << "'" << bucket->GetName() << "',"
+                     << bucket->GetAccessLatency();
                 ok = ok && output.InsertRow("StorageElements", dbIn.str());
-            }
-
-            for(const std::unique_ptr<CGridSite>& gridSite : mRucio->mGridSites)
-            {
-				CNetworkLink* link = gridSite->CreateNetworkLink(region, ONE_GiB / 32);
-                dbIn.str(std::string());
-                dbIn << link->GetId() << ","
-                     << link->GetSrcSiteId() << ","
-                     << link->GetDstSiteId();
-                ok = ok && output.InsertRow("NetworkLinks", dbIn.str());
-
-                link = region->CreateNetworkLink(gridSite.get(), ONE_GiB / 128);
-                dbIn.str(std::string());
-                dbIn << link->GetId() << ","
-                     << link->GetSrcSiteId() << ","
-                     << link->GetDstSiteId();
-                ok = ok && output.InsertRow("NetworkLinks", dbIn.str());
             }
         }
     }
 
-	if (profileJson.contains("links"))
+	try
 	{
 		json linksCfg;
-		configManager.TryLoadProfileCfg(linksCfg, configManager.GetFileNameFromObj(profileJson["links"]));
+		configManager.TryLoadProfileCfg(linksCfg, configManager.GetFileNameFromObj(profileJson.at("links")));
 
+        for(const auto& [srcSiteName, dstNameCfgJson] : linksCfg.items())
+        {
+            if(nameToSite.count(srcSiteName) == 0)
+            {
+                std::cout<<"Failed to find src site for link configuration: "<<srcSiteName<<std::endl;
+                continue;
+            }
+
+            ISite* srcSite = nameToSite[srcSiteName];
+            for(const auto& [dstSiteName, dstLinkCfgJson] : dstNameCfgJson.items())
+            {
+                if(nameToSite.count(dstSiteName) == 0)
+                {
+                    std::cout<<"Failed to find dst site for link configuration: "<<dstSiteName<<std::endl;
+                    continue;
+                }
+                ISite* dstSite = nameToSite[dstSiteName];
+                try
+                {
+                    std::uint32_t bandwidth = dstLinkCfgJson.at("bandwidth").get<std::uint32_t>();
+        			CNetworkLink* link = srcSite->CreateNetworkLink(dstSite, bandwidth);
+                    dbIn.str(std::string());
+                    dbIn << link->GetId() << ","
+                         << link->GetSrcSiteId() << ","
+                         << link->GetDstSiteId();
+                    ok = ok && output.InsertRow("NetworkLinks", dbIn.str());
+
+                    bandwidth = dstLinkCfgJson.at("receivingLink").at("bandwidth").get<std::uint32_t>();
+        			link = dstSite->CreateNetworkLink(srcSite, bandwidth);
+                    dbIn.str(std::string());
+                    dbIn << link->GetId() << ","
+                         << link->GetSrcSiteId() << ","
+                         << link->GetDstSiteId();
+                    ok = ok && output.InsertRow("NetworkLinks", dbIn.str());
+                }
+            	catch (const json::out_of_range& error)
+            	{
+            		std::cout << "Failed to create link: " << error.what() << std::endl;
+            	}
+            }
+        }
+    }
+	catch (const json::out_of_range& error)
+	{
+		std::cout << "Failed to load links cfg: " << error.what() << std::endl;
 	}
 
-    for(const std::unique_ptr<IBaseCloud>& cloud : mClouds)
-        cloud->SetupDefaultCloud();
-
     assert(ok);
+
+    for(const std::unique_ptr<IBaseCloud>& cloud : mClouds)
+        cloud->InitialiseNetworkLinks();
 
     ////////////////////////////
     // setup scheuleables
@@ -153,6 +190,7 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
     for(const std::unique_ptr<CGridSite>& gridSite : mRucio->mGridSites)
         for(const std::unique_ptr<CStorageElement>& gridStoragleElement : gridSite->mStorageElements)
             dataGen->mStorageElements.push_back(gridStoragleElement.get());
+    dataGen->mStorageElements.push_back(((gcp::CRegion*)(mClouds[0]->mRegions[0].get()))->mStorageElements[0].get());
 
     auto reaper = std::make_shared<CReaper>(mRucio.get(), 600, 600);
 

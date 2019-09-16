@@ -52,7 +52,9 @@ CInsertValuesContainer::CInsertValuesContainer(const std::shared_ptr<IDatabase>&
     : IInsertValuesContainer(db),
       mID(id),
       mNumParameters(numParameters)
-{}
+{
+    (void)numReserveValues;
+}
 
 void CInsertValuesContainer::AddValue(double value)
 {
@@ -152,7 +154,7 @@ auto CInsertValuesContainer::InsertValues() -> std::size_t
     }
     else
         std::cout<<"Copy end failed: "<<resEnd<<std::endl;
-    
+
     return (mValues.size() / mNumParameters);
 }
 

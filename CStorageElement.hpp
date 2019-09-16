@@ -30,7 +30,7 @@ public:
 
     static std::shared_ptr<IPreparedInsert> outputReplicaInsertQuery;
 
-	CStorageElement(std::string&& name, ISite* const site);
+	CStorageElement(std::string&& name, const TickType accessLatency, ISite* const site);
     CStorageElement(CStorageElement&&) = default;
     CStorageElement& operator=(CStorageElement&&) = default;
 
@@ -50,6 +50,8 @@ public:
 	{return mId;}
     inline auto GetName() const -> const std::string&
     {return mName;}
+    inline auto GetAccessLatency() const -> TickType
+    {return mAccessLatency;}
     inline auto GetSite() const -> const ISite*
     {return mSite;}
     inline auto GetSite() -> ISite*
@@ -58,6 +60,7 @@ public:
 private:
     IdType mId;
     std::string mName;
+    TickType mAccessLatency;
     phmap::parallel_flat_hash_set<IdType> mFileIds;
 
 protected:

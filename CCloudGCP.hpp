@@ -51,7 +51,7 @@ namespace gcp
 	public:
 		using ISite::ISite;
 
-		auto CreateStorageElement(std::string&& name) -> CBucket* final;
+		auto CreateStorageElement(std::string&& name, const TickType accessLatency) -> CBucket* final;
 		auto CalculateStorageCosts(TickType now) -> double;
 		auto CalculateOperationCosts(TickType now) -> double;
 		auto CalculateNetworkCosts(double& sumUsedTraffic, std::uint64_t& sumDoneTransfers) -> double;
@@ -73,7 +73,7 @@ namespace gcp
                           const std::uint8_t multiLocationIdx) -> CRegion* final;
 
 		auto ProcessBilling(TickType now) -> std::unique_ptr<ICloudBill> final;
-		void SetupDefaultCloud() final;
+		void InitialiseNetworkLinks() final;
 
         bool LoadConfig(const json& config) final;
 

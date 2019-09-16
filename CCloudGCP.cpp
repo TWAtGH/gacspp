@@ -120,9 +120,9 @@ namespace gcp
 	    return (BYTES_TO_GiB(threshold) * curLevelIt->second) + lowerLevelCosts;
     }
 
-    auto CRegion::CreateStorageElement(std::string&& name) -> CBucket*
+    auto CRegion::CreateStorageElement(std::string&& name, const TickType accessLatency) -> CBucket*
     {
-	    CBucket* newBucket = new CBucket(std::move(name), this);
+	    CBucket* newBucket = new CBucket(std::move(name), accessLatency, this);
 	    mStorageElements.emplace_back(newBucket);
 	    return newBucket;
     }
@@ -207,7 +207,7 @@ namespace gcp
         return std::make_unique<CCloudBill>(totalStorageCosts, totalNetworkCosts, sumUsedTraffic, totalOperationCosts);
     }
 
-    void CCloud::SetupDefaultCloud()
+    void CCloud::InitialiseNetworkLinks()
     {
 		for (const std::unique_ptr<ISite>& srcSite : mRegions)
 		{
@@ -227,7 +227,7 @@ namespace gcp
 				}
 				else
 					mNetworkPrices->at("download").at(dstRegionMultiLocationIdx).at("skuId").get_to(skuId);
-				
+
 				srcRegion->mNetworkLinkIdToPrice[networkLink->GetId()] = GetTieredRateFromSKUId(skuId);
 			}
 		}
@@ -316,7 +316,8 @@ namespace gcp
 							{
 								try
 								{
-									CBucket* bucket = region->CreateStorageElement(bucketJson.at("name").get<std::string>());
+									region->CreateStorageElement(bucketJson.at("name").get<std::string>(),
+                                                                 bucketJson.at("accessLatency").get<TickType>());
 								}
 								catch (const json::out_of_range& error)
 								{
@@ -366,7 +367,7 @@ namespace gcp
 				baseUnitConversionFactor /= SECONDS_PER_MONTH;
 			else if (usageUnit == "GiBy.d")
 				baseUnitConversionFactor /= SECONDS_PER_DAY;
-			
+
 			for (const json& rateJson : pricingJson.at("tieredRates"))
 			{
 				try
@@ -381,7 +382,7 @@ namespace gcp
 					std::cout << error.what() << std::endl;
 				}
 			}
-			
+
 		}
 		catch (const json::out_of_range& error)
 		{

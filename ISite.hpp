@@ -30,7 +30,7 @@ public:
 	{return mId != b.mId;}
 
 	virtual auto CreateNetworkLink(ISite* const dstSite, const std::uint32_t bandwidth) -> CNetworkLink*;
-    virtual auto CreateStorageElement(std::string&& name) -> CStorageElement* = 0;
+    virtual auto CreateStorageElement(std::string&& name, const TickType accessLatency) -> CStorageElement* = 0;
 
 	auto GetNetworkLink(const ISite* const dstSite) -> CNetworkLink*;
 	auto GetNetworkLink(const ISite* const dstSite) const -> const CNetworkLink*;

@@ -2,7 +2,7 @@
 "init":[
     "DROP TABLE IF EXISTS Sites, StorageElements, NetworkLinks, Files, Replicas, Transfers CASCADE;",
     "CREATE TABLE Sites (id BIGINT, name varchar(64), locationName varchar(32), cloudName varchar(32));",
-    "CREATE TABLE StorageElements (id BIGINT, siteId BIGINT, name varchar(64));",
+    "CREATE TABLE StorageElements (id BIGINT, siteId BIGINT, name varchar(64), accessLatency BIGINT);",
     "CREATE TABLE NetworkLinks (id BIGINT, srcSiteId BIGINT, dstSiteId BIGINT);",
     "CREATE TABLE Files (id BIGINT, createdAt BIGINT, expiredAt BIGINT, filesize INTEGER);",
     "CREATE TABLE Replicas (id BIGINT, fileId BIGINT, storageElementId BIGINT, createdAt BIGINT, expiredAt BIGINT);",
@@ -11,7 +11,7 @@
 "_init":[
     "DROP TABLE IF EXISTS Sites, StorageElements, NetworkLinks, Files, Replicas, Transfers CASCADE;",
     "CREATE TABLE Sites (id BIGINT PRIMARY KEY, name varchar(64), locationName varchar(32), cloudName varchar(32));",
-    "CREATE TABLE StorageElements (id BIGINT PRIMARY KEY, siteId BIGINT, name varchar(64), FOREIGN KEY(siteId) REFERENCES Sites(id));",
+    "CREATE TABLE StorageElements (id BIGINT PRIMARY KEY, siteId BIGINT, name varchar(64), accessLatency BIGINT, FOREIGN KEY(siteId) REFERENCES Sites(id));",
     "CREATE TABLE NetworkLinks (id BIGINT PRIMARY KEY, srcSiteId BIGINT, dstSiteId BIGINT, FOREIGN KEY(srcSiteId) REFERENCES Sites(id), FOREIGN KEY(dstSiteId) REFERENCES Sites(id));",
     "CREATE TABLE Files (id BIGINT PRIMARY KEY, createdAt BIGINT, expiredAt BIGINT, filesize INTEGER);",
     "CREATE TABLE Replicas (id BIGINT PRIMARY KEY, fileId BIGINT, storageElementId BIGINT, createdAt BIGINT, expiredAt BIGINT, FOREIGN KEY(fileId) REFERENCES Files(id), FOREIGN KEY(storageElementId) REFERENCES StorageElements(id));",

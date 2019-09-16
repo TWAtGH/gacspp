@@ -4,35 +4,18 @@
     "sites":
     [
         {
-            "multiLocationIdx": 0,
-            "name": "ASGC",
-            "location": "asia",
-            "storageElements":
-            [
-                {
-                    "name": "TAIWAN_DATADISK"
-                }
-            ]
-        },
-        {
-            "multiLocationIdx": 2,
-            "name": "CERN",
-            "location": "europe",
-            "storageElements":
-            [
-                {
-                    "name": "CERN_DATADISK"
-                }
-            ]
-        },
-        {
-            "multiLocationIdx": 4,
+            "multiLocationIdx": 3,
             "name": "BNL",
             "location": "us",
             "storageElements":
             [
                 {
-                    "name": "BNL_DATADISK"
+                    "name": "BNL_DATATAPE",
+                    "accessLatency": 60000
+                },
+                {
+                    "name": "BNL_DATADISK",
+                    "accessLatency": 500
                 }
             ]
         }

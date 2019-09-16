@@ -13,7 +13,8 @@
         "numJobSlots": 1000,
         "buckets": [
           {
-            "name": "iowa_bucket"
+            "name": "iowa_bucket",
+            "accessLatency": 500
           }
         ]
     }
