@@ -163,6 +163,7 @@ private:
     };
 
     std::vector<STransfer> mActiveTransfers;
+    std::vector<STransfer> mQueuedTransfers;
 
 public:
     std::uint32_t mNumCompletedTransfers = 0;
@@ -180,14 +181,7 @@ public:
 };
 
 
-class CBaseTransferNumGen
-{
-public:
-    virtual auto GetNumToCreate(RNGEngineType& rngEngine, std::uint32_t numActive, const TickType now) -> std::uint32_t = 0;
-};
-
-
-class CWavedTransferNumGen : public CBaseTransferNumGen
+class CWavedTransferNumGen
 {
 public:
     double mSoftmaxScale;
@@ -212,14 +206,14 @@ private:
     std::uint32_t mTickFreq;
 
 public:
-    std::shared_ptr<CBaseTransferNumGen> mTransferNumGen;
+    std::shared_ptr<CWavedTransferNumGen> mTransferNumGen;
     std::vector<CStorageElement*> mSrcStorageElements;
     std::vector<CStorageElement*> mDstStorageElements;
 
 public:
     CUniformTransferGen(IBaseSim* sim,
                         std::shared_ptr<CTransferManager> transferMgr,
-                        std::shared_ptr<CBaseTransferNumGen> transferNumGen,
+                        std::shared_ptr<CWavedTransferNumGen> transferNumGen,
                         const std::uint32_t tickFreq,
                         const TickType startTick=0 );
 
@@ -235,14 +229,14 @@ private:
     std::uint32_t mTickFreq;
 
 public:
-    std::shared_ptr<CBaseTransferNumGen> mTransferNumGen;
+    std::shared_ptr<CWavedTransferNumGen> mTransferNumGen;
     std::vector<CStorageElement*> mSrcStorageElements;
     std::vector<CStorageElement*> mDstStorageElements;
 
 public:
     CExponentialTransferGen(IBaseSim* sim,
                             std::shared_ptr<CTransferManager> transferMgr,
-                            std::shared_ptr<CBaseTransferNumGen> transferNumGen,
+                            std::shared_ptr<CWavedTransferNumGen> transferNumGen,
                             const std::uint32_t tickFreq,
                             const TickType startTick=0 );
 
@@ -258,14 +252,14 @@ private:
     std::uint32_t mTickFreq;
 
 public:
-    std::shared_ptr<CBaseTransferNumGen> mTransferNumGen;
+    std::shared_ptr<CWavedTransferNumGen> mTransferNumGen;
     std::unordered_map<IdType, int> mSrcStorageElementIdToPrio;
     std::vector<CStorageElement*> mDstStorageElements;
 
 public:
     CSrcPrioTransferGen(IBaseSim* sim,
                         std::shared_ptr<CTransferManager> transferMgr,
-                        std::shared_ptr<CBaseTransferNumGen> transferNumGen,
+                        std::shared_ptr<CWavedTransferNumGen> transferNumGen,
                         const std::uint32_t tickFreq,
                         const TickType startTick=0 );
 
@@ -296,6 +290,29 @@ public:
                         std::shared_ptr<CFixedTimeTransferManager> transferMgr,
                         const std::uint32_t tickFreq,
                         const TickType startTick=0 );
+
+    void OnUpdate(const TickType now) final;
+};
+
+
+class CCachedSrcTransferGen : public CScheduleable
+{
+private:
+    IBaseSim* mSim;
+    std::shared_ptr<CFixedTimeTransferManager> mTransferMgr;
+    std::uint32_t mTickFreq;
+
+    bool ExistsFileAtStorageElement(const SFile* file, const CStorageElement* storageElement) const;
+
+public:
+    CCachedSrcTransferGen(IBaseSim* sim,
+                        std::shared_ptr<CFixedTimeTransferManager> transferMgr,
+                        const std::uint32_t tickFreq,
+                        const TickType startTick=0 );
+
+    std::vector<CStorageElement*> mSrcStorageElements;
+    std::vector<std::pair<std::size_t, CStorageElement*>> mCacheElements;
+    std::vector<CStorageElement*> mDstStorageElements;
 
     void OnUpdate(const TickType now) final;
 };

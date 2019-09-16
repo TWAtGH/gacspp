@@ -254,7 +254,7 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
     auto reaper = std::make_shared<CReaper>(mRucio.get(), 600, 600);
 
     auto x2cTransferMgr = std::make_shared<CFixedTimeTransferManager>(20, 100);
-    auto x2cTransferGen = std::make_shared<CJobSlotTransferGen>(this, x2cTransferMgr, 25);
+    auto x2cTransferGen = std::make_shared<CCachedSrcTransferGen>(this, x2cTransferMgr, 120);
 
 
     auto heartbeat = std::make_shared<CHeartbeat>(this, x2cTransferMgr, nullptr, static_cast<std::uint32_t>(SECONDS_PER_DAY), static_cast<TickType>(SECONDS_PER_DAY));
@@ -264,12 +264,10 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
     heartbeat->mProccessDurations["Reaper"] = &(reaper->mUpdateDurationSummed);
 
 
-    for(const std::unique_ptr<CGridSite>& gridSite : mRucio->mGridSites)
-        for(const std::unique_ptr<CStorageElement>& storageElement : gridSite->mStorageElements)
-            x2cTransferGen->mSrcStorageElementIdToPrio[storageElement->GetId()] = 0;
 
-    CJobSlotTransferGen::SJobSlotInfo jobslot = {5000, {}};
-    x2cTransferGen->mDstInfo.push_back( std::make_pair(nameToStorageElement["BNL_DATADISK"], jobslot) );
+    x2cTransferGen->mSrcStorageElements.push_back( nameToStorageElement["BNL_DATATAPE"] );
+    x2cTransferGen->mCacheElements.push_back( std::make_pair(10000, nameToStorageElement["iowa_bucket"]) );
+    x2cTransferGen->mDstStorageElements.push_back( nameToStorageElement["BNL_DATADISK"] );
 
 
     mSchedule.push(std::make_shared<CBillingGenerator>(this));
