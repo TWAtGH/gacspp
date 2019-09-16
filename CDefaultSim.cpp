@@ -72,6 +72,7 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
 	}
 
     std::unordered_map<std::string, ISite*> nameToSite;
+    std::unordered_map<std::string, CStorageElement*> nameToStorageElement;
 	std::stringstream dbIn;
 	bool ok = true;
     //add all grid sites and storage elements to output DB (before links)
@@ -89,6 +90,9 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
 
         for(const std::unique_ptr<CStorageElement>& storageElement : gridSite->mStorageElements)
         {
+            assert(nameToStorageElement.count(storageElement->GetName()) == 0);
+            nameToStorageElement[storageElement->GetName()] = storageElement.get();
+
             dbIn.str(std::string());
             dbIn << storageElement->GetId() << ","
                  << gridSite->GetId() << ","
@@ -116,6 +120,9 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
 
             for(const std::unique_ptr<gcp::CBucket>& bucket : region->mStorageElements)
             {
+                assert(nameToStorageElement.count(bucket->GetName()) == 0);
+                nameToStorageElement[bucket->GetName()] = bucket.get();
+
                 dbIn.str(std::string());
                 dbIn << bucket->GetId() << ","
                      << region->GetId() << ","
@@ -158,6 +165,9 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
                          << link->GetDstSiteId();
                     ok = ok && output.InsertRow("NetworkLinks", dbIn.str());
 
+                    if(dstLinkCfgJson.at("receivingLink").empty())
+                        continue;
+
                     bandwidth = dstLinkCfgJson.at("receivingLink").at("bandwidth").get<std::uint32_t>();
         			link = dstSite->CreateNetworkLink(srcSite, bandwidth);
                     dbIn.str(std::string());
@@ -186,50 +196,83 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
     ////////////////////////////
     // setup scheuleables
     ////////////////////////////
-    auto dataGen = std::make_shared<CDataGenerator>(this, 50, 0);
-    for(const std::unique_ptr<CGridSite>& gridSite : mRucio->mGridSites)
-        for(const std::unique_ptr<CStorageElement>& gridStoragleElement : gridSite->mStorageElements)
-            dataGen->mStorageElements.push_back(gridStoragleElement.get());
-    dataGen->mStorageElements.push_back(((gcp::CRegion*)(mClouds[0]->mRegions[0].get()))->mStorageElements[0].get());
+    try
+    {
+        for(const json& dataGenCfg : profileJson.at("dataGens"))
+        {
+            const TickType startTick = dataGenCfg.at("startTick").get<TickType>();
+            const TickType tickFreq = dataGenCfg.at("tickFreq").get<TickType>();
+
+            std::unordered_map<std::string, std::unique_ptr<IValueGenerator>> jsonPropNameToValueGen;
+            for(const std::string& propName : {"numFilesCfg", "fileSizeCfg", "lifetimeCfg"})
+            {
+                const json& propJson = dataGenCfg.at(propName);
+                const std::string type = propJson.at("type").get<std::string>();
+                if(type == "normal")
+                {
+                    const double mean = propJson.at("mean");
+                    const double stddev = propJson.at("stddev");
+                    jsonPropNameToValueGen[propName] = std::make_unique<CNormalRandomValueGenerator>(mean, stddev);
+                }
+                else if(type == "fixed")
+                {
+                    const double value = propJson.at("value");
+                    jsonPropNameToValueGen[propName] = std::make_unique<CFixedValueGenerator>(value);
+                }
+            }
+
+            std::shared_ptr<CDataGenerator> dataGen = std::make_shared<CDataGenerator>(this,
+                                                                            std::move(jsonPropNameToValueGen["numFilesCfg"]),
+                                                                            std::move(jsonPropNameToValueGen["fileSizeCfg"]),
+                                                                            std::move(jsonPropNameToValueGen["lifetimeCfg"]),
+                                                                            tickFreq, startTick);
+
+            for(const json& storageElement : dataGenCfg.at("storageElements"))
+            {
+                const std::string storageElementName = storageElement.get<std::string>();
+                if(nameToStorageElement.count(storageElementName) == 0)
+                {
+                    std::cout<<"Failed to find storage element for data generator: "<<storageElementName<<std::endl;
+                    continue;
+                }
+                dataGen->mStorageElements.push_back(nameToStorageElement[storageElementName]);
+            }
+
+            for(const json& ratioVal : dataGenCfg.at("numReplicaRatios"))
+                dataGen->mNumReplicaRatio.push_back(ratioVal.get<float>());
+
+            dataGen->mSelectStorageElementsRandomly = dataGenCfg.at("selectStorageElementsRandomly").get<bool>();
+
+            mSchedule.push(dataGen);
+        }
+    }
+    catch(const json::out_of_range& error)
+	{
+		std::cout << "Failed to load data gen cfg: " << error.what() << std::endl;
+	}
 
     auto reaper = std::make_shared<CReaper>(mRucio.get(), 600, 600);
 
     auto x2cTransferMgr = std::make_shared<CFixedTimeTransferManager>(20, 100);
-    //auto x2cTransferNumGen = std::make_shared<CWavedTransferNumGen>(12, 200, 25, 0.075);
-    //auto x2cTransferGen = std::make_shared<CSrcPrioTransferGen>(this, x2cTransferMgr, x2cTransferNumGen, 25);
     auto x2cTransferGen = std::make_shared<CJobSlotTransferGen>(this, x2cTransferMgr, 25);
 
 
     auto heartbeat = std::make_shared<CHeartbeat>(this, x2cTransferMgr, nullptr, static_cast<std::uint32_t>(SECONDS_PER_DAY), static_cast<TickType>(SECONDS_PER_DAY));
-    heartbeat->mProccessDurations["DataGen"] = &(dataGen->mUpdateDurationSummed);
+    //heartbeat->mProccessDurations["DataGen"] = &(dataGen->mUpdateDurationSummed);
     heartbeat->mProccessDurations["X2CTransferUpdate"] = &(x2cTransferMgr->mUpdateDurationSummed);
     heartbeat->mProccessDurations["X2CTransferGen"] = &(x2cTransferGen->mUpdateDurationSummed);
     heartbeat->mProccessDurations["Reaper"] = &(reaper->mUpdateDurationSummed);
 
 
     for(const std::unique_ptr<CGridSite>& gridSite : mRucio->mGridSites)
-    {
         for(const std::unique_ptr<CStorageElement>& storageElement : gridSite->mStorageElements)
-        {
             x2cTransferGen->mSrcStorageElementIdToPrio[storageElement->GetId()] = 0;
-        }
-    }
 
-    for(const std::unique_ptr<ISite>& cloudSite : mClouds[0]->mRegions)
-    {
-        auto region = dynamic_cast<gcp::CRegion*>(cloudSite.get());
-        assert(region);
-        for (const std::unique_ptr<gcp::CBucket>& bucket : region->mStorageElements)
-        {
-            x2cTransferGen->mSrcStorageElementIdToPrio[bucket->GetId()] = 1;
-            //x2cTransferGen->mDstStorageElements.push_back(bucket.get());
-            CJobSlotTransferGen::SJobSlotInfo jobslot = {static_cast<std::uint32_t>(std::stoi(region->mCustomConfig["numJobSlots"])), {}};
-            x2cTransferGen->mDstInfo.push_back( std::make_pair(bucket.get(), jobslot) );
-        }
-    }
+    CJobSlotTransferGen::SJobSlotInfo jobslot = {5000, {}};
+    x2cTransferGen->mDstInfo.push_back( std::make_pair(nameToStorageElement["BNL_DATADISK"], jobslot) );
+
 
     mSchedule.push(std::make_shared<CBillingGenerator>(this));
-    mSchedule.push(dataGen);
     mSchedule.push(reaper);
     mSchedule.push(x2cTransferMgr);
     mSchedule.push(x2cTransferGen);

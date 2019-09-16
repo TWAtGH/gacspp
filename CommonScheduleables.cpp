@@ -16,9 +16,38 @@
 #include "SFile.hpp"
 
 
-CDataGenerator::CDataGenerator(IBaseSim* sim, const std::uint32_t tickFreq, const TickType startTick)
+CFixedValueGenerator::CFixedValueGenerator(const double value)
+    : mValue(value)
+{}
+
+auto CFixedValueGenerator::GetValue(RNGEngineType& rngEngine) -> double
+{
+    (void)rngEngine;
+    return mValue;
+}
+
+
+CNormalRandomValueGenerator::CNormalRandomValueGenerator(const double mean, const double stddev)
+    : mNormalRNGDistribution(mean, stddev)
+{}
+
+auto CNormalRandomValueGenerator::GetValue(RNGEngineType& rngEngine) -> double
+{
+    return mNormalRNGDistribution(rngEngine);
+}
+
+
+CDataGenerator::CDataGenerator( IBaseSim* sim,
+                                std::unique_ptr<IValueGenerator>&& numFilesRNG,
+                                std::unique_ptr<IValueGenerator>&& fileSizeRNG,
+                                std::unique_ptr<IValueGenerator>&& fileLifetimeRNG,
+                                const std::uint32_t tickFreq,
+                                const TickType startTick)
     : CScheduleable(startTick),
       mSim(sim),
+      mNumFilesRNG(std::move(numFilesRNG)),
+      mFileSizeRNG(std::move(fileSizeRNG)),
+      mFileLifetimeRNG(std::move(fileLifetimeRNG)),
       mTickFreq(tickFreq)
 {
     //mOutputFileInsertQuery = COutput::GetRef().CreatePreparedInsert("INSERT INTO Files VALUES(?, ?, ?, ?);", '?');
@@ -30,11 +59,15 @@ void CDataGenerator::OnUpdate(const TickType now)
     auto curRealtime = std::chrono::high_resolution_clock::now();
     const std::uint32_t totalFilesToGen = GetRandomNumFilesToGenerate();
 
-    std::uint32_t numFilesToGen = std::max(static_cast<std::uint32_t>(totalFilesToGen * 0.6f), 1U);
+    float numReplicaRatio = mNumReplicaRatio.empty() ? 1 : mNumReplicaRatio[0];
+    std::uint32_t numFilesToGen = static_cast<std::uint32_t>(totalFilesToGen * numReplicaRatio);
     CreateFilesAndReplicas(numFilesToGen, 1, now);
 
-    numFilesToGen = totalFilesToGen - numFilesToGen;
-    CreateFilesAndReplicas(numFilesToGen, 2, now);
+    for(std::size_t i=1; i<mNumReplicaRatio.size(); ++i)
+    {
+        numFilesToGen = static_cast<std::uint32_t>(totalFilesToGen * mNumReplicaRatio[i]);
+        CreateFilesAndReplicas(numFilesToGen, i+1, now);
+    }
 
     mUpdateDurationSummed += std::chrono::high_resolution_clock::now() - curRealtime;
     mNextCallTick = now + mTickFreq;
@@ -42,20 +75,23 @@ void CDataGenerator::OnUpdate(const TickType now)
 
 auto CDataGenerator::GetRandomFileSize() -> std::uint32_t
 {
+    assert(mFileSizeRNG);
     const double min = 64 * ONE_MiB;
     const double max = static_cast<double>(std::numeric_limits<std::uint32_t>::max());
-    const double val = GiB_TO_BYTES(std::abs(mFileSizeRNG(mSim->mRNGEngine)));
+    const double val = GiB_TO_BYTES(std::abs(mFileSizeRNG->GetValue(mSim->mRNGEngine)));
     return static_cast<std::uint32_t>(std::clamp(val, min, max));
 }
 
 auto CDataGenerator::GetRandomNumFilesToGenerate() -> std::uint32_t
 {
-    return static_cast<std::uint32_t>( std::max(1.f, mNumFilesRNG(mSim->mRNGEngine)) );
+    assert(mNumFilesRNG);
+    return static_cast<std::uint32_t>( std::max(1.0, mNumFilesRNG->GetValue(mSim->mRNGEngine)) );
 }
 
 auto CDataGenerator::GetRandomLifeTime() -> TickType
 {
-    float val = DAYS_TO_SECONDS(std::abs(mFileLifetimeRNG(mSim->mRNGEngine)));
+    assert(mFileLifetimeRNG);
+    float val = DAYS_TO_SECONDS(std::abs(mFileLifetimeRNG->GetValue(mSim->mRNGEngine)));
     return static_cast<TickType>( std::max(float(SECONDS_PER_DAY), val) );
 }
 
@@ -88,11 +124,13 @@ auto CDataGenerator::CreateFilesAndReplicas(const std::uint32_t numFiles, const 
         bytesOfFilesGen += fileSize;
 
         auto reverseRSEIt = mStorageElements.rbegin();
+        auto selectedElementIt = mStorageElements.begin();
         //numReplicasPerFile <= numStorageElements !
         for(std::uint32_t numCreated = 0; numCreated<numReplicasPerFile; ++numCreated)
         {
-            auto selectedElementIt = mStorageElements.begin() + (rngSampler(mSim->mRNGEngine) % (numStorageElements - numCreated));
-            auto r = (*selectedElementIt)->CreateReplica(file);
+            if(mSelectStorageElementsRandomly)
+                selectedElementIt = mStorageElements.begin() + (rngSampler(mSim->mRNGEngine) % (numStorageElements - numCreated));
+            std::shared_ptr<SReplica> r = (*selectedElementIt)->CreateReplica(file);
             r->Increase(fileSize, now);
             r->mExpiresAt = now + (lifetime / numReplicasPerFile);
             replicaInsertQueries->AddValue(r->GetId());
@@ -100,8 +138,13 @@ auto CDataGenerator::CreateFilesAndReplicas(const std::uint32_t numFiles, const 
             replicaInsertQueries->AddValue((*selectedElementIt)->GetId());
             replicaInsertQueries->AddValue(now);
             replicaInsertQueries->AddValue(r->mExpiresAt);
-            std::iter_swap(selectedElementIt, reverseRSEIt);
-			++reverseRSEIt;
+            if(mSelectStorageElementsRandomly)
+            {
+                std::iter_swap(selectedElementIt, reverseRSEIt);
+                ++reverseRSEIt;
+            }
+            else
+                ++selectedElementIt;
         }
     }
     COutput::GetRef().QueueInserts(std::move(fileInsertQueries));
@@ -683,7 +726,7 @@ void CJobSlotTransferGen::OnUpdate(const TickType now)
 
         // todo: consider mTickFreq
         std::uint32_t flexCreationLimit = std::min(numMaxSlots - usedSlots, std::uint32_t(1 + (0.01 * numMaxSlots)));
-        std::pair<TickType, std::uint32_t> newJobs = std::make_pair(now+900, 0);
+        std::pair<TickType, std::uint32_t> newJobs = std::make_pair(now+900+60000, 0);
         for(std::uint32_t totalTransfersCreated=0; totalTransfersCreated<flexCreationLimit; ++totalTransfersCreated)
         {
             SFile* fileToTransfer = allFiles[fileRndSelector(rngEngine)].get();

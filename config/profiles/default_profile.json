@@ -1,5 +1,5 @@
 {
-"maxTick": 2592000,
+"maxTick": 7776000,
 "clouds": [
 		{
 			"id": "gcp",
@@ -12,5 +12,28 @@
 	},
 "links": {
 	"config": {"_file_": "links_default.json"}
-	}
+    },
+"dataGens": [
+        {
+            "storageElements": ["BNL_DATATAPE"],
+            "numReplicaRatios": [],
+            "selectStorageElementsRandomly": false,
+            "startTick": 0,
+            "tickFreq": 43200,
+            "numFilesCfg": {
+                "type": "normal",
+                "mean": 232,
+                "stddev": 1
+            },
+            "fileSizeCfg":{
+                "type": "normal",
+                "mean": 0.5,
+                "stddev": 0.25
+            },
+            "lifetimeCfg": {
+                "type": "fixed",
+                "value": 157680000
+            }
+        }
+    ]
 }

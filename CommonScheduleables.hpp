@@ -12,7 +12,31 @@ class CStorageElement;
 class CNetworkLink;
 struct SReplica;
 
+class IValueGenerator
+{
+public:
+    virtual auto GetValue(RNGEngineType& rngEngine) -> double = 0;
+};
 
+class CFixedValueGenerator : public IValueGenerator
+{
+private:
+    double mValue;
+
+public:
+    CFixedValueGenerator(const double value);
+    virtual auto GetValue(RNGEngineType& rngEngine) -> double;
+};
+
+class CNormalRandomValueGenerator : public IValueGenerator
+{
+private:
+    std::normal_distribution<double> mNormalRNGDistribution;
+
+public:
+    CNormalRandomValueGenerator(const double mean, const double stddev);
+    virtual auto GetValue(RNGEngineType& rngEngine) -> double;
+};
 
 class CDataGenerator : public CScheduleable
 {
@@ -21,9 +45,9 @@ private:
 
     IBaseSim* mSim;
 
-    std::normal_distribution<float> mNumFilesRNG {40, 1};
-    std::normal_distribution<double> mFileSizeRNG {0.5, 0.25};
-    std::normal_distribution<float> mFileLifetimeRNG {6, 1};
+    std::unique_ptr<IValueGenerator> mNumFilesRNG;
+    std::unique_ptr<IValueGenerator> mFileSizeRNG;
+    std::unique_ptr<IValueGenerator> mFileLifetimeRNG;
 
     std::uint32_t mTickFreq;
 
@@ -34,8 +58,17 @@ private:
     std::uint64_t CreateFilesAndReplicas(const std::uint32_t numFiles, const std::uint32_t numReplicasPerFile, const TickType now);
 
 public:
+
+    bool mSelectStorageElementsRandomly = false;
+    std::vector<float> mNumReplicaRatio;
     std::vector<CStorageElement*> mStorageElements;
-    CDataGenerator(IBaseSim* sim, const std::uint32_t tickFreq, const TickType startTick=0);
+
+    CDataGenerator( IBaseSim* sim,
+                    std::unique_ptr<IValueGenerator>&& numFilesRNG,
+                    std::unique_ptr<IValueGenerator>&& fileSizeRNG,
+                    std::unique_ptr<IValueGenerator>&& fileLifetimeRNG,
+                    const std::uint32_t tickFreq,
+                    const TickType startTick=0);
 
     void OnUpdate(const TickType now) final;
 };
