@@ -7,6 +7,8 @@
 
 namespace gcp
 {
+	typedef std::vector<std::pair<std::uint64_t, std::int32_t>> TieredPriceType;
+
     class CCloudBill : public ICloudBill
     {
     private:
@@ -29,9 +31,7 @@ namespace gcp
         double mOperationCosts = 0;
 
 	public:
-        std::vector<std::pair<std::uint32_t, std::int32_t>> mStorageRates;
-
-        using CStorageElement::CStorageElement;
+		using CStorageElement::CStorageElement;
 
 		CBucket(CBucket&&) = default;
 
@@ -49,14 +49,16 @@ namespace gcp
 	class CRegion : public ISite
 	{
 	public:
-        using ISite::ISite;
+		using ISite::ISite;
 
 		auto CreateStorageElement(std::string&& name) -> CBucket* final;
-		double CalculateStorageCosts(TickType now);
-		double CalculateOperationCosts(TickType now);
-		double CalculateNetworkCosts(double& sumUsedTraffic, std::uint64_t& sumDoneTransfers);
+		auto CalculateStorageCosts(TickType now) -> double;
+		auto CalculateOperationCosts(TickType now) -> double;
+		auto CalculateNetworkCosts(double& sumUsedTraffic, std::uint64_t& sumDoneTransfers) -> double;
 
         std::vector<std::unique_ptr<CBucket>> mStorageElements;
+		std::unordered_map<IdType, TieredPriceType> mNetworkLinkIdToPrice;
+		TieredPriceType mStoragePrice;
 	};
 
 	class CCloud final : public IBaseCloud
@@ -73,12 +75,25 @@ namespace gcp
 		auto ProcessBilling(TickType now) -> std::unique_ptr<ICloudBill> final;
 		void SetupDefaultCloud() final;
 
-        bool TryConsumeConfig(const json& config) final;
+        bool LoadConfig(const json& config) final;
 
     private:
-        json* mSKUSettings = nullptr;
+		//todo: use smart pointers (destructor invisible?)
+		json* mSKUSettings = nullptr;
+		json* mNetworkPrices = nullptr;
 
-        void LoadBaseSettingsJson(const json& config);
-        void InitBucketBySKUId(CBucket* bucket, const std::string& skuId);
+		auto GetTieredRateFromSKUId(const std::string& skuId) const -> TieredPriceType;
+	};
+
+	class CCloudFactory : public ICloudFactory
+	{
+	private:
+		static ICloudFactory* mInstance;
+
+	public:
+		CCloudFactory();
+		~CCloudFactory();
+
+		auto CreateCloud(std::string&& cloudName) const->std::unique_ptr<IBaseCloud> final;
 	};
 }

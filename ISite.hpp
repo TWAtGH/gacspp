@@ -7,16 +7,10 @@
 
 #include "constants.h"
 
-class CLinkSelector;
+class CNetworkLink;
 class CStorageElement;
 
 
-
-// 0 = asia
-// 1 = australia-southeast1
-// 2 = europe
-// 3 = southamerica-east1
-// 4 = us
 
 class ISite
 {
@@ -35,10 +29,11 @@ public:
 	inline bool operator!=(const ISite& b) const
 	{return mId != b.mId;}
 
-	virtual auto CreateLinkSelector(ISite* const dstSite, const std::uint32_t bandwidth) -> CLinkSelector*;
+	virtual auto CreateNetworkLink(ISite* const dstSite, const std::uint32_t bandwidth) -> CNetworkLink*;
     virtual auto CreateStorageElement(std::string&& name) -> CStorageElement* = 0;
 
-	auto GetLinkSelector(const ISite* const dstSite) -> CLinkSelector*;
+	auto GetNetworkLink(const ISite* const dstSite) -> CNetworkLink*;
+	auto GetNetworkLink(const ISite* const dstSite) const -> const CNetworkLink*;
 
 	inline auto GetId() const -> IdType
 	{return mId;}
@@ -49,7 +44,7 @@ public:
     inline auto GetMultiLocationIdx() const -> std::uint8_t
     {return mMultiLocationIdx;}
 
-    std::vector<std::unique_ptr<CLinkSelector>> mLinkSelectors;
+    std::vector<std::unique_ptr<CNetworkLink>> mNetworkLinks;
 
 private:
 	IdType mId;
@@ -58,7 +53,7 @@ private:
     std::uint8_t mMultiLocationIdx;
 
 protected:
-	std::unordered_map<IdType, std::size_t> mDstSiteIdToLinkSelectorIdx;
+	std::unordered_map<IdType, std::size_t> mDstSiteIdToNetworkLinkIdx;
 
 public:
     std::unordered_map<std::string, std::string> mCustomConfig;

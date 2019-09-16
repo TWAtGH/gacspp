@@ -2,7 +2,7 @@
 
 #include "ISite.hpp"
 
-#include "CLinkSelector.hpp"
+#include "CNetworkLink.hpp"
 #include "CStorageElement.hpp"
 
 
@@ -16,19 +16,27 @@ ISite::ISite(std::string&& name, std::string&& locationName, const std::uint8_t 
 
 ISite::~ISite() = default;
 
-auto ISite::CreateLinkSelector(ISite* const dstSite, const std::uint32_t bandwidth) -> CLinkSelector*
+auto ISite::CreateNetworkLink(ISite* const dstSite, const std::uint32_t bandwidth) -> CNetworkLink*
 {
-    auto result = mDstSiteIdToLinkSelectorIdx.insert({dstSite->mId, mLinkSelectors.size()});
+    auto result = mDstSiteIdToNetworkLinkIdx.insert({dstSite->mId, mNetworkLinks.size()});
     assert(result.second);
-    CLinkSelector* newLinkSelector = new CLinkSelector(bandwidth, this, dstSite);
-    mLinkSelectors.emplace_back(newLinkSelector);
-    return newLinkSelector;
+    CNetworkLink* newNetworkLink = new CNetworkLink(bandwidth, this, dstSite);
+    mNetworkLinks.emplace_back(newNetworkLink);
+    return newNetworkLink;
 }
 
-auto ISite::GetLinkSelector(const ISite* const dstSite) -> CLinkSelector*
+auto ISite::GetNetworkLink(const ISite* const dstSite) -> CNetworkLink*
 {
-    auto result = mDstSiteIdToLinkSelectorIdx.find(dstSite->mId);
-    if(result == mDstSiteIdToLinkSelectorIdx.end())
+    auto result = mDstSiteIdToNetworkLinkIdx.find(dstSite->mId);
+    if(result == mDstSiteIdToNetworkLinkIdx.end())
         return nullptr;
-    return mLinkSelectors[result->second].get();
+    return mNetworkLinks[result->second].get();
+}
+
+auto ISite::GetNetworkLink(const ISite* const dstSite) const -> const CNetworkLink*
+{
+	auto result = mDstSiteIdToNetworkLinkIdx.find(dstSite->mId);
+	if (result == mDstSiteIdToNetworkLinkIdx.end())
+		return nullptr;
+	return mNetworkLinks[result->second].get();
 }

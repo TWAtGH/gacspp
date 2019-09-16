@@ -1,25 +1,23 @@
 #include <cassert>
+#include <iostream>
 #include <sstream>
+
+#include "json.hpp"
 
 #include "CDefaultSim.hpp"
 #include "CCloudGCP.hpp"
-#include "CConfigLoader.hpp"
-#include "CLinkSelector.hpp"
+#include "CConfigManager.hpp"
+#include "CNetworkLink.hpp"
 #include "CRucio.hpp"
 #include "COutput.hpp"
 #include "CommonScheduleables.hpp"
 
 
 
-void CDefaultSim::SetupDefaults()
+void CDefaultSim::SetupDefaults(const json& profileJson)
 {
+	CConfigManager& configManager = CConfigManager::GetRef();
     COutput& output = COutput::GetRef();
-    CConfigLoader& config = CConfigLoader::GetRef();
-    ////////////////////////////
-    // init output db
-    ////////////////////////////
-    std::stringstream dbIn;
-    bool ok = true;
 
     //CStorageElement::outputReplicaInsertQuery = output.CreatePreparedInsert("INSERT INTO Replicas VALUES(?, ?, ?, ?, ?)", '?');
     CStorageElement::outputReplicaInsertQuery = output.CreatePreparedInsert("COPY Replicas(id, fileId, storageElementId, createdAt, expiredAt) FROM STDIN with(FORMAT csv);", 5, '?');
@@ -29,14 +27,52 @@ void CDefaultSim::SetupDefaults()
     // setup grid and clouds
     ////////////////////////////
     mRucio = std::make_unique<CRucio>();
-    mClouds.emplace_back(std::make_unique<gcp::CCloud>("GCP"));
+	try
+	{
+		json rucioCfg;
+		configManager.TryLoadProfileCfg(rucioCfg, configManager.GetFileNameFromObj(profileJson.at("rucio")));
+		mRucio->LoadConfig(rucioCfg);
+	}
+	catch(const json::out_of_range& error)
+	{
+		std::cout << "Failed to load rucio cfg: " << error.what() << std::endl;
+	}
 
-    config.mConfigConsumer.push_back(mRucio.get());
-    for(std::unique_ptr<IBaseCloud>& cloud : mClouds)
-        config.mConfigConsumer.push_back(cloud.get());
+	try
+	{
+		for (const json& cloudJson : profileJson.at("clouds"))
+		{
+			std::unique_ptr<IBaseCloud> cloud;
+			try
+			{
+				const std::string cloudId = cloudJson.at("id").get<std::string>();
+				cloud = CCloudFactoryManager::GetRef().CreateCloud(cloudId, cloudJson.at("name").get<std::string>());
 
-    config.TryLoadConfig(std::filesystem::current_path() / "config" / "default.json");
+				if (!cloud)
+				{
+					std::cout << "Failed to create cloud with id: " << cloudId << std::endl;
+					continue;
+				}
+			}
+			catch (const json::exception& error)
+			{
+				std::cout << "Failed to load config for cloud: " << error.what() << std::endl;
+				continue;
+			}
 
+			json cloudCfg;
+			configManager.TryLoadProfileCfg(cloudCfg, configManager.GetFileNameFromObj(cloudJson));
+			cloud->LoadConfig(cloudCfg);
+			mClouds.emplace_back(std::move(cloud));
+		}
+	}
+	catch (const json::out_of_range& error)
+	{
+		std::cout << "Failed to load clouds cfg: " << error.what() << std::endl;
+	}
+
+	std::stringstream dbIn;
+	bool ok = true;
     //add all grid sites and storage elements to output DB (before links)
     for(const std::unique_ptr<CGridSite>& gridSite : mRucio->mGridSites)
     {
@@ -81,22 +117,29 @@ void CDefaultSim::SetupDefaults()
 
             for(const std::unique_ptr<CGridSite>& gridSite : mRucio->mGridSites)
             {
-                CLinkSelector* link = gridSite->CreateLinkSelector(region, ONE_GiB / 32);
+				CNetworkLink* link = gridSite->CreateNetworkLink(region, ONE_GiB / 32);
                 dbIn.str(std::string());
                 dbIn << link->GetId() << ","
                      << link->GetSrcSiteId() << ","
                      << link->GetDstSiteId();
-                ok = ok && output.InsertRow("LinkSelectors", dbIn.str());
+                ok = ok && output.InsertRow("NetworkLinks", dbIn.str());
 
-                link = region->CreateLinkSelector(gridSite.get(), ONE_GiB / 128);
+                link = region->CreateNetworkLink(gridSite.get(), ONE_GiB / 128);
                 dbIn.str(std::string());
                 dbIn << link->GetId() << ","
                      << link->GetSrcSiteId() << ","
                      << link->GetDstSiteId();
-                ok = ok && output.InsertRow("LinkSelectors", dbIn.str());
+                ok = ok && output.InsertRow("NetworkLinks", dbIn.str());
             }
         }
     }
+
+	if (profileJson.contains("links"))
+	{
+		json linksCfg;
+		configManager.TryLoadProfileCfg(linksCfg, configManager.GetFileNameFromObj(profileJson["links"]));
+
+	}
 
     for(const std::unique_ptr<IBaseCloud>& cloud : mClouds)
         cloud->SetupDefaultCloud();

@@ -13,8 +13,8 @@
 
 auto COutput::GetRef() -> COutput&
 {
-    static COutput mInstance;
-    return mInstance;
+    static COutput instance;
+    return instance;
 }
 
 COutput::~COutput()

@@ -9,7 +9,7 @@
 class IBaseSim;
 class CRucio;
 class CStorageElement;
-class CLinkSelector;
+class CNetworkLink;
 struct SReplica;
 
 
@@ -78,12 +78,12 @@ private:
     {
         std::weak_ptr<SReplica> mSrcReplica;
         std::weak_ptr<SReplica> mDstReplica;
-        CLinkSelector* mLinkSelector;
+		CNetworkLink* mNetworkLink;
         TickType mStartTick;
 
         STransfer(  std::shared_ptr<SReplica> srcReplica,
                     std::shared_ptr<SReplica> dstReplica,
-                    CLinkSelector* const linkSelector,
+					CNetworkLink* const networkLink,
                     const TickType startTick);
     };
 
@@ -117,14 +117,14 @@ private:
     {
         std::weak_ptr<SReplica> mSrcReplica;
         std::weak_ptr<SReplica> mDstReplica;
-        CLinkSelector* mLinkSelector;
+		CNetworkLink* mNetworkLink;
         TickType mStartTick;
 
         std::uint32_t mIncreasePerTick;
 
         STransfer(  std::shared_ptr<SReplica> srcReplica,
                     std::shared_ptr<SReplica> dstReplica,
-                    CLinkSelector* const linkSelector,
+					CNetworkLink* const networkLink,
                     const TickType startTick,
                     const std::uint32_t increasePerTick);
     };

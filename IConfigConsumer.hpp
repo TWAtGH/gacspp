@@ -8,5 +8,5 @@ using nlohmann::json;
 class IConfigConsumer
 {
 public:
-    virtual bool TryConsumeConfig(const json& config) = 0;
+    virtual bool LoadConfig(const json& config) = 0;
 };

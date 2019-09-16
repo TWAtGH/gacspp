@@ -1,0 +1,51 @@
+{
+	"interregion": {
+		"0": {
+			"name": "APAC",
+			"0": {"skuId": "A115-9CB2-F553"},
+			"1": {"skuId": "CDD1-6B91-FDF8"},
+			"2": {"skuId": "EF0A-B3BA-32CA"},
+			"3": {"skuId": "6B37-399C-BF69"},
+			"4": {"skuId": "1F9A-A9AC-FFC3"}
+		},
+		"1": {
+			"name": "AU",
+			"0": {"skuId": "CDD1-6B91-FDF8"},
+			"1": {"skuId": "3DCF-1741-642F"},
+			"2": {"skuId": "1E7D-CBB0-AF0C"},
+			"3": {"skuId": "27F0-D54C-619A"},
+			"4": {"skuId": "7F66-C883-4D7D"}
+		},
+		"2": {
+			"name": "EU",
+			"0": {"skuId": "EF0A-B3BA-32CA"},
+			"1": {"skuId": "1E7D-CBB0-AF0C"},
+			"2": {"skuId": "68F8-91DC-CFA9"},
+			"3": {"skuId": "C7FF-4F9E-C0DB"},
+			"4": {"skuId": "96EB-C6ED-FBDE"}
+		},
+		"3": {
+			"name": "NA",
+			"0": {"skuId": "6B37-399C-BF69"},
+			"1": {"skuId": "27F0-D54C-619A"},
+			"2": {"skuId": "C7FF-4F9E-C0DB"},
+			"3": {"skuId": "8878-37D4-D2AC"},
+			"4": {"skuId": "BB86-91E8-5450"}
+		},
+		"4": {
+			"name": "SA",
+			"0": {"skuId": "1F9A-A9AC-FFC3"},
+			"1": {"skuId": "7F66-C883-4D7D"},
+			"2": {"skuId": "96EB-C6ED-FBDE"},
+			"3": {"skuId": "BB86-91E8-5450"},
+			"4": {"skuId": "F3A4-ED7C-EF4B"}
+		}
+	},
+	"download": {
+		"0": {"skuId": "1F8B-71B0-3D1B"},
+		"1": {"skuId": "9B2D-2B7D-FA5C"},
+		"2": {"skuId": "22EB-AAE8-FBCD"},
+		"3": {"skuId": "22EB-AAE8-FBCD"},
+		"4": {"skuId": "22EB-AAE8-FBCD"}
+	}
+}

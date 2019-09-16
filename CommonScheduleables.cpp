@@ -8,7 +8,7 @@
 #include "IBaseCloud.hpp"
 #include "IBaseSim.hpp"
 
-#include "CLinkSelector.hpp"
+#include "CNetworkLink.hpp"
 #include "CRucio.hpp"
 #include "COutput.hpp"
 #include "CStorageElement.hpp"
@@ -152,7 +152,7 @@ void CBillingGenerator::OnUpdate(const TickType now)
         summary << srcGridSite->GetName() << std::endl;
         for (auto& dstRegion : mSim->mClouds[0]->mRegions)
         {
-            auto link = srcGridSite->GetLinkSelector(dstRegion.get());
+            auto link = srcGridSite->GetNetworkLink(dstRegion.get());
             if (link == nullptr)
                 continue;
             summary << "\t--> " << dstRegion->GetName() << ": " << link->mDoneTransfers << std::endl;
@@ -176,11 +176,11 @@ void CBillingGenerator::OnUpdate(const TickType now)
 
 CTransferManager::STransfer::STransfer( std::shared_ptr<SReplica> srcReplica,
                                         std::shared_ptr<SReplica> dstReplica,
-                                        CLinkSelector* const linkSelector,
+										CNetworkLink* const networkLink,
                                         const TickType startTick)
     : mSrcReplica(srcReplica),
       mDstReplica(dstReplica),
-      mLinkSelector(linkSelector),
+      mNetworkLink(networkLink),
       mStartTick(startTick)
 {}
 
@@ -200,10 +200,10 @@ void CTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcReplica, std:
     srcReplica->GetStorageElement()->OnOperation(CStorageElement::GET);
     ISite* const srcSite = srcReplica->GetStorageElement()->GetSite();
     ISite* const dstSite = dstReplica->GetStorageElement()->GetSite();
-    CLinkSelector* const linkSelector = srcSite->GetLinkSelector(dstSite);
+	CNetworkLink* const networkLink = srcSite->GetNetworkLink(dstSite);
 
-    linkSelector->mNumActiveTransfers += 1;
-    mActiveTransfers.emplace_back(srcReplica, dstReplica, linkSelector, now);
+	networkLink->mNumActiveTransfers += 1;
+    mActiveTransfers.emplace_back(srcReplica, dstReplica, networkLink, now);
 }
 
 void CTransferManager::OnUpdate(const TickType now)
@@ -221,22 +221,22 @@ void CTransferManager::OnUpdate(const TickType now)
         STransfer& transfer = mActiveTransfers[idx];
         std::shared_ptr<SReplica> srcReplica = transfer.mSrcReplica.lock();
         std::shared_ptr<SReplica> dstReplica = transfer.mDstReplica.lock();
-        CLinkSelector* const linkSelector = transfer.mLinkSelector;
+		CNetworkLink* const networkLink = transfer.mNetworkLink;
 
         if(!srcReplica || !dstReplica)
         {
-            linkSelector->mFailedTransfers += 1;
-            linkSelector->mNumActiveTransfers -= 1;
+			networkLink->mFailedTransfers += 1;
+			networkLink->mNumActiveTransfers -= 1;
             transfer = std::move(mActiveTransfers.back());
             mActiveTransfers.pop_back();
             continue; // handle same idx again
         }
 
-        const double sharedBandwidth = linkSelector->mBandwidth / static_cast<double>(linkSelector->mNumActiveTransfers);
+        const double sharedBandwidth = networkLink->mBandwidth / static_cast<double>(networkLink->mNumActiveTransfers);
         std::uint32_t amount = static_cast<std::uint32_t>(sharedBandwidth * timeDiff);
         amount = dstReplica->Increase(amount, now);
         summedTraffic += amount;
-        linkSelector->mUsedTraffic += amount;
+		networkLink->mUsedTraffic += amount;
 
         if(dstReplica->IsComplete())
         {
@@ -249,8 +249,8 @@ void CTransferManager::OnUpdate(const TickType now)
             ++mNumCompletedTransfers;
             mSummedTransferDuration += now - transfer.mStartTick;
 
-            linkSelector->mDoneTransfers += 1;
-            linkSelector->mNumActiveTransfers -= 1;
+			networkLink->mDoneTransfers += 1;
+			networkLink->mNumActiveTransfers -= 1;
             transfer = std::move(mActiveTransfers.back());
             mActiveTransfers.pop_back();
             continue; // handle same idx again
@@ -268,12 +268,12 @@ void CTransferManager::OnUpdate(const TickType now)
 
 CFixedTimeTransferManager::STransfer::STransfer( std::shared_ptr<SReplica> srcReplica,
                                                  std::shared_ptr<SReplica> dstReplica,
-                                                 CLinkSelector* const linkSelector,
+                                                 CNetworkLink* const networkLink,
                                                  const TickType startTick,
                                                  const std::uint32_t increasePerTick)
     : mSrcReplica(srcReplica),
       mDstReplica(dstReplica),
-      mLinkSelector(linkSelector),
+      mNetworkLink(networkLink),
       mStartTick(startTick),
       mIncreasePerTick(increasePerTick)
 {}
@@ -294,12 +294,12 @@ void CFixedTimeTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcRepl
     srcReplica->GetStorageElement()->OnOperation(CStorageElement::GET);
     ISite* const srcSite = srcReplica->GetStorageElement()->GetSite();
     ISite* const dstSite = dstReplica->GetStorageElement()->GetSite();
-    CLinkSelector* const linkSelector = srcSite->GetLinkSelector(dstSite);
+	CNetworkLink* const networkLink = srcSite->GetNetworkLink(dstSite);
 
     std::uint32_t increasePerTick = static_cast<std::uint32_t>(static_cast<double>(srcReplica->GetFile()->GetSize()) / duration);
 
-    linkSelector->mNumActiveTransfers += 1;
-    mActiveTransfers.emplace_back(srcReplica, dstReplica, linkSelector, now, std::max(1U, increasePerTick));
+	networkLink->mNumActiveTransfers += 1;
+    mActiveTransfers.emplace_back(srcReplica, dstReplica, networkLink, now, std::max(1U, increasePerTick));
 }
 
 void CFixedTimeTransferManager::OnUpdate(const TickType now)
@@ -317,12 +317,12 @@ void CFixedTimeTransferManager::OnUpdate(const TickType now)
         STransfer& transfer = mActiveTransfers[idx];
         std::shared_ptr<SReplica> srcReplica = transfer.mSrcReplica.lock();
         std::shared_ptr<SReplica> dstReplica = transfer.mDstReplica.lock();
-        CLinkSelector* const linkSelector = transfer.mLinkSelector;
+		CNetworkLink* const networkLink = transfer.mNetworkLink;
 
         if(!srcReplica || !dstReplica)
         {
-            linkSelector->mFailedTransfers += 1;
-            linkSelector->mNumActiveTransfers -= 1;
+			networkLink->mFailedTransfers += 1;
+			networkLink->mNumActiveTransfers -= 1;
             transfer = std::move(mActiveTransfers.back());
             mActiveTransfers.pop_back();
             continue; // handle same idx again
@@ -330,7 +330,7 @@ void CFixedTimeTransferManager::OnUpdate(const TickType now)
 
         std::uint32_t amount = dstReplica->Increase(transfer.mIncreasePerTick * timeDiff, now);
         summedTraffic += amount;
-        linkSelector->mUsedTraffic += amount;
+		networkLink->mUsedTraffic += amount;
 
         if(dstReplica->IsComplete())
         {
@@ -343,8 +343,8 @@ void CFixedTimeTransferManager::OnUpdate(const TickType now)
             ++mNumCompletedTransfers;
             mSummedTransferDuration += now - transfer.mStartTick;
 
-            linkSelector->mDoneTransfers += 1;
-            linkSelector->mNumActiveTransfers -= 1;
+			networkLink->mDoneTransfers += 1;
+			networkLink->mNumActiveTransfers -= 1;
             transfer = std::move(mActiveTransfers.back());
             mActiveTransfers.pop_back();
             continue; // handle same idx again
@@ -606,7 +606,7 @@ void CSrcPrioTransferGen::OnUpdate(const TickType now)
                 double minWeight = std::numeric_limits<double>::max();
                 for (std::shared_ptr<SReplica>& replica : bestSrcReplicas)
                 {
-                    double w = replica->GetStorageElement()->GetSite()->GetLinkSelector(dstSite)->GetWeight();
+                    double w = replica->GetStorageElement()->GetSite()->GetNetworkLink(dstSite)->GetWeight();
                     if (w < minWeight)
                     {
                         minWeight = w;
@@ -736,7 +736,7 @@ void CJobSlotTransferGen::OnUpdate(const TickType now)
                     double minWeight = std::numeric_limits<double>::max();
                     for (std::shared_ptr<SReplica>& replica : bestSrcReplicas)
                     {
-                        double w = replica->GetStorageElement()->GetSite()->GetLinkSelector(dstSite)->GetWeight();
+                        double w = replica->GetStorageElement()->GetSite()->GetNetworkLink(dstSite)->GetWeight();
                         if (w < minWeight)
                         {
                             minWeight = w;

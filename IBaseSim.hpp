@@ -4,13 +4,17 @@
 #include <random>
 #include <vector>
 
+#include "json_fwd.hpp"
+
 #include "constants.h"
 
 #include "CScheduleable.hpp"
 
+
+using nlohmann::json;
+
 class IBaseCloud;
 class CRucio;
-
 
 
 class IBaseSim
@@ -26,7 +30,7 @@ public:
     std::unique_ptr<CRucio> mRucio;
     std::vector<std::unique_ptr<IBaseCloud>> mClouds;
 
-    virtual void SetupDefaults() = 0;
+    virtual void SetupDefaults(const json& profileJson) = 0;
     virtual void Run(const TickType maxTick);
 
 protected:

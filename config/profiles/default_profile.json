@@ -1,0 +1,16 @@
+{
+"maxTick": 2592000,
+"clouds": [
+		{
+			"id": "gcp",
+			"name": "gcp_default",
+			"config": {"_file_": "gcp_default.json"}
+		}
+	],
+"rucio": {
+	"config": {"_file_": "rucio_default.json"}
+	},
+"links": {
+	"config": {"_file_": "links_default.json"}
+	}
+}

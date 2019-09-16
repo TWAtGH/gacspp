@@ -59,5 +59,5 @@ public:
     auto RunReaper(const TickType now) -> std::size_t;
     void ReaperWorker(const std::size_t threadIdx);
 
-    bool TryConsumeConfig(const json& config) final;
+    bool LoadConfig(const json& config) final;
 };

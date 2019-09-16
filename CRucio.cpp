@@ -2,7 +2,6 @@
 
 #include "json.hpp"
 
-#include "CLinkSelector.hpp"
 #include "CRucio.hpp"
 #include "CStorageElement.hpp"
 #include "SFile.hpp"
@@ -133,88 +132,64 @@ auto CRucio::RunReaper(const TickType now) -> std::size_t
     return numFiles - mFiles.size();
 }
 
-bool CRucio::TryConsumeConfig(const json& config)
+bool CRucio::LoadConfig(const json& config)
 {
-    json::const_iterator rootIt = config.find("rucio");
-    if( rootIt == config.cend() )
-        return false;
+	if (!config.contains("rucio"))
+		return false;
 
-    for( const auto& [key, value] : rootIt.value().items() )
-    {
-        if( key == "sites" )
-        {
-            for(const auto& siteJson : value)
-            {
-                std::unique_ptr<std::uint8_t> multiLocationIdx;
-                std::string siteName, siteLocation;
-                json storageElementsJson;
-                std::unordered_map<std::string, std::string> customConfig;
-                for(const auto& [siteJsonKey, siteJsonValue] : siteJson.items())
-                {
-                    if(siteJsonKey == "name")
-                        siteName = siteJsonValue.get<std::string>();
-                    else if(siteJsonKey == "location")
-                        siteLocation = siteJsonValue.get<std::string>();
-                    else if(siteJsonKey == "multiLocationIdx")
-                        multiLocationIdx = std::make_unique<std::uint8_t>(siteJsonValue.get<std::uint8_t>());
-                    else if(siteJsonKey == "storageElements")
-                        storageElementsJson = siteJsonValue;
-                    else if(siteJsonValue.type() == json::value_t::string)
-                        customConfig[siteJsonKey] = siteJsonValue.get<std::string>();
-                    else
-                        customConfig[siteJsonKey] = siteJsonValue.dump();
-                }
+	const json& rucioCfgJson = config["rucio"];
 
-                if (multiLocationIdx == nullptr)
-                {
-                    std::cout << "Couldn't find multiLocationIdx attribute of site" << std::endl;
-                    continue;
-                }
+	try
+	{
+		for (const json& siteJson : rucioCfgJson.at("sites"))
+		{
+			std::unordered_map<std::string, std::string> customConfig;
+			CGridSite* site = nullptr;
+			try
+			{
+				site = CreateGridSite(siteJson.at("name").get<std::string>(),
+					siteJson.at("location").get<std::string>(),
+					siteJson.at("multiLocationIdx").get<std::uint8_t>());
 
-                if (siteName.empty())
-                {
-                    std::cout << "Couldn't find name attribute of site" << std::endl;
-                    continue;
-                }
+				for (const auto& [siteJsonKey, siteJsonValue] : siteJson.items())
+				{
+					if (siteJsonKey == "storageElements")
+					{
+						assert(siteJsonValue.is_array());
+						for (const json& storageElementJson : siteJsonValue)
+						{
+							try
+							{
+								site->CreateStorageElement(storageElementJson.at("name").get<std::string>());
+							}
+							catch (const json::out_of_range& error)
+							{
+								std::cout << "Failed to add storage element: " << error.what() << std::endl;
+								continue;
+							}
+						}
+					}
+					else if ((siteJsonKey == "name") || (siteJsonKey == "location") || (siteJsonKey == "multiLocationIdx"))
+						continue;
+					else if (siteJsonValue.type() == json::value_t::string)
+						customConfig[siteJsonKey] = siteJsonValue.get<std::string>();
+					else
+						customConfig[siteJsonKey] = siteJsonValue.dump();
+				}
+				site->mCustomConfig = std::move(customConfig);
+			}
+			catch (const json::out_of_range& error)
+			{
+				std::cout << "Failed to add site: " << error.what() << std::endl;
+				continue;
+			}
+		}
+	}
+	catch (const json::exception& error)
+	{
+		std::cout << "Failed to load sites: " << error.what() << std::endl;
+		return false;
+	}
 
-                if (siteLocation.empty())
-                {
-                    std::cout << "Couldn't find location attribute of site: " << siteName << std::endl;
-                    continue;
-                }
-
-                std::cout << "Adding site " << siteName << " in " << siteLocation << std::endl;
-                CGridSite *site = CreateGridSite(std::move(siteName), std::move(siteLocation), *multiLocationIdx);
-                site->mCustomConfig = std::move(customConfig);
-
-                if (storageElementsJson.empty())
-                {
-                    std::cout << "No storage elements to create for this site" << std::endl;
-                    continue;
-                }
-
-                for(const auto& storageElementJson : storageElementsJson)
-                {
-                    std::string storageElementName;
-                    for(const auto& [storageElementJsonKey, storageElementJsonValue] : storageElementJson.items())
-                    {
-                        if(storageElementJsonKey == "name")
-                            storageElementName = storageElementJsonValue.get<std::string>();
-                        else
-                            std::cout << "Ignoring unknown attribute while loading StorageElements: " << storageElementJsonKey << std::endl;
-                    }
-
-                    if (storageElementName.empty())
-                    {
-                        std::cout << "Couldn't find name attribute of StorageElement" << std::endl;
-                        continue;
-                    }
-
-                    std::cout << "Adding StorageElement " << storageElementName << std::endl;
-                    site->CreateStorageElement(std::move(storageElementName));
-                }
-            }
-        }
-    }
     return true;
 }
