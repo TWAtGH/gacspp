@@ -16,6 +16,23 @@ namespace gcp
 {
 	ICloudFactory* CCloudFactory::mInstance = new CCloudFactory;
 
+    static long double CalculateCostsRecursive(long double amount, TieredPriceType::const_iterator curLevelIt, const TieredPriceType::const_iterator &endIt, std::uint64_t prevThreshold = 0)
+    {
+	    assert(curLevelIt->first >= prevThreshold);
+
+	    const std::uint64_t threshold = curLevelIt->first - prevThreshold;
+		TieredPriceType::const_iterator nextLevelIt = curLevelIt + 1;
+
+	    if (amount <= threshold || nextLevelIt == endIt)
+		    return (amount * curLevelIt->second) / 1000000000.0;
+
+	    const long double lowerLevelCosts = CalculateCostsRecursive(amount - threshold, nextLevelIt, endIt, curLevelIt->first);
+
+	    return ((threshold * curLevelIt->second) / 1000000000.0) + lowerLevelCosts;
+    }
+
+
+
     CCloudBill::CCloudBill(double storageCost, double networkCost, double traffic, double operationCost, std::size_t numClassA, std::size_t numClassB)
         : mStorageCost(storageCost),
           mNetworkCost(networkCost),
@@ -43,10 +60,10 @@ namespace gcp
         switch(op)
         {
             case CStorageElement::INSERT:
-				++mNumClassA;
+				mCostTracking->mNumClassA += 1;
             break;
             case CStorageElement::GET:
-				++mNumClassB;
+				mCostTracking->mNumClassB += 1;
             break;
             default: break;
         }
@@ -56,7 +73,7 @@ namespace gcp
     {
         if (now > mTimeLastCostUpdate)
         {
-            mStorageCosts += BYTES_TO_GiB(mUsedStorage) * GetCurStoragePrice() * SECONDS_TO_MONTHS((now - mTimeLastCostUpdate));
+            mCostTracking->mStorageCosts += (BYTES_TO_GiB(mUsedStorage) * GetCurStoragePrice() * (now - mTimeLastCostUpdate)) / 1000000000.0;
             mTimeLastCostUpdate = now;
         }
         CStorageElement::OnIncreaseReplica(amount, now);
@@ -67,7 +84,7 @@ namespace gcp
         std::unique_lock<std::mutex> lock(mReplicaRemoveMutex);
         if (now > mTimeLastCostUpdate)
         {
-            mStorageCosts += BYTES_TO_GiB(mUsedStorage) * GetCurStoragePrice() * SECONDS_TO_MONTHS((now - mTimeLastCostUpdate));
+            mCostTracking->mStorageCosts += (BYTES_TO_GiB(mUsedStorage) * GetCurStoragePrice() * (now - mTimeLastCostUpdate)) / 1000000000.0;
             mTimeLastCostUpdate = now;
         }
         CStorageElement::OnRemoveReplica(replica, now, false);
@@ -77,27 +94,37 @@ namespace gcp
     {
         if (now > mTimeLastCostUpdate)
         {
-            mStorageCosts += BYTES_TO_GiB(mUsedStorage) * GetCurStoragePrice() * SECONDS_TO_MONTHS((now - mTimeLastCostUpdate));
+            mCostTracking->mStorageCosts += (BYTES_TO_GiB(mUsedStorage) * GetCurStoragePrice() * (now - mTimeLastCostUpdate)) / 1000000000.0;
             mTimeLastCostUpdate = now;
         }
 
-        double costs = mStorageCosts;
-        mStorageCosts = 0;
+        double costs = mCostTracking->mStorageCosts;
+        mCostTracking->mStorageCosts = 0;
         return costs;
     }
 
     auto CBucket::CalculateOperationCosts() -> double
     {
-		const double cost = (mNumClassA * 0.000005) + (mNumClassB * 0.0000004);
-		mNumClassA = mNumClassB = 0;
+        const TieredPriceType& classAOpPrice = mPriceData->mClassAOpPrice;
+        const TieredPriceType& classBOpPrice = mPriceData->mClassBOpPrice;
+
+        assert(!classAOpPrice.empty());
+        assert(!classBOpPrice.empty());
+
+        std::size_t numClassA = mCostTracking->mNumClassA;
+        std::size_t numClassB = mCostTracking->mNumClassB;
+
+        const double cost = CalculateCostsRecursive(numClassA, classAOpPrice.cbegin(), classAOpPrice.cend())
+                            + CalculateCostsRecursive(numClassB, classBOpPrice.cbegin(), classBOpPrice.cend());
+
+        mCostTracking->mNumClassA = mCostTracking->mNumClassA = 0;
+
         return cost;
     }
 
-    auto CBucket::GetCurStoragePrice() const -> double
+    auto CBucket::GetCurStoragePrice() const -> long double
     {
-		const CRegion* region = dynamic_cast<const CRegion*>(GetSite());
-		assert(region);
-		const TieredPriceType& storagePrice = region->mStoragePrice;
+		const TieredPriceType& storagePrice = mPriceData->mStoragePrice;
 		assert(!storagePrice.empty());
 
 		std::size_t rateIdx = 0, i = 1;
@@ -106,21 +133,10 @@ namespace gcp
 			++i;
 			++rateIdx;
 		}
-		return static_cast<double>(region->mStoragePrice[rateIdx].second) / 1000000000.0;
+		return storagePrice[rateIdx].second;
     }
 
 
-
-    static double CalculateNetworkCostsRecursive(std::uint64_t traffic, TieredPriceType::const_iterator curLevelIt, const TieredPriceType::const_iterator &endIt, std::uint64_t prevThreshold = 0)
-    {
-	    assert(curLevelIt->first >= prevThreshold);
-	    const std::uint64_t threshold = curLevelIt->first - prevThreshold;
-		TieredPriceType::const_iterator nextLevelIt = curLevelIt + 1;
-	    if (traffic <= threshold || nextLevelIt == endIt)
-		    return BYTES_TO_GiB(traffic) * (curLevelIt->second/1000000000.0);
-	    const double lowerLevelCosts = CalculateNetworkCostsRecursive(traffic - threshold, nextLevelIt, endIt, curLevelIt->first);
-	    return (BYTES_TO_GiB(threshold) * (curLevelIt->second / 1000000000.0)) + lowerLevelCosts;
-    }
 
     auto CRegion::CreateStorageElement(std::string&& name, const TickType accessLatency) -> CBucket*
     {
@@ -155,10 +171,11 @@ namespace gcp
 	    for (const std::unique_ptr<CNetworkLink>& networkLink : mNetworkLinks)
 	    {
 			const TieredPriceType& networkPrice = mNetworkLinkIdToPrice.at(networkLink->GetId());
-            double costs = CalculateNetworkCostsRecursive(networkLink->mUsedTraffic, networkPrice.cbegin(), networkPrice.cend());
+            const double inGiB = BYTES_TO_GiB(networkLink->mUsedTraffic);
+            double costs = CalculateCostsRecursive(inGiB, networkPrice.cbegin(), networkPrice.cend());
 
             regionNetworkCosts += costs;
-            sumUsedTraffic += BYTES_TO_GiB(networkLink->mUsedTraffic);
+            sumUsedTraffic += inGiB;
             sumDoneTransfers += networkLink->mDoneTransfers;
 			networkLink->mUsedTraffic = 0;
 			networkLink->mDoneTransfers = 0;
@@ -313,8 +330,6 @@ namespace gcp
 						regionJson.at("location").get<std::string>(),
 						regionJson.at("multiLocationIdx").get<std::uint8_t>());
 
-					region->mStoragePrice = GetTieredRateFromSKUId(regionJson.at("storageSKUId").get<std::string>());
-
 					for (const auto& [regionJsonKey, regionJsonValue] : regionJson.items())
 					{
 						if (regionJsonKey == "buckets")
@@ -324,8 +339,12 @@ namespace gcp
 							{
 								try
 								{
-									region->CreateStorageElement(bucketJson.at("name").get<std::string>(),
-                                                                 bucketJson.at("accessLatency").get<TickType>());
+									CBucket* bucket = region->CreateStorageElement( bucketJson.at("name").get<std::string>(),
+                                                                                    bucketJson.at("accessLatency").get<TickType>());
+
+                 					bucket->mPriceData->mStoragePrice = GetTieredRateFromSKUId(bucketJson.at("storageSKUId").get<std::string>());
+                                    bucket->mPriceData->mClassAOpPrice = GetTieredRateFromSKUId(bucketJson.at("classAOpSKUId").get<std::string>());
+                                    bucket->mPriceData->mClassBOpPrice = GetTieredRateFromSKUId(bucketJson.at("classBOpSKUId").get<std::string>());
 								}
 								catch (const json::out_of_range& error)
 								{
@@ -369,20 +388,25 @@ namespace gcp
 			const json& pricingJson = mSKUSettings->at(skuId).at("pricingInfo").at(0).at("pricingExpression");
 
 			const std::string& usageUnit = pricingJson.at("usageUnit").get<std::string>();
-			long double baseUnitConversionFactor = pricingJson.at("baseUnitConversionFactor").get<long double>();
-
+			long double baseUnitConversionFactor = 1;
 			if (usageUnit == "GiBy.mo")
-				baseUnitConversionFactor /= SECONDS_PER_MONTH;
+				baseUnitConversionFactor = pricingJson.at("baseUnitConversionFactor").get<long double>() / ONE_GiB;
 			else if (usageUnit == "GiBy.d")
-				baseUnitConversionFactor /= SECONDS_PER_DAY;
+				baseUnitConversionFactor = pricingJson.at("baseUnitConversionFactor").get<long double>() / ONE_GiB;
+			else if (usageUnit == "By")
+                baseUnitConversionFactor = 1 / ONE_GiB;
+            else if(usageUnit == "count" || usageUnit == "GiBy")
+                baseUnitConversionFactor = 1;
+            else
+                std::cout << "Unknown usageUnit: " << usageUnit << std::endl;
 
 			for (const json& rateJson : pricingJson.at("tieredRates"))
 			{
 				try
 				{
 					const std::uint32_t startUsageAmount = rateJson.at("startUsageAmount").get<std::uint32_t>();
-					const std::int32_t nanoPrice = rateJson.at("unitPrice").at("nanos").get<std::int32_t>();
-					prices.emplace_back(static_cast<std::uint64_t>(startUsageAmount * baseUnitConversionFactor), nanoPrice);
+					const std::int32_t price = rateJson.at("unitPrice").at("nanos").get<std::int32_t>();
+					prices.emplace_back(startUsageAmount, price / baseUnitConversionFactor);
 				}
 				catch (const json::exception& error)
 				{

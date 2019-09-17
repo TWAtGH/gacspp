@@ -7,14 +7,14 @@
         "multiLocationIdx": 3,
         "name": "us-central1",
         "location": "Iowa",
-		"storageSKUId": "E5F0-6A5D-7BAD",
-		"classAOpSKUId": "4DBF-185F-A415",
-		"classBOpSKUId": "7870-010B-2763",
         "numJobSlots": 1000,
         "buckets": [
           {
             "name": "iowa_bucket",
-            "accessLatency": 500
+            "accessLatency": 500,
+    		"storageSKUId": "E5F0-6A5D-7BAD",
+    		"classAOpSKUId": "4DBF-185F-A415",
+    		"classBOpSKUId": "7870-010B-2763"
           }
         ]
     }

@@ -13,8 +13,3 @@ histogram as (
 )
 select bucket, range, freq
 from histogram;
-
-select width_bucket(startTick, 0, 2592000, 500) as buckets, count(*)
-from transfers
-group by buckets
-order by buckets;

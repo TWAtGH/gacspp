@@ -22,7 +22,7 @@
             "tickFreq": 43200,
             "numFilesCfg": {
                 "type": "normal",
-                "mean": 232,
+                "mean": 520,
                 "stddev": 1
             },
             "fileSizeCfg":{

@@ -7,7 +7,7 @@
 
 namespace gcp
 {
-	typedef std::vector<std::pair<std::uint64_t, std::int32_t>> TieredPriceType;
+	typedef std::vector<std::pair<std::uint32_t, long double>> TieredPriceType;
 
     class CCloudBill : public ICloudBill
     {
@@ -29,11 +29,25 @@ namespace gcp
 	{
 	private:
         TickType mTimeLastCostUpdate = 0;
-        double mStorageCosts = 0;
-		std::size_t mNumClassA;
-		std::size_t mNumClassB;
+        struct SCostTracking
+        {
+            double mStorageCosts = 0;
+        	std::size_t mNumClassA = 0;
+        	std::size_t mNumClassB = 0;
+        };
+
+        std::unique_ptr<SCostTracking> mCostTracking = std::make_unique<SCostTracking>();
 
 	public:
+        struct SPriceData
+        {
+            TieredPriceType mStoragePrice;
+            TieredPriceType mClassAOpPrice;
+            TieredPriceType mClassBOpPrice;
+        };
+
+        std::unique_ptr<SPriceData> mPriceData = std::make_unique<SPriceData>();
+
 		using CStorageElement::CStorageElement;
 
 		CBucket(CBucket&&) = default;
@@ -46,12 +60,12 @@ namespace gcp
 		auto CalculateStorageCosts(TickType now) -> double;
         auto CalculateOperationCosts() -> double;
 
-        auto GetCurStoragePrice() const -> double;
+        auto GetCurStoragePrice() const -> long double;
 
 		inline auto GetNumClassA() const -> std::size_t
-		{return mNumClassA;}
+		{return mCostTracking->mNumClassA;}
 		inline auto GetNumClassB() const -> std::size_t
-		{return mNumClassB;}
+		{return mCostTracking->mNumClassB;}
 	};
 
 	class CRegion : public ISite
@@ -66,7 +80,6 @@ namespace gcp
 
         std::vector<std::unique_ptr<CBucket>> mStorageElements;
 		std::unordered_map<IdType, TieredPriceType> mNetworkLinkIdToPrice;
-		TieredPriceType mStoragePrice;
 	};
 
 	class CCloud final : public IBaseCloud

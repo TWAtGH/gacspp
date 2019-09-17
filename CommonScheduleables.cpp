@@ -882,7 +882,7 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
     // create transfers per dst storage element
     for(CStorageElement* dstStorageElement : mDstStorageElements)
     {
-        const std::size_t numToCreate = 10;
+        const std::size_t numToCreate = 70;
 
         // create numToCreate many transfers
         for(std::size_t numTransfersCreated=0; numTransfersCreated<numToCreate; ++numTransfersCreated)
