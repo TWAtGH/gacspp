@@ -16,11 +16,13 @@ namespace gcp
 {
 	ICloudFactory* CCloudFactory::mInstance = new CCloudFactory;
 
-    CCloudBill::CCloudBill(double storageCost, double networkCost, double traffic, double operationCost)
+    CCloudBill::CCloudBill(double storageCost, double networkCost, double traffic, double operationCost, std::size_t numClassA, std::size_t numClassB)
         : mStorageCost(storageCost),
           mNetworkCost(networkCost),
           mTraffic(traffic),
-          mOperationCost(operationCost)
+          mOperationCost(operationCost),
+		  mNumClassA(numClassA),
+		  mNumClassB(numClassB)
     {}
 
     std::string CCloudBill::ToString() const
@@ -29,7 +31,8 @@ namespace gcp
         res << std::fixed << std::setprecision(2);
         res << std::setw(12) << "Storage: " << mStorageCost << " CHF" << std::endl;
         res << std::setw(12) << "Network: " << mNetworkCost << " CHF (" << mTraffic << " GiB)" << std::endl;
-        res << std::setw(12) << "Operations: " << mOperationCost << " CHF" << std::endl;
+        res << std::setw(12) << "Operations: " << mOperationCost << " CHF ";
+		res << "(ClassA: " << mNumClassA / 1000 << "k + ClassB: " << mNumClassB / 1000 << "k)" << std::endl;
         return res.str();
     }
 
@@ -40,10 +43,10 @@ namespace gcp
         switch(op)
         {
             case CStorageElement::INSERT:
-                mOperationCosts += 0.000005;
+				++mNumClassA;
             break;
             case CStorageElement::GET:
-                mOperationCosts += 0.0000004;
+				++mNumClassB;
             break;
             default: break;
         }
@@ -83,12 +86,11 @@ namespace gcp
         return costs;
     }
 
-    auto CBucket::CalculateOperationCosts(TickType now) -> double
+    auto CBucket::CalculateOperationCosts() -> double
     {
-        (void)now;
-        double costs = mOperationCosts;
-        mOperationCosts = 0;
-        return costs;
+		const double cost = (mNumClassA * 0.000005) + (mNumClassB * 0.0000004);
+		mNumClassA = mNumClassB = 0;
+        return cost;
     }
 
     auto CBucket::GetCurStoragePrice() const -> double
@@ -115,9 +117,9 @@ namespace gcp
 	    const std::uint64_t threshold = curLevelIt->first - prevThreshold;
 		TieredPriceType::const_iterator nextLevelIt = curLevelIt + 1;
 	    if (traffic <= threshold || nextLevelIt == endIt)
-		    return BYTES_TO_GiB(traffic) * curLevelIt->second;
+		    return BYTES_TO_GiB(traffic) * (curLevelIt->second/1000000000.0);
 	    const double lowerLevelCosts = CalculateNetworkCostsRecursive(traffic - threshold, nextLevelIt, endIt, curLevelIt->first);
-	    return (BYTES_TO_GiB(threshold) * curLevelIt->second) + lowerLevelCosts;
+	    return (BYTES_TO_GiB(threshold) * (curLevelIt->second / 1000000000.0)) + lowerLevelCosts;
     }
 
     auto CRegion::CreateStorageElement(std::string&& name, const TickType accessLatency) -> CBucket*
@@ -135,11 +137,15 @@ namespace gcp
 	    return regionStorageCosts;
     }
 
-    double CRegion::CalculateOperationCosts(TickType now)
+    double CRegion::CalculateOperationCosts(std::size_t& numClassA, std::size_t& numClassB)
     {
 	    double regionOperationCosts = 0;
 	    for (const std::unique_ptr<CBucket>& bucket : mStorageElements)
-		    regionOperationCosts += bucket->CalculateOperationCosts(now);
+		{
+			numClassA += bucket->GetNumClassA();
+			numClassB += bucket->GetNumClassB();
+			regionOperationCosts += bucket->CalculateOperationCosts();
+		}
 	    return regionOperationCosts;
     }
 
@@ -192,19 +198,21 @@ namespace gcp
 	    double totalOperationCosts = 0;
 	    double totalNetworkCosts = 0;
         double sumUsedTraffic = 0;
+		std::size_t numClassA = 0;
+		std::size_t numClassB = 0;
         std::uint64_t sumDoneTransfer = 0;
 	    for (const std::unique_ptr<ISite>& site : mRegions)
 	    {
 		    auto region = dynamic_cast<CRegion*>(site.get());
 		    assert(region != nullptr);
 		    const double regionStorageCosts = region->CalculateStorageCosts(now);
-		    const double regionOperationCosts = region->CalculateOperationCosts(now);
+		    const double regionOperationCosts = region->CalculateOperationCosts(numClassA, numClassB);
 		    const double regionNetworkCosts = region->CalculateNetworkCosts(sumUsedTraffic, sumDoneTransfer);
 		    totalStorageCosts += regionStorageCosts;
 		    totalOperationCosts += regionOperationCosts;
 		    totalNetworkCosts += regionNetworkCosts;
 	    }
-        return std::make_unique<CCloudBill>(totalStorageCosts, totalNetworkCosts, sumUsedTraffic, totalOperationCosts);
+        return std::make_unique<CCloudBill>(totalStorageCosts, totalNetworkCosts, sumUsedTraffic, totalOperationCosts, numClassA, numClassB);
     }
 
     void CCloud::InitialiseNetworkLinks()

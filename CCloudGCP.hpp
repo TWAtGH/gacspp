@@ -16,9 +16,11 @@ namespace gcp
         double mNetworkCost;
         double mTraffic;
         double mOperationCost;
+		std::size_t mNumClassA;
+		std::size_t mNumClassB;
 
     public:
-        CCloudBill(double storageCost, double networkCost, double traffic, double operationCost);
+        CCloudBill(double storageCost, double networkCost, double traffic, double operationCost, std::size_t numClassA, std::size_t numClassB);
         virtual std::string ToString() const final;
     };
 
@@ -28,7 +30,8 @@ namespace gcp
 	private:
         TickType mTimeLastCostUpdate = 0;
         double mStorageCosts = 0;
-        double mOperationCosts = 0;
+		std::size_t mNumClassA;
+		std::size_t mNumClassB;
 
 	public:
 		using CStorageElement::CStorageElement;
@@ -41,9 +44,14 @@ namespace gcp
 		virtual void OnRemoveReplica(const SReplica* replica, TickType now) final;
 
 		auto CalculateStorageCosts(TickType now) -> double;
-        auto CalculateOperationCosts(TickType now) -> double;
+        auto CalculateOperationCosts() -> double;
 
         auto GetCurStoragePrice() const -> double;
+
+		inline auto GetNumClassA() const -> std::size_t
+		{return mNumClassA;}
+		inline auto GetNumClassB() const -> std::size_t
+		{return mNumClassB;}
 	};
 
 	class CRegion : public ISite
@@ -53,7 +61,7 @@ namespace gcp
 
 		auto CreateStorageElement(std::string&& name, const TickType accessLatency) -> CBucket* final;
 		auto CalculateStorageCosts(TickType now) -> double;
-		auto CalculateOperationCosts(TickType now) -> double;
+		auto CalculateOperationCosts(std::size_t& numClassA, std::size_t& numClassB) -> double;
 		auto CalculateNetworkCosts(double& sumUsedTraffic, std::uint64_t& sumDoneTransfers) -> double;
 
         std::vector<std::unique_ptr<CBucket>> mStorageElements;

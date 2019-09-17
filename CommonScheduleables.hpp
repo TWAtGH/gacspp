@@ -112,15 +112,18 @@ private:
         std::weak_ptr<SReplica> mSrcReplica;
         std::weak_ptr<SReplica> mDstReplica;
 		CNetworkLink* mNetworkLink;
-        TickType mStartTick;
+		TickType mQueuedAt;
+		TickType mStartAt;
 
         STransfer(  std::shared_ptr<SReplica> srcReplica,
                     std::shared_ptr<SReplica> dstReplica,
 					CNetworkLink* const networkLink,
-                    const TickType startTick);
+					const TickType queudAt,
+					const TickType startAt);
     };
 
     std::vector<STransfer> mActiveTransfers;
+	std::vector<STransfer> mQueuedTransfers;
 
 public:
     std::uint32_t mNumCompletedTransfers = 0;
@@ -151,14 +154,16 @@ private:
         std::weak_ptr<SReplica> mSrcReplica;
         std::weak_ptr<SReplica> mDstReplica;
 		CNetworkLink* mNetworkLink;
-        TickType mStartTick;
+		TickType mQueuedAt;
+		TickType mStartAt;
 
         std::uint32_t mIncreasePerTick;
 
         STransfer(  std::shared_ptr<SReplica> srcReplica,
                     std::shared_ptr<SReplica> dstReplica,
 					CNetworkLink* const networkLink,
-                    const TickType startTick,
+					const TickType queuedAt,
+                    const TickType startAt,
                     const std::uint32_t increasePerTick);
     };
 

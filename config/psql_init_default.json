@@ -6,16 +6,7 @@
     "CREATE TABLE NetworkLinks (id BIGINT, srcSiteId BIGINT, dstSiteId BIGINT);",
     "CREATE TABLE Files (id BIGINT, createdAt BIGINT, expiredAt BIGINT, filesize INTEGER);",
     "CREATE TABLE Replicas (id BIGINT, fileId BIGINT, storageElementId BIGINT, createdAt BIGINT, expiredAt BIGINT);",
-    "CREATE TABLE Transfers (id BIGINT, srcReplicaId BIGINT, dstReplicaId BIGINT, startTick BIGINT, endTick BIGINT);"
-],
-"_init":[
-    "DROP TABLE IF EXISTS Sites, StorageElements, NetworkLinks, Files, Replicas, Transfers CASCADE;",
-    "CREATE TABLE Sites (id BIGINT PRIMARY KEY, name varchar(64), locationName varchar(32), cloudName varchar(32));",
-    "CREATE TABLE StorageElements (id BIGINT PRIMARY KEY, siteId BIGINT, name varchar(64), accessLatency BIGINT, FOREIGN KEY(siteId) REFERENCES Sites(id));",
-    "CREATE TABLE NetworkLinks (id BIGINT PRIMARY KEY, srcSiteId BIGINT, dstSiteId BIGINT, FOREIGN KEY(srcSiteId) REFERENCES Sites(id), FOREIGN KEY(dstSiteId) REFERENCES Sites(id));",
-    "CREATE TABLE Files (id BIGINT PRIMARY KEY, createdAt BIGINT, expiredAt BIGINT, filesize INTEGER);",
-    "CREATE TABLE Replicas (id BIGINT PRIMARY KEY, fileId BIGINT, storageElementId BIGINT, createdAt BIGINT, expiredAt BIGINT, FOREIGN KEY(fileId) REFERENCES Files(id), FOREIGN KEY(storageElementId) REFERENCES StorageElements(id));",
-    "CREATE TABLE Transfers (id BIGINT PRIMARY KEY, srcReplicaId BIGINT, dstReplicaId BIGINT, startTick BIGINT, endTick BIGINT, FOREIGN KEY(srcReplicaId) REFERENCES Replicas(id), FOREIGN KEY(dstReplicaId) REFERENCES Replicas(id));"
+    "CREATE TABLE Transfers (id BIGINT, srcReplicaId BIGINT, dstReplicaId BIGINT, queuedAt BIGINT, startedAt BIGINT, finishedAt BIGINT);"
 ],
 
 "shutdown":[
