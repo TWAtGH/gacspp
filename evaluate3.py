@@ -21,6 +21,207 @@ def GetQueryFromFile(path):
         print('Failed to get query from file: {}'.format(err))
     return ''
 
+def NewPlot(name, plotFunc, *args):
+    resW = 1920
+    resH = 1080
+    dpi = 100
+    plt.figure(num=name, figsize=(resW/dpi, resH/dpi), dpi=dpi)
+    plt.ticklabel_format(axis='both', style='plain')
+    plt.grid(axis='y')
+    plotFunc(*args)
+    
+def PlotFileSize(dbCursor):
+    print('FileSize plot...')
+    q = GetQueryFromFile(os.path.join('queries', 'filesize.sql'))
+    
+    t1 = time.time()
+    print('\tquery...')
+    dbCursor.execute(q)
+    print('\ttook: {}s'.format(time.time() - t1))
+
+    t1 = time.time()
+    print('\tfetching...')
+    row = dbCursor.fetchone()
+    bins = [row[1], row[2]]
+    weights = [row[3]]
+    for row in dbCursor.fetchall():
+        bins.append(row[2])
+        weights.append(row[3])
+
+    print('\ttook: {}s'.format(time.time() - t1))
+
+    t1 = time.time()
+    print('\tplotting...')
+    plt.hist(bins[:-1], bins=bins, weights=weights)
+    print('\ttook: {}s'.format(time.time() - t1))
+
+    plt.xlabel('Filesize/MiB')
+    plt.ylabel('Count')
+    plt.legend()
+    plt.axis(xmin=0, ymin=0)
+    plt.savefig('FileSize.png')
+
+def PlotNumReplicasAtStorageElement(dbCursor, storageElementName):
+    print('PlotNumReplicasAtStorageElement plot...')
+    q = GetQueryFromFile(os.path.join('queries', 'numReplicasAtStorageElement.sql'))
+    q = q.replace('<storageelementname>', storageElementName)
+    
+    t1 = time.time()
+    print('\tquery...')
+    dbCursor.execute(q)
+    print('\ttook: {}s'.format(time.time() - t1))
+
+    t1 = time.time()
+    print('\tfetching...')
+    rows = []
+    x = []
+    for row in dbCursor.fetchall():
+        rows.append(row)
+        x.append(row[0])
+        if( x[-1] != row[1] ):
+            x.append(row[1])
+        
+    print('\ttook: {}s'.format(time.time() - t1))
+
+    
+    t1 = time.time()
+    print('\ttransforming...')
+    y = [0] * len(x)
+    x.sort()
+    lastStartIdx = 0
+    for row in rows:
+        while x[lastStartIdx] < row[0]:
+            lastStartIdx += 1
+        for i in range(lastStartIdx, len(x)):
+            if x[i] > row[1]:
+                break
+            y[i] += row[2]
+
+    print('\ttook: {}s'.format(time.time() - t1))
+
+    t1 = time.time()
+    print('\tplotting...')
+    plt.plot(x, y)
+    print('\ttook: {}s'.format(time.time() - t1))
+
+    plt.xlabel('time')
+    plt.ylabel('Number of replicas')
+    plt.legend()
+    plt.axis(xmin=0, ymin=0)
+    plt.savefig('PlotNumReplicasAtStorageElement.png')
+
+def PlotTransferTimeStats(dbCursor):
+    print('PlotTransferTimeStats plot...')
+    q = GetQueryFromFile(os.path.join('queries', 'transferTimeStats.sql'))
+    
+    t1 = time.time()
+    print('\tquery...')
+    dbCursor.execute(q)
+    print('\ttook: {}s'.format(time.time() - t1))
+
+    t1 = time.time()
+    print('\tfetching...')
+    x = []
+    y = ([], [])
+    for row in dbCursor.fetchall():
+        x.append(row[0])
+        y[0].append(row[1])
+        y[1].append(row[2])
+        
+    print('\ttook: {}s'.format(time.time() - t1))
+
+    
+    t1 = time.time()
+    print('\ttransforming...')
+
+    print('\ttook: {}s'.format(time.time() - t1))
+
+    t1 = time.time()
+    print('\tplotting...')
+    plt.plot(x, y[0], color='red', label='Queue to start time')
+    plt.plot(x, y[1], color='tan', label='Queue to finish time')
+    print('\ttook: {}s'.format(time.time() - t1))
+
+    plt.xlabel('time')
+    plt.ylabel('time')
+    plt.legend()
+    plt.axis(xmin=0, ymin=0)
+    plt.savefig('PlotTransferTimeStats.png')
+
+def PlotTransferNumStats(dbCursor, interval=(3600*6)):
+    print('PlotTransferNumStats plot...')
+    q = GetQueryFromFile(os.path.join('queries', 'transferNumQueuedStats.sql'))
+    
+    t1 = time.time()
+    print('\tquery1...')
+    dbCursor.execute(q)
+    print('\ttook: {}s'.format(time.time() - t1))
+
+    t1 = time.time()
+    print('\tfetching1...')
+    x = []
+    y = []
+    for row in dbCursor.fetchall():
+        x.append(row[0])
+        y.append(row[1])
+    print('\ttook: {}s'.format(time.time() - t1))
+    
+    t1 = time.time()
+    print('\ttransforming1...')
+    bins = [0]
+    weights1 = []
+    i = 0
+    for t in range(0, x[-1], interval):
+        bins.append(t)
+        weights1.append(0)
+        while x[i] < t:
+            weights1[-1] += y[i]
+            i += 1
+    print('\ttook: {}s'.format(time.time() - t1))
+    
+
+    q = GetQueryFromFile(os.path.join('queries', 'transferNumStartedStats.sql'))
+    
+    t1 = time.time()
+    print('\tquery2...')
+    dbCursor.execute(q)
+    print('\ttook: {}s'.format(time.time() - t1))
+
+    t1 = time.time()
+    print('\tfetching2...')
+    x = []
+    y = []
+    for row in dbCursor.fetchall():
+        x.append(row[0])
+        y.append(row[1])
+    print('\ttook: {}s'.format(time.time() - t1))
+    
+    t1 = time.time()
+    print('\ttransforming2...')
+    weights2 = [0] * (len(bins) - 1)
+    i = 0
+    j = 0
+    for t in range(0, x[-1], interval):
+        if t > bins[-1]:
+            bins.append(t)
+            weights1.append(0)
+        weights2[j] = 0
+        while x[i] < t:
+            weights2[j] += y[i]
+            i += 1
+        j += 1
+    print('\ttook: {}s'.format(time.time() - t1))
+    
+    t1 = time.time()
+    print('\tplotting2...')
+    plt.hist([bins[:-1], bins[:-1]], bins, weights=[weights1, weights2],  stacked=True, color=['red', 'tan'], label=['Num queued', 'Num started'])
+    print('\ttook: {}s'.format(time.time() - t1))
+
+    plt.xlabel('time/6h bins')
+    plt.ylabel('Count')
+    plt.legend()
+    plt.axis(xmin=0, ymin=0)
+    plt.savefig('PlotTransferNumStats.png')
 
 tstart = time.time()
 connectionStr = ''
@@ -32,63 +233,15 @@ except Exception as err:
 
 
 conn = psycopg2.connect(connectionStr)
-db = conn.cursor()
+dbCursor = conn.cursor()
 
 
-q = GetQueryFromFile(os.path.join('queries', 'filesize.sql'))
+NewPlot('FileSize', PlotFileSize, dbCursor)
+NewPlot('TransferTimes', PlotTransferTimeStats, dbCursor)
+NewPlot('TransferCounts', PlotTransferNumStats, dbCursor, 3600*24)
+#NewPlot('NumReplicasBNL_DATADISK', PlotNumReplicasAtStorageElement, dbCursor, 'BNL_DATADISK')
+NewPlot('NumReplicasIowa_bucket', PlotNumReplicasAtStorageElement, dbCursor, 'iowa_bucket')
 
-resW = 1920
-resH = 1080
-dpi = 100
-plt.figure(num=1, figsize=(resW/dpi, resH/dpi), dpi=dpi)
-plt.ticklabel_format(axis='both', style='plain')
-plt.grid(axis='y')
-
-t1 = time.time()
-print('query...')
-db.execute(q)
-print('took: {}s'.format(time.time() - t1))
-
-t1 = time.time()
-print('fetching...')
-#t = db.fetchone()
-#print(t)
-#sid = t[1]
-#x = [t[0]]
-#y = [t[3]]
-#for t in db.fetchall():
-#	if t[1] != sid:
-#		plt.plot(x, y, label=sid)
-#		sid = t[1]
-#		x = [t[0]]
-#		y = [t[3]]
-#	else:
-#		x.append(t[0])
-#		y.append(y[-1] + t[3])
-
-x = db.fetchall()
-y = 200
-
-#x=[t[0] for t in db.fetchall()]
-print('took: {}s'.format(time.time() - t1))
-
-t1 = time.time()
-print('transforming...')
-plt.hist(x, y)
-print('took: {}s'.format(time.time() - t1))
-
-
-plt.xlabel('Sim Time')
-plt.ylabel('Count')
-plt.legend()
-plt.axis(xmin=0, ymin=0)
-
-t1 = time.time()
-print('saving...')
-plt.savefig('test.png')
-print('took: {}s'.format(time.time() - t1))
-
-print('plotting...')
 print('{}s'.format(time.time() - tstart))
 
 plt.show()

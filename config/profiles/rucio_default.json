@@ -11,7 +11,7 @@
             [
                 {
                     "name": "BNL_DATATAPE",
-                    "accessLatency": 60000
+                    "accessLatency": 2400000
                 },
                 {
                     "name": "BNL_DATADISK",

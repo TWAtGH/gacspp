@@ -76,10 +76,10 @@ void CDataGenerator::OnUpdate(const TickType now)
 auto CDataGenerator::GetRandomFileSize() -> std::uint32_t
 {
     assert(mFileSizeRNG);
-    const double min = 64 * ONE_MiB;
-    const double max = static_cast<double>(std::numeric_limits<std::uint32_t>::max());
-    const double val = GiB_TO_BYTES(std::abs(mFileSizeRNG->GetValue(mSim->mRNGEngine)));
-    return static_cast<std::uint32_t>(std::clamp(val, min, max));
+    constexpr double min = 64 * ONE_MiB;
+    constexpr double max = static_cast<double>(std::numeric_limits<std::uint32_t>::max());
+    const double val = min + GiB_TO_BYTES(std::abs(mFileSizeRNG->GetValue(mSim->mRNGEngine)));
+    return static_cast<std::uint32_t>(std::min(val, max));
 }
 
 auto CDataGenerator::GetRandomNumFilesToGenerate() -> std::uint32_t
@@ -189,20 +189,7 @@ void CBillingGenerator::OnUpdate(const TickType now)
     summary << caption << std::endl;
     summary << std::string(caption.length(), '=') << std::endl;
 
-    summary << "-Grid2Cloud Number of transfers per link-" << std::endl;
-    for(auto& srcGridSite : mSim->mRucio->mGridSites)
-    {
-        summary << srcGridSite->GetName() << std::endl;
-        for (auto& dstRegion : mSim->mClouds[0]->mRegions)
-        {
-            auto link = srcGridSite->GetNetworkLink(dstRegion.get());
-            if (link == nullptr)
-                continue;
-            summary << "\t--> " << dstRegion->GetName() << ": " << link->mDoneTransfers << std::endl;
-            link->mDoneTransfers = 0;
-        }
-    }
-    for(auto& cloud : mSim->mClouds)
+    for(const std::unique_ptr<IBaseCloud>& cloud : mSim->mClouds)
     {
         summary << std::endl;
         summary<<cloud->GetName()<<" - Billing for Month "<<static_cast<std::uint32_t>(SECONDS_TO_MONTHS(now))<<":\n";

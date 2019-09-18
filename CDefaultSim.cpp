@@ -266,7 +266,8 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
 
 
     x2cTransferGen->mSrcStorageElements.push_back( nameToStorageElement["BNL_DATATAPE"] );
-    //x2cTransferGen->mCacheElements.push_back( std::make_pair(10000, nameToStorageElement["iowa_bucket"]) );
+	if(nameToStorageElement.count("iowa_bucket") > 0)
+		x2cTransferGen->mCacheElements.push_back( std::make_pair(1000, nameToStorageElement["iowa_bucket"]) );
     x2cTransferGen->mDstStorageElements.push_back( nameToStorageElement["BNL_DATADISK"] );
 
 
