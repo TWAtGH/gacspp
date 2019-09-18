@@ -54,25 +54,6 @@ CDataGenerator::CDataGenerator( IBaseSim* sim,
     mOutputFileInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Files(id, createdAt, expiredAt, filesize) FROM STDIN with(FORMAT csv);", 4, '?');
 }
 
-void CDataGenerator::OnUpdate(const TickType now)
-{
-    auto curRealtime = std::chrono::high_resolution_clock::now();
-    const std::uint32_t totalFilesToGen = GetRandomNumFilesToGenerate();
-
-    float numReplicaRatio = mNumReplicaRatio.empty() ? 1 : mNumReplicaRatio[0];
-    std::uint32_t numFilesToGen = static_cast<std::uint32_t>(totalFilesToGen * numReplicaRatio);
-    CreateFilesAndReplicas(numFilesToGen, 1, now);
-
-    for(std::size_t i=1; i<mNumReplicaRatio.size(); ++i)
-    {
-        numFilesToGen = static_cast<std::uint32_t>(totalFilesToGen * mNumReplicaRatio[i]);
-        CreateFilesAndReplicas(numFilesToGen, i+1, now);
-    }
-
-    mUpdateDurationSummed += std::chrono::high_resolution_clock::now() - curRealtime;
-    mNextCallTick = now + mTickFreq;
-}
-
 auto CDataGenerator::GetRandomFileSize() -> std::uint32_t
 {
     assert(mFileSizeRNG);
@@ -150,6 +131,25 @@ auto CDataGenerator::CreateFilesAndReplicas(const std::uint32_t numFiles, const 
     COutput::GetRef().QueueInserts(std::move(fileInsertQueries));
     COutput::GetRef().QueueInserts(std::move(replicaInsertQueries));
     return bytesOfFilesGen;
+}
+
+void CDataGenerator::OnUpdate(const TickType now)
+{
+    auto curRealtime = std::chrono::high_resolution_clock::now();
+    const std::uint32_t totalFilesToGen = GetRandomNumFilesToGenerate();
+
+    float numReplicaRatio = mNumReplicaRatio.empty() ? 1 : mNumReplicaRatio[0];
+    std::uint32_t numFilesToGen = static_cast<std::uint32_t>(totalFilesToGen * numReplicaRatio);
+    CreateFilesAndReplicas(numFilesToGen, 1, now);
+
+    for(std::size_t i=1; i<mNumReplicaRatio.size(); ++i)
+    {
+        numFilesToGen = static_cast<std::uint32_t>(totalFilesToGen * mNumReplicaRatio[i]);
+        CreateFilesAndReplicas(numFilesToGen, i+1, now);
+    }
+
+    mUpdateDurationSummed += std::chrono::high_resolution_clock::now() - curRealtime;
+    mNextCallTick = now + mTickFreq;
 }
 
 
@@ -835,12 +835,14 @@ void CJobSlotTransferGen::OnUpdate(const TickType now)
 
 CCachedSrcTransferGen::CCachedSrcTransferGen(IBaseSim* sim,
                                              std::shared_ptr<CFixedTimeTransferManager> transferMgr,
+                                             const TickType defaultReplicaLifetime,
                                              const std::uint32_t tickFreq,
                                              const TickType startTick)
     : CScheduleable(startTick),
       mSim(sim),
       mTransferMgr(transferMgr),
-      mTickFreq(tickFreq)
+      mTickFreq(tickFreq),
+      mDefaultReplicaLifetime(defaultReplicaLifetime)
 {}
 
 bool CCachedSrcTransferGen::ExistsFileAtStorageElement(const SFile* file, const CStorageElement* storageElement) const
@@ -851,6 +853,46 @@ bool CCachedSrcTransferGen::ExistsFileAtStorageElement(const SFile* file, const 
             return true;
     }
     return false;
+}
+
+void CCachedSrcTransferGen::ExpireReplica(CStorageElement* storageElement, const TickType now)
+{
+    const std::vector<std::shared_ptr<SReplica>>& replicas = storageElement->mReplicas;
+    if(replicas.empty())
+        return;
+    auto replicasIt = replicas.begin();
+    auto oldestReplicaIt = replicasIt;
+    TickType oldestTime = (*replicasIt)->mExpiresAt;
+    if((replicas.size()/mTickFreq) >= 50)
+    {
+        //to increase performance we just randomly pick 100 replicas
+        //and expire the oldest one of these
+        const std::size_t numSamples = static_cast<std::size_t>(replicas.size() * 0.05f);
+        std::uniform_int_distribution<std::size_t> replicaRndSelector(0, replicas.size() - 1);
+        for(std::size_t i=0; i<numSamples; ++i)
+        {
+            replicasIt = replicas.begin() + replicaRndSelector(mSim->mRNGEngine);
+            if((*replicasIt)->mExpiresAt < oldestTime)
+            {
+                oldestTime = (*replicasIt)->mExpiresAt;
+                oldestReplicaIt = replicasIt;
+            }
+        }
+    }
+    else
+    {
+        while(replicasIt != replicas.end())
+        {
+            if((*replicasIt)->mExpiresAt < oldestTime)
+            {
+                oldestTime = (*replicasIt)->mExpiresAt;
+                oldestReplicaIt = replicasIt;
+            }
+            replicasIt++;
+        }
+    }
+    (*oldestReplicaIt)->mExpiresAt = 0;
+    (*oldestReplicaIt)->GetFile()->RemoveExpiredReplicas(now);
 }
 
 void CCachedSrcTransferGen::OnUpdate(const TickType now)
@@ -894,11 +936,11 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
             //check caches first
             if(!mCacheElements.empty())
             {
-                for(const std::pair<std::size_t, CStorageElement*>& cacheElement : mCacheElements)
+                for(const SCacheElementInfo& cacheElement : mCacheElements)
                 {
 					for (const std::shared_ptr<SReplica>& r : fileToTransfer->mReplicas)
 					{
-						if (r->GetStorageElement() == cacheElement.second)
+						if (r->GetStorageElement() == cacheElement.mStorageElement)
 							bestSrcReplica = r;
 					}
 					if (bestSrcReplica)
@@ -929,27 +971,13 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
                 if(!mCacheElements.empty())
                 {
                     //todo: randomise cache element selection?
-                    CStorageElement* cacheStorageElement = mCacheElements[0].second;
-                    if(cacheStorageElement->mReplicas.size() >= mCacheElements[0].first)
-                    {
-                        auto replicasIt = cacheStorageElement->mReplicas.begin();
-                        auto oldestReplicaIt = replicasIt;
-                        TickType oldestTime = (*replicasIt)->mExpiresAt;
-                        while(replicasIt != cacheStorageElement->mReplicas.end())
-                        {
-                            if((*replicasIt)->mExpiresAt < oldestTime)
-                            {
-                                oldestTime = (*replicasIt)->mExpiresAt;
-                                oldestReplicaIt = replicasIt;
-                            }
-                            replicasIt++;
-                        }
-                        (*oldestReplicaIt)->mExpiresAt = now;
-                    }
+                    CStorageElement* cacheStorageElement = mCacheElements[0].mStorageElement;
+                    if(cacheStorageElement->mReplicas.size() >= mCacheElements[0].mCacheSize)
+                        ExpireReplica(cacheStorageElement, now);
 
                     std::shared_ptr<SReplica> newCacheReplica = cacheStorageElement->CreateReplica(fileToTransfer);
                     assert(newCacheReplica);
-                    newCacheReplica->mExpiresAt = now + SECONDS_PER_MONTH;
+                    newCacheReplica->mExpiresAt = now + mCacheElements[0].mDefaultReplicaLifetime;
 
                     replicaInsertQueries->AddValue(newCacheReplica->GetId());
                     replicaInsertQueries->AddValue(fileToTransfer->GetId());
@@ -963,7 +991,7 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
 
 			std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(fileToTransfer);
 			assert(newReplica);
-			newReplica->mExpiresAt = now + SECONDS_PER_DAY;
+			newReplica->mExpiresAt = now + mDefaultReplicaLifetime;
 
 			replicaInsertQueries->AddValue(newReplica->GetId());
 			replicaInsertQueries->AddValue(fileToTransfer->GetId());

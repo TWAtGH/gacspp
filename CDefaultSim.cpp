@@ -193,6 +193,7 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
     for(const std::unique_ptr<IBaseCloud>& cloud : mClouds)
         cloud->InitialiseNetworkLinks();
 
+
     ////////////////////////////
     // setup scheuleables
     ////////////////////////////
@@ -200,8 +201,8 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
     {
         for(const json& dataGenCfg : profileJson.at("dataGens"))
         {
-            const TickType startTick = dataGenCfg.at("startTick").get<TickType>();
             const TickType tickFreq = dataGenCfg.at("tickFreq").get<TickType>();
+            const TickType startTick = dataGenCfg.at("startTick").get<TickType>();
 
             std::unordered_map<std::string, std::unique_ptr<IValueGenerator>> jsonPropNameToValueGen;
             for(const std::string& propName : {"numFilesCfg", "fileSizeCfg", "lifetimeCfg"})
@@ -243,6 +244,9 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
 
             dataGen->mSelectStorageElementsRandomly = dataGenCfg.at("selectStorageElementsRandomly").get<bool>();
 
+            if(dataGenCfg.contains("numPreSimStartFiles"))
+                dataGen->CreateFilesAndReplicas(dataGenCfg["numPreSimStartFiles"].get<std::uint32_t>(), 1, 0);
+
             mSchedule.push(dataGen);
         }
     }
@@ -251,29 +255,71 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
 		std::cout << "Failed to load data gen cfg: " << error.what() << std::endl;
 	}
 
-    auto reaper = std::make_shared<CReaper>(mRucio.get(), 600, 600);
 
-    auto x2cTransferMgr = std::make_shared<CFixedTimeTransferManager>(20, 100);
-    auto x2cTransferGen = std::make_shared<CCachedSrcTransferGen>(this, x2cTransferMgr, 120);
+    std::shared_ptr<CReaper> reaper;
+    try
+    {
+        const json& reaperCfg = profileJson.at("reaper");
+        const TickType tickFreq = reaperCfg.at("tickFreq").get<TickType>();
+        const TickType startTick = reaperCfg.at("startTick").get<TickType>();
+        reaper = std::make_shared<CReaper>(mRucio.get(), tickFreq, startTick);
+    }
+    catch(const json::out_of_range& error)
+    {
+        std::cout << "Failed to load reaper cfg: " << error.what() << std::endl;
+        reaper = std::make_shared<CReaper>(mRucio.get(), 600, 600);
+    }
 
 
-    auto heartbeat = std::make_shared<CHeartbeat>(this, x2cTransferMgr, nullptr, static_cast<std::uint32_t>(SECONDS_PER_DAY), static_cast<TickType>(SECONDS_PER_DAY));
+    std::shared_ptr<CCachedSrcTransferGen> transferGen;
+    std::shared_ptr<CFixedTimeTransferManager> manager;
+    try
+    {
+        const json& transferGenCfg = profileJson.at("cachedTransferGen");
+        const std::string managerType = transferGenCfg.at("managerType").get<std::string>();
+        const TickType tickFreq = transferGenCfg.at("tickFreq").get<TickType>();
+        const TickType startTick = transferGenCfg.at("startTick").get<TickType>();
+        const TickType managerTickFreq = transferGenCfg.at("managerTickFreq").get<TickType>();
+        const TickType managerStartTick = transferGenCfg.at("managerStartTick").get<TickType>();
+        const TickType defaultReplicaLifetime = transferGenCfg.at("defaultReplicaLifetime").get<TickType>();
+        if(managerType == "fixedTime")
+        {
+            manager = std::make_shared<CFixedTimeTransferManager>(managerTickFreq, managerStartTick);
+            transferGen = std::make_shared<CCachedSrcTransferGen>(this, manager, defaultReplicaLifetime, tickFreq, startTick);
+
+            for(const json& srcStorageElementName : transferGenCfg.at("srcStorageElements"))
+                transferGen->mSrcStorageElements.push_back( nameToStorageElement[srcStorageElementName.get<std::string>()] );
+            for(const json& cacheStorageElementJson : transferGenCfg.at("cacheStorageElements"))
+            {
+                const std::size_t cacheSize = cacheStorageElementJson.at("size").get<std::size_t>();
+                const TickType defaultReplicaLifetime = cacheStorageElementJson.at("defaultReplicaLifetime").get<TickType>();
+                CStorageElement* storageElement = nameToStorageElement[cacheStorageElementJson.at("storageElement").get<std::string>()];
+                transferGen->mCacheElements.push_back( {cacheSize, defaultReplicaLifetime, storageElement} );
+            }
+            for(const json& dstStorageElementName : transferGenCfg.at("dstStorageElements"))
+                transferGen->mDstStorageElements.push_back( nameToStorageElement[dstStorageElementName.get<std::string>()] );
+        }
+        else
+        {
+            std::cout << "Failed to load reaper cached transfer gen cfg: only fixed transfer implemented" << std::endl;
+        }
+    }
+    catch(const json::out_of_range& error)
+    {
+        std::cout << "Failed to load reaper cached transfer gen cfg: " << error.what() << std::endl;
+    }
+
+
+    auto heartbeat = std::make_shared<CHeartbeat>(this, manager, nullptr, static_cast<std::uint32_t>(SECONDS_PER_DAY), static_cast<TickType>(SECONDS_PER_DAY));
     //heartbeat->mProccessDurations["DataGen"] = &(dataGen->mUpdateDurationSummed);
-    heartbeat->mProccessDurations["X2CTransferUpdate"] = &(x2cTransferMgr->mUpdateDurationSummed);
-    heartbeat->mProccessDurations["X2CTransferGen"] = &(x2cTransferGen->mUpdateDurationSummed);
+    heartbeat->mProccessDurations["TransferUpdate"] = &(manager->mUpdateDurationSummed);
+    heartbeat->mProccessDurations["TransferGen"] = &(transferGen->mUpdateDurationSummed);
     heartbeat->mProccessDurations["Reaper"] = &(reaper->mUpdateDurationSummed);
-
-
-
-    x2cTransferGen->mSrcStorageElements.push_back( nameToStorageElement["BNL_DATATAPE"] );
-	if(nameToStorageElement.count("iowa_bucket") > 0)
-		x2cTransferGen->mCacheElements.push_back( std::make_pair(1000, nameToStorageElement["iowa_bucket"]) );
-    x2cTransferGen->mDstStorageElements.push_back( nameToStorageElement["BNL_DATADISK"] );
 
 
     mSchedule.push(std::make_shared<CBillingGenerator>(this));
     mSchedule.push(reaper);
-    mSchedule.push(x2cTransferMgr);
-    mSchedule.push(x2cTransferGen);
+    mSchedule.push(manager);
+    mSchedule.push(transferGen);
     mSchedule.push(heartbeat);
 }

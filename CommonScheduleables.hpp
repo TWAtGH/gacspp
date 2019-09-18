@@ -55,8 +55,6 @@ private:
     std::uint32_t GetRandomNumFilesToGenerate();
     TickType GetRandomLifeTime();
 
-    std::uint64_t CreateFilesAndReplicas(const std::uint32_t numFiles, const std::uint32_t numReplicasPerFile, const TickType now);
-
 public:
 
     bool mSelectStorageElementsRandomly = false;
@@ -69,6 +67,8 @@ public:
                     std::unique_ptr<IValueGenerator>&& fileLifetimeRNG,
                     const std::uint32_t tickFreq,
                     const TickType startTick=0);
+
+    std::uint64_t CreateFilesAndReplicas(const std::uint32_t numFiles, const std::uint32_t numReplicasPerFile, const TickType now);
 
     void OnUpdate(const TickType now) final;
 };
@@ -308,16 +308,26 @@ private:
     std::uint32_t mTickFreq;
 
     bool ExistsFileAtStorageElement(const SFile* file, const CStorageElement* storageElement) const;
+    void ExpireReplica(CStorageElement* storageElement, const TickType now);
 
 public:
+    struct SCacheElementInfo
+    {
+        std::size_t mCacheSize;
+        TickType mDefaultReplicaLifetime;
+        CStorageElement* mStorageElement;
+    };
+
     CCachedSrcTransferGen(IBaseSim* sim,
                         std::shared_ptr<CFixedTimeTransferManager> transferMgr,
+                        const TickType defaultReplicaLifetime,
                         const std::uint32_t tickFreq,
                         const TickType startTick=0 );
 
     std::vector<CStorageElement*> mSrcStorageElements;
-    std::vector<std::pair<std::size_t, CStorageElement*>> mCacheElements;
+    std::vector<SCacheElementInfo> mCacheElements;
     std::vector<CStorageElement*> mDstStorageElements;
+    TickType mDefaultReplicaLifetime;
 
     void OnUpdate(const TickType now) final;
 };

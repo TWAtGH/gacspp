@@ -20,6 +20,7 @@
             "selectStorageElementsRandomly": false,
             "startTick": 0,
             "tickFreq": 43200,
+            "numPreSimStartFiles": 200000,
             "numFilesCfg": {
                 "type": "normal",
                 "mean": 520,
@@ -35,5 +36,27 @@
                 "value": 157680000
             }
         }
-    ]
+    ],
+"reaper": {
+        "tickFreq": 300,
+        "startTick": 300
+    },
+"cachedTransferGen": {
+    "managerType": "fixedTime",
+    "tickFreq": 120,
+    "startTick": 0,
+    "managerTickFreq": 20,
+    "managerStartTick": 100,
+    "srcStorageElements": ["BNL_DATATAPE"],
+    "dstStorageElements": ["BNL_DATADISK"],
+    "defaultReplicaLifetime": 86400,
+    "cacheStorageElements": [],
+    "_cacheStorageElements": [
+            {
+                "size": 75000,
+                "defaultReplicaLifetime": 2592000,
+                "storageElement": "iowa_bucket"
+            }
+        ]
+    }
 }
