@@ -23,7 +23,7 @@ void CStorageElement::OnOperation(const OPERATION op)
     (void)op;
 }
 
-auto CStorageElement::CreateReplica(SFile* const file) -> std::shared_ptr<SReplica>
+auto CStorageElement::CreateReplica(std::shared_ptr<SFile>& file) -> std::shared_ptr<SReplica>
 {
     const auto result = mFileIds.insert(file->GetId());
 
