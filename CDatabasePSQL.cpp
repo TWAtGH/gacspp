@@ -78,12 +78,20 @@ void CInsertValuesContainer::AddValue(std::uint64_t value)
 
 void CInsertValuesContainer::AddValue(const std::string& value)
 {
-    mValues += (value + ",");
+	mValues.reserve(mValues.size() + value.size() + 7);
+	mValues += '"';
+	for (auto c : value)
+	{
+		if (c == '"')
+			mValues += '"';
+		mValues += c;
+	}
+    mValues += "\",";
 }
 
 void CInsertValuesContainer::AddValue(std::string&& value)
 {
-    mValues += (std::move(value) + ",");
+	AddValue(value);
 }
 
 bool CInsertValuesContainer::MergeIfPossible(std::unique_ptr<IInsertValuesContainer>& other)

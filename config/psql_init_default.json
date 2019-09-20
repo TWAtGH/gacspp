@@ -1,12 +1,13 @@
 {
 "init":[
-    "DROP TABLE IF EXISTS Sites, StorageElements, NetworkLinks, Files, Replicas, Transfers CASCADE;",
-    "CREATE TABLE Sites (id BIGINT, name varchar(64), locationName varchar(32), cloudName varchar(32));",
-    "CREATE TABLE StorageElements (id BIGINT, siteId BIGINT, name varchar(64), accessLatency BIGINT);",
+    "DROP TABLE IF EXISTS Sites, StorageElements, NetworkLinks, Files, Replicas, Transfers, Bills CASCADE;",
+    "CREATE TABLE Sites (id BIGINT, name VARCHAR, locationName VARCHAR, cloudName VARCHAR);",
+    "CREATE TABLE StorageElements (id BIGINT, siteId BIGINT, name VARCHAR, accessLatency BIGINT);",
     "CREATE TABLE NetworkLinks (id BIGINT, srcSiteId BIGINT, dstSiteId BIGINT);",
     "CREATE TABLE Files (id BIGINT, createdAt BIGINT, expiredAt BIGINT, filesize INTEGER);",
     "CREATE TABLE Replicas (id BIGINT, fileId BIGINT, storageElementId BIGINT, createdAt BIGINT, expiredAt BIGINT);",
-    "CREATE TABLE Transfers (id BIGINT, srcReplicaId BIGINT, dstReplicaId BIGINT, queuedAt BIGINT, startedAt BIGINT, finishedAt BIGINT);"
+    "CREATE TABLE Transfers (id BIGINT, srcReplicaId BIGINT, dstReplicaId BIGINT, queuedAt BIGINT, startedAt BIGINT, finishedAt BIGINT);",
+    "CREATE TABLE Bills (cloudName VARCHAR, month INTEGER, bill VARCHAR);"
 ],
 
 "shutdown":[

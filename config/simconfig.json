@@ -1,5 +1,6 @@
 {
-"profile": "default_profile.json",
+"profile": "model-beta_cached_125k_ttl30d.json",
+"_profile": "model-beta_no_cache.json",
 "output": {
     "insertQueryBufferLen": 8192,
     "keepInMemory": true,

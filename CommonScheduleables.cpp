@@ -50,7 +50,6 @@ CDataGenerator::CDataGenerator( IBaseSim* sim,
       mFileLifetimeRNG(std::move(fileLifetimeRNG)),
       mTickFreq(tickFreq)
 {
-    //mOutputFileInsertQuery = COutput::GetRef().CreatePreparedInsert("INSERT INTO Files VALUES(?, ?, ?, ?);", '?');
     mOutputFileInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Files(id, createdAt, expiredAt, filesize) FROM STDIN with(FORMAT csv);", 4, '?');
 }
 
@@ -175,11 +174,18 @@ CBillingGenerator::CBillingGenerator(IBaseSim* sim, const std::uint32_t tickFreq
     : CScheduleable(startTick),
       mSim(sim),
       mTickFreq(tickFreq)
-{}
+{
+	mCloudBillInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Bills(cloudName, month, bill) FROM STDIN with(FORMAT csv);", 3, '?');
+}
 
 void CBillingGenerator::OnUpdate(const TickType now)
 {
     std::stringstream summary;
+	
+	std::unique_ptr<IInsertValuesContainer> billInsertQueries = mCloudBillInsertQuery->CreateValuesContainer(3 * mSim->mClouds.size());
+
+	const std::uint32_t month = static_cast<std::uint32_t>(SECONDS_TO_MONTHS(now));
+
     const std::string caption = std::string(10, '=') + " Monthly Summary " + std::string(10, '=');
 
     summary << std::fixed << std::setprecision(2);
@@ -191,13 +197,19 @@ void CBillingGenerator::OnUpdate(const TickType now)
 
     for(const std::unique_ptr<IBaseCloud>& cloud : mSim->mClouds)
     {
+		std::string bill = cloud->ProcessBilling(now)->ToString();
         summary << std::endl;
-        summary<<cloud->GetName()<<" - Billing for Month "<<static_cast<std::uint32_t>(SECONDS_TO_MONTHS(now))<<":\n";
-        summary << cloud->ProcessBilling(now)->ToString();
+        summary<<cloud->GetName()<<" - Billing for Month "<< month <<":\n";
+        summary << bill;
+		billInsertQueries->AddValue(cloud->GetName());
+		billInsertQueries->AddValue(month);
+		billInsertQueries->AddValue(std::move(bill));
     }
 
     summary << std::string(caption.length(), '=') << std::endl;
     std::cout << summary.str() << std::endl;
+
+	COutput::GetRef().QueueInserts(std::move(billInsertQueries));
 
     mNextCallTick = now + mTickFreq;
 }
@@ -908,100 +920,111 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
 
     std::unique_ptr<IInsertValuesContainer> replicaInsertQueries = CStorageElement::outputReplicaInsertQuery->CreateValuesContainer(512);
 
-    // create transfers per dst storage element
-    for(CStorageElement* dstStorageElement : mDstStorageElements)
-    {
-        const std::size_t numToCreate = 70;
+	std::size_t fileAccessCount = 4;
+	const std::vector<std::size_t> numPerCount = { 50, 15, 4, 1 };
+	while(fileAccessCount > 0)
+	{
+		--fileAccessCount;
+		// create transfers per dst storage element
+		for(CStorageElement* dstStorageElement : mDstStorageElements)
+		{
+			const std::size_t numToCreate = numPerCount[fileAccessCount];
 
-        // create numToCreate many transfers
-        for(std::size_t numTransfersCreated=0; numTransfersCreated<numToCreate; ++numTransfersCreated)
-        {
-            //try to find a file that is not already on the dst storage element
-            SFile* fileToTransfer = nullptr;
-            for(std::size_t i=0; i<10 ; ++i)
-            {
-                fileToTransfer = allFiles[fileRndSelector(rngEngine)].get();
-                if(fileToTransfer->mReplicas.empty() || ExistsFileAtStorageElement(fileToTransfer, dstStorageElement))
-                    fileToTransfer = nullptr;
-                else
-                    break;
-            }
-
-            if(!fileToTransfer)
-                continue;
-
-            //find best src replica
-			std::shared_ptr<SReplica> bestSrcReplica = nullptr;
-
-            //check caches first
-            if(!mCacheElements.empty())
-            {
-                for(const SCacheElementInfo& cacheElement : mCacheElements)
-                {
-					for (const std::shared_ptr<SReplica>& r : fileToTransfer->mReplicas)
-					{
-						if (r->GetStorageElement() == cacheElement.mStorageElement)
-							bestSrcReplica = r;
-					}
-					if (bestSrcReplica)
+			// create numToCreate many transfers
+			for(std::size_t numTransfersCreated=0; numTransfersCreated<numToCreate; ++numTransfersCreated)
+			{
+				//try to find a file that is not already on the dst storage element
+				SFile* fileToTransfer = nullptr;
+				for(std::size_t i=0; i<10 ; ++i)
+				{
+					fileToTransfer = allFiles[fileRndSelector(rngEngine)].get();
+					if(fileToTransfer->mReplicas.empty() || ExistsFileAtStorageElement(fileToTransfer, dstStorageElement))
+						fileToTransfer = nullptr;
+					else
 						break;
-                }
-            }
+				}
 
-            if(!bestSrcReplica)
-            {
-                double minWeight = 0;
-                for(std::shared_ptr<SReplica>& srcReplica : fileToTransfer->mReplicas)
-                {
-                    if(!srcReplica->IsComplete())
-                        continue;
+				if(!fileToTransfer)
+					continue;
 
-                    const double weight = srcReplica->GetStorageElement()->GetSite()->GetNetworkLink(dstStorageElement->GetSite())->GetWeight();
-                    if(!bestSrcReplica || weight < minWeight)
-                    {
-                        bestSrcReplica = srcReplica;
-                        minWeight = weight;
-                    }
-                }
+				//find best src replica
+				std::shared_ptr<SReplica> bestSrcReplica = nullptr;
 
-                if(!bestSrcReplica)
-                    continue;
+				//check caches first
+				if(!mCacheElements.empty())
+				{
+					for(const SCacheElementInfo& cacheElement : mCacheElements)
+					{
+						for (const std::shared_ptr<SReplica>& r : fileToTransfer->mReplicas)
+						{
+							if (r->GetStorageElement() == cacheElement.mStorageElement)
+								bestSrcReplica = r;
+						}
+						if (bestSrcReplica)
+							break;
+					}
+				}
 
-                //handle cache miss here so that we didnt have to create the new cache replica before
-                if(!mCacheElements.empty())
-                {
-                    //todo: randomise cache element selection?
-                    CStorageElement* cacheStorageElement = mCacheElements[0].mStorageElement;
-                    if(cacheStorageElement->mReplicas.size() >= mCacheElements[0].mCacheSize)
-                        ExpireReplica(cacheStorageElement, now);
+				if(!bestSrcReplica)
+				{
+					double minWeight = 0;
+					for(std::shared_ptr<SReplica>& srcReplica : fileToTransfer->mReplicas)
+					{
+						if(!srcReplica->IsComplete())
+							continue;
 
-                    std::shared_ptr<SReplica> newCacheReplica = cacheStorageElement->CreateReplica(fileToTransfer);
-                    assert(newCacheReplica);
-                    newCacheReplica->mExpiresAt = now + mCacheElements[0].mDefaultReplicaLifetime;
+						const double weight = srcReplica->GetStorageElement()->GetSite()->GetNetworkLink(dstStorageElement->GetSite())->GetWeight();
+						if(!bestSrcReplica || weight < minWeight)
+						{
+							bestSrcReplica = srcReplica;
+							minWeight = weight;
+						}
+					}
 
-                    replicaInsertQueries->AddValue(newCacheReplica->GetId());
-                    replicaInsertQueries->AddValue(fileToTransfer->GetId());
-                    replicaInsertQueries->AddValue(cacheStorageElement->GetId());
-                    replicaInsertQueries->AddValue(now);
-                    replicaInsertQueries->AddValue(newCacheReplica->mExpiresAt);
+					if(!bestSrcReplica)
+						continue;
 
-                    mTransferMgr->CreateTransfer(bestSrcReplica, newCacheReplica, now, 60);
-                }
-            }
+					//handle cache miss here so that we didnt have to create the new cache replica before
+					if(!mCacheElements.empty())
+					{
+						//todo: randomise cache element selection?
+						CStorageElement* cacheStorageElement = mCacheElements[0].mStorageElement;
+						if(cacheStorageElement->mReplicas.size() >= mCacheElements[0].mCacheSize)
+							ExpireReplica(cacheStorageElement, now);
 
-			std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(fileToTransfer);
-			assert(newReplica);
-			newReplica->mExpiresAt = now + mDefaultReplicaLifetime;
+						std::shared_ptr<SReplica> newCacheReplica = cacheStorageElement->CreateReplica(fileToTransfer);
+						assert(newCacheReplica);
+						newCacheReplica->mExpiresAt = now + mCacheElements[0].mDefaultReplicaLifetime;
 
-			replicaInsertQueries->AddValue(newReplica->GetId());
-			replicaInsertQueries->AddValue(fileToTransfer->GetId());
-			replicaInsertQueries->AddValue(dstStorageElement->GetId());
-			replicaInsertQueries->AddValue(now);
-			replicaInsertQueries->AddValue(newReplica->mExpiresAt);
+						replicaInsertQueries->AddValue(newCacheReplica->GetId());
+						replicaInsertQueries->AddValue(fileToTransfer->GetId());
+						replicaInsertQueries->AddValue(cacheStorageElement->GetId());
+						replicaInsertQueries->AddValue(now);
+						replicaInsertQueries->AddValue(newCacheReplica->mExpiresAt);
 
-			mTransferMgr->CreateTransfer(bestSrcReplica, newReplica, now, 60);
-        }
-    }
+						mTransferMgr->CreateTransfer(bestSrcReplica, newCacheReplica, now, 60);
+					}
+				}
+
+				std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(fileToTransfer);
+				assert(newReplica);
+				newReplica->mExpiresAt = now + mDefaultReplicaLifetime;
+
+				replicaInsertQueries->AddValue(newReplica->GetId());
+				replicaInsertQueries->AddValue(fileToTransfer->GetId());
+				replicaInsertQueries->AddValue(dstStorageElement->GetId());
+				replicaInsertQueries->AddValue(now);
+				replicaInsertQueries->AddValue(newReplica->mExpiresAt);
+
+				mTransferMgr->CreateTransfer(bestSrcReplica, newReplica, now, 60);
+
+				std::swap(mFilesByAccessCount[fileAccessCount][fileIdx], mFilesByAccessCount.back());
+				mFilesByAccessCount[fileAccessCount].pop_back();
+				if ((fileAccessCount + 1) < mFilesByAccessCount.size())
+					mFilesByAccessCount[fileAccessCount + 1].push_back(fileToTransfer);
+			}
+		}
+	}
 
     COutput::GetRef().QueueInserts(std::move(replicaInsertQueries));
 

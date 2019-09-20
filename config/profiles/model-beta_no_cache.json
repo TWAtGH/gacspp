@@ -1,0 +1,55 @@
+{
+"maxTick": 7776000,
+"clouds": [
+		{
+			"id": "gcp",
+			"name": "gcp_default",
+			"config": {"_file_": "gcp_default.json"}
+		}
+	],
+"rucio": {
+	"config": {"_file_": "rucio_default.json"}
+	},
+"links": {
+	"config": {"_file_": "links_default.json"}
+    },
+"dataGens": [
+        {
+            "storageElements": ["BNL_DATATAPE"],
+            "numReplicaRatios": [],
+            "selectStorageElementsRandomly": false,
+            "startTick": 0,
+            "tickFreq": 43200,
+            "numPreSimStartFiles": 200000,
+            "numFilesCfg": {
+                "type": "normal",
+                "mean": 520,
+                "stddev": 1
+            },
+            "fileSizeCfg":{
+                "type": "normal",
+                "mean": 0.5,
+                "stddev": 0.25
+            },
+            "lifetimeCfg": {
+                "type": "fixed",
+                "value": 157680000
+            }
+        }
+    ],
+"reaper": {
+        "tickFreq": 300,
+        "startTick": 300
+    },
+"cachedTransferGen": {
+    "managerType": "fixedTime",
+    "tickFreq": 120,
+    "startTick": 0,
+    "managerTickFreq": 20,
+    "managerStartTick": 100,
+    "srcStorageElements": ["BNL_DATATAPE"],
+    "dstStorageElements": ["BNL_DATADISK"],
+    "defaultReplicaLifetime": 86400,
+    "cacheStorageElements": []
+    }
+}

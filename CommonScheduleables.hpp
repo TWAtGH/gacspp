@@ -89,6 +89,8 @@ public:
 class CBillingGenerator : public CScheduleable
 {
 private:
+	std::shared_ptr<IPreparedInsert> mCloudBillInsertQuery;
+
     IBaseSim* mSim;
     std::uint32_t mTickFreq;
 
@@ -311,6 +313,7 @@ private:
     void ExpireReplica(CStorageElement* storageElement, const TickType now);
 
 public:
+	std::vector<std::vector<SFile*>> mFilesByAccessCount;
     struct SCacheElementInfo
     {
         std::size_t mCacheSize;

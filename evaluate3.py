@@ -243,8 +243,8 @@ dbCursor = conn.cursor()
 NewPlot('FileSize', PlotFileSize, dbCursor)
 NewPlot('TransferTimes', PlotTransferTimeStats, dbCursor)
 NewPlot('TransferCounts', PlotTransferNumStats, dbCursor, 3600*6)
-NewPlot('NumReplicasBNL_DATADISK', PlotNumReplicasAtStorageElement, dbCursor, 'BNL_DATADISK')
-NewPlot('NumReplicasIowa_bucket', PlotNumReplicasAtStorageElement, dbCursor, 'iowa_bucket')
+#NewPlot('NumReplicasBNL_DATADISK', PlotNumReplicasAtStorageElement, dbCursor, 'BNL_DATADISK')
+#NewPlot('NumReplicasIowa_bucket', PlotNumReplicasAtStorageElement, dbCursor, 'iowa_bucket')
 
 print('{}s'.format(time.time() - tstart))
 
