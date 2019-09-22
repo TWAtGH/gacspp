@@ -1,9 +1,9 @@
 #include <fstream>
 #include <iostream>
 
-#include "constants.h"
 #include "CConfigManager.hpp"
-#include "json.hpp"
+#include "common/constants.h"
+#include "third_party/json.hpp"
 
 
 auto CConfigManager::GetRef() -> CConfigManager &

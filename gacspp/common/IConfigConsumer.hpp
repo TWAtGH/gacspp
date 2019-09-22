@@ -1,6 +1,6 @@
 #pragma once
 
-#include "json_fwd.hpp"
+#include "third_party/json_fwd.hpp"
 
 using nlohmann::json;
 

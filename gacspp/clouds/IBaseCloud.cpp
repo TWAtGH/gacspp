@@ -1,7 +1,7 @@
 #include <cassert>
 
 #include "IBaseCloud.hpp"
-#include "ISite.hpp"
+#include "infrastructure/ISite.hpp"
 
 IBaseCloud::IBaseCloud(std::string&& name)
     : mName(std::move(name))

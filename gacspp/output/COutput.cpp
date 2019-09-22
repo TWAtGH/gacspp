@@ -2,13 +2,13 @@
 #include <chrono>
 #include <fstream>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 
-#include <iostream>
-
-#include "constants.h"
 #include "COutput.hpp"
 #include "CDatabasePSQL.hpp"
+
+#include "common/constants.h"
 
 
 auto COutput::GetRef() -> COutput&

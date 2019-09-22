@@ -3,7 +3,7 @@ CC = $(CXX)
 CXXFLAGS = -O3 -march=native -std=c++17 -Wall -Wextra -pedantic
 LDLIBS = -ldl -lpthread -lstdc++fs -lpq
 
-COMPONENTS = clouds common infrastructure output sim
+COMPONENTS = clouds clouds/gcp common infrastructure output sim
 
 HEADERS := $(wildcard $(COMPONENTS:%=gacspp/%/*.h*))
 SOURCES := $(wildcard $(COMPONENTS:%=gacspp/%/*.cpp))
@@ -14,5 +14,5 @@ gacspp.out: $(OBJFILES)
 	$(CXX) -o gacspp.out $(OBJFILES) $(LDLIBS)
 
 $(OBJFILES): bin/%.o: gacspp/%.cpp $(HEADERS)
-	$(CXX)  -c $(CXXFLAGS) $< -o $@
-	
+	mkdir -p $(@D)
+	$(CXX) -c $(CXXFLAGS) -Igacspp/ $< -o $@

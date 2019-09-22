@@ -1,10 +1,10 @@
 #include <cassert>
 
 #include "ISite.hpp"
-
-#include "COutput.hpp"
 #include "CStorageElement.hpp"
 #include "SFile.hpp"
+
+#include "output/COutput.hpp"
 
 
 std::shared_ptr<IPreparedInsert> CStorageElement::outputReplicaInsertQuery = nullptr;

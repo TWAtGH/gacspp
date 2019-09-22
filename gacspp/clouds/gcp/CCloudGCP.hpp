@@ -1,9 +1,9 @@
 #pragma once
 
-#include "IBaseCloud.hpp"
-#include "ISite.hpp"
+#include "clouds/IBaseCloud.hpp"
 
-#include "CStorageElement.hpp"
+#include "infrastructure/ISite.hpp"
+#include "infrastructure/CStorageElement.hpp"
 
 namespace gcp
 {

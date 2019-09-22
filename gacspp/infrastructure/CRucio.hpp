@@ -8,10 +8,11 @@
 #include <thread>
 #include <vector>
 
-#include "constants.h"
-
-#include "IConfigConsumer.hpp"
 #include "ISite.hpp"
+
+#include "common/constants.h"
+#include "common/IConfigConsumer.hpp"
+
 
 struct SFile;
 

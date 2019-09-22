@@ -3,7 +3,7 @@
 #include <memory>
 #include <vector>
 
-#include "constants.h"
+#include "common/constants.h"
 
 class CStorageElement;
 struct SReplica;

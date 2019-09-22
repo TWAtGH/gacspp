@@ -1,10 +1,13 @@
 #include <iomanip>
 #include <iostream>
 
-#include "json.hpp"
-#include "CConfigManager.hpp"
 #include "CDefaultSim.hpp"
-#include "COutput.hpp"
+
+#include "common/CConfigManager.hpp"
+
+#include "output/COutput.hpp"
+
+#include "third_party/json.hpp"
 
 
 

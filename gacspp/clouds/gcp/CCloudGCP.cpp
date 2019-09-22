@@ -3,14 +3,15 @@
 #include <iostream>
 #include <sstream>
 
-#include "json.hpp"
-
-#include "CConfigManager.hpp"
 #include "CCloudGCP.hpp"
-#include "CNetworkLink.hpp"
-#include "SFile.hpp"
 
-#include <fstream>
+#include "common/CConfigManager.hpp"
+
+#include "infrastructure/CNetworkLink.hpp"
+#include "infrastructure/SFile.hpp"
+
+#include "third_party/json.hpp"
+
 
 namespace gcp
 {

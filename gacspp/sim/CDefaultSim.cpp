@@ -2,15 +2,19 @@
 #include <iostream>
 #include <sstream>
 
-#include "json.hpp"
-
 #include "CDefaultSim.hpp"
-#include "CCloudGCP.hpp"
-#include "CConfigManager.hpp"
-#include "CNetworkLink.hpp"
-#include "CRucio.hpp"
-#include "COutput.hpp"
 #include "CommonScheduleables.hpp"
+
+#include "clouds/gcp/CCloudGCP.hpp"
+
+#include "common/CConfigManager.hpp"
+
+#include "infrastructure/CNetworkLink.hpp"
+#include "infrastructure/CRucio.hpp"
+
+#include "output/COutput.hpp"
+
+#include "third_party/json.hpp"
 
 
 

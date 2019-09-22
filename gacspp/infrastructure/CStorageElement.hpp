@@ -6,8 +6,8 @@
 #include <unordered_set>
 #include <vector>
 
-#include "constants.h"
-#include "parallel_hashmap/phmap.h"
+#include "common/constants.h"
+#include "third_party/parallel_hashmap/phmap.h"
 
 class ISite;
 struct SFile;

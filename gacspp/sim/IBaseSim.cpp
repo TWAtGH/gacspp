@@ -1,9 +1,10 @@
 #include <cassert>
 
-#include "IBaseCloud.hpp"
 #include "IBaseSim.hpp"
 
-#include "CRucio.hpp"
+#include "clouds/IBaseCloud.hpp"
+
+#include "infrastructure/CRucio.hpp"
 
 
 IBaseSim::IBaseSim() = default;

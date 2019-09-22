@@ -5,9 +5,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include "constants.h"
-
-#include "IConfigConsumer.hpp"
+#include "common/constants.h"
+#include "common/IConfigConsumer.hpp"
 
 class ISite;
 

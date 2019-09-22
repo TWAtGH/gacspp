@@ -1,9 +1,9 @@
 #include <cassert>
+#include <iostream>
 #include <sstream>
 
 #include "CDatabasePSQL.hpp"
 
-#include <iostream>
 
 namespace psql
 {

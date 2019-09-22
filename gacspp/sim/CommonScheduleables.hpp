@@ -3,14 +3,19 @@
 #include <chrono>
 #include <unordered_map>
 
-#include "constants.h"
 #include "CScheduleable.hpp"
+
+#include "common/constants.h"
+
+
 
 class IBaseSim;
 class CRucio;
 class CStorageElement;
 class CNetworkLink;
+struct SFile;
 struct SReplica;
+class IPreparedInsert;
 
 class IValueGenerator
 {

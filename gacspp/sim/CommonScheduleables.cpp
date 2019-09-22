@@ -5,15 +5,18 @@
 #include <limits>
 #include <sstream>
 
-#include "IBaseCloud.hpp"
+#include "CommonScheduleables.hpp"
 #include "IBaseSim.hpp"
 
-#include "CNetworkLink.hpp"
-#include "CRucio.hpp"
-#include "COutput.hpp"
-#include "CStorageElement.hpp"
-#include "CommonScheduleables.hpp"
-#include "SFile.hpp"
+#include "clouds/IBaseCloud.hpp"
+
+#include "infrastructure/CNetworkLink.hpp"
+#include "infrastructure/CRucio.hpp"
+#include "infrastructure/CStorageElement.hpp"
+#include "infrastructure/SFile.hpp"
+
+#include "output/COutput.hpp"
+
 
 
 CFixedValueGenerator::CFixedValueGenerator(const double value)
