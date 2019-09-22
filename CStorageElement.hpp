@@ -42,7 +42,7 @@ public:
 
     virtual void OnOperation(const OPERATION op);
 
-	virtual auto CreateReplica(SFile* file) -> std::shared_ptr<SReplica>;
+	virtual auto CreateReplica(std::shared_ptr<SFile>& file) -> std::shared_ptr<SReplica>;
     virtual void OnIncreaseReplica(const std::uint64_t amount, const TickType now);
     virtual void OnRemoveReplica(const SReplica* replica, const TickType now, bool needLock=true);
 

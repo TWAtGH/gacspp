@@ -56,7 +56,7 @@ CDataGenerator::CDataGenerator( IBaseSim* sim,
 auto CDataGenerator::GetRandomFileSize() -> std::uint32_t
 {
     assert(mFileSizeRNG);
-    constexpr double min = 64 * ONE_MiB;
+    constexpr double min = MiB_TO_BYTES(64);
     constexpr double max = static_cast<double>(std::numeric_limits<std::uint32_t>::max());
     const double val = min + GiB_TO_BYTES(std::abs(mFileSizeRNG->GetValue(mSim->mRNGEngine)));
     return static_cast<std::uint32_t>(std::min(val, max));
@@ -94,7 +94,7 @@ auto CDataGenerator::CreateFilesAndReplicas(const std::uint32_t numFiles, const 
         const std::uint32_t fileSize = GetRandomFileSize();
         const TickType lifetime = GetRandomLifeTime();
 
-        SFile* const file = mSim->mRucio->CreateFile(fileSize, now + lifetime);
+        std::shared_ptr<SFile> file = mSim->mRucio->CreateFile(fileSize, now + lifetime);
 
         fileInsertQueries->AddValue(file->GetId());
         fileInsertQueries->AddValue(now);
@@ -181,7 +181,7 @@ CBillingGenerator::CBillingGenerator(IBaseSim* sim, const std::uint32_t tickFreq
 void CBillingGenerator::OnUpdate(const TickType now)
 {
     std::stringstream summary;
-	
+
 	std::unique_ptr<IInsertValuesContainer> billInsertQueries = mCloudBillInsertQuery->CreateValuesContainer(3 * mSim->mClouds.size());
 
 	const std::uint32_t month = static_cast<std::uint32_t>(SECONDS_TO_MONTHS(now));
@@ -492,7 +492,7 @@ void CUniformTransferGen::OnUpdate(const TickType now)
             std::shared_ptr<SReplica>& curReplica = srcStorageElement->mReplicas[idx];
             if(curReplica->IsComplete())
             {
-                SFile* const file = curReplica->GetFile();
+                std::shared_ptr<SFile> file = curReplica->GetFile();
                 CStorageElement* const dstStorageElement = mDstStorageElements[dstStorageElementRndChooser(rngEngine)];
                 std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(file);
                 if(newReplica != nullptr)
@@ -565,7 +565,7 @@ void CExponentialTransferGen::OnUpdate(const TickType now)
                 std::shared_ptr<SReplica>& curReplica = srcStorageElement->mReplicas[srcReplicaRndSelecter(rngEngine)];
                 if(curReplica->IsComplete())
                 {
-                    SFile* const file = curReplica->GetFile();
+                    std::shared_ptr<SFile> file = curReplica->GetFile();
                     std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(file);
                     if(newReplica != nullptr)
                     {
@@ -614,7 +614,7 @@ void CSrcPrioTransferGen::OnUpdate(const TickType now)
 {
     auto curRealtime = std::chrono::high_resolution_clock::now();
 
-    const std::vector<std::unique_ptr<SFile>>& allFiles = mSim->mRucio->mFiles;
+    const std::vector<std::shared_ptr<SFile>>& allFiles = mSim->mRucio->mFiles;
     const std::size_t numDstStorageElements = mDstStorageElements.size();
     assert(allFiles.size() > 0 && numDstStorageElements > 0);
 
@@ -630,10 +630,10 @@ void CSrcPrioTransferGen::OnUpdate(const TickType now)
     for(std::uint32_t totalTransfersCreated=0; totalTransfersCreated< flexCreationLimit; ++totalTransfersCreated)
     {
         CStorageElement* const dstStorageElement = mDstStorageElements[static_cast<std::size_t>(dstStorageElementRndSelecter(rngEngine) * 2) % numDstStorageElements];
-        SFile* fileToTransfer = allFiles[fileRndSelector(rngEngine)].get();
+        std::shared_ptr<SFile> fileToTransfer = allFiles[fileRndSelector(rngEngine)];
 
         for(std::uint32_t i = 0; i < 5 && fileToTransfer->mReplicas.empty() && fileToTransfer->mExpiresAt < (now + 100); ++i)
-            fileToTransfer = allFiles[fileRndSelector(rngEngine)].get();
+            fileToTransfer = allFiles[fileRndSelector(rngEngine)];
 
         const std::vector<std::shared_ptr<SReplica>>& replicas = fileToTransfer->mReplicas;
         if(replicas.empty())
@@ -725,7 +725,7 @@ void CJobSlotTransferGen::OnUpdate(const TickType now)
 {
     auto curRealtime = std::chrono::high_resolution_clock::now();
 
-    const std::vector<std::unique_ptr<SFile>>& allFiles = mSim->mRucio->mFiles;
+    const std::vector<std::shared_ptr<SFile>>& allFiles = mSim->mRucio->mFiles;
     assert(allFiles.size() > 0);
 
     RNGEngineType& rngEngine = mSim->mRNGEngine;
@@ -760,10 +760,10 @@ void CJobSlotTransferGen::OnUpdate(const TickType now)
         std::pair<TickType, std::uint32_t> newJobs = std::make_pair(now+900, 0);
         for(std::uint32_t totalTransfersCreated=0; totalTransfersCreated<flexCreationLimit; ++totalTransfersCreated)
         {
-            SFile* fileToTransfer = allFiles[fileRndSelector(rngEngine)].get();
+            std::shared_ptr<SFile> fileToTransfer = allFiles[fileRndSelector(rngEngine)];
 
             for(std::uint32_t i = 0; i < 10 && fileToTransfer->mReplicas.empty() && fileToTransfer->mExpiresAt < (now + 100); ++i)
-                fileToTransfer = allFiles[fileRndSelector(rngEngine)].get();
+                fileToTransfer = allFiles[fileRndSelector(rngEngine)];
 
             const std::vector<std::shared_ptr<SReplica>>& replicas = fileToTransfer->mReplicas;
             if(replicas.empty())
@@ -855,9 +855,11 @@ CCachedSrcTransferGen::CCachedSrcTransferGen(IBaseSim* sim,
       mTransferMgr(transferMgr),
       mTickFreq(tickFreq),
       mDefaultReplicaLifetime(defaultReplicaLifetime)
-{}
+{
+    mSim->mRucio->mFileCreationListeners.push_back(&(mRatiosAndFilesPerAccessCount[0].second));
+}
 
-bool CCachedSrcTransferGen::ExistsFileAtStorageElement(const SFile* file, const CStorageElement* storageElement) const
+bool CCachedSrcTransferGen::ExistsFileAtStorageElement(const std::shared_ptr<SFile>& file, const CStorageElement* storageElement) const
 {
     for(const std::shared_ptr<SReplica>& r : file->mReplicas)
     {
@@ -911,37 +913,41 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
 {
     auto curRealtime = std::chrono::high_resolution_clock::now();
 
-    const std::vector<std::unique_ptr<SFile>>& allFiles = mSim->mRucio->mFiles;
-    assert(!allFiles.empty());
-
     RNGEngineType& rngEngine = mSim->mRNGEngine;
-    std::uniform_int_distribution<std::size_t> fileRndSelector(0, allFiles.size() - 1);
-
-
     std::unique_ptr<IInsertValuesContainer> replicaInsertQueries = CStorageElement::outputReplicaInsertQuery->CreateValuesContainer(512);
 
-	std::size_t fileAccessCount = 4;
-	const std::vector<std::size_t> numPerCount = { 50, 15, 4, 1 };
-	while(fileAccessCount > 0)
-	{
-		--fileAccessCount;
+    for(auto it=mRatiosAndFilesPerAccessCount.rbegin(); it!=mRatiosAndFilesPerAccessCount.rend(); ++it)
+    {
+        const std::size_t numTransfersToCreate = it->first; //shouldnt be per dst element
+        std::vector<std::weak_ptr<SFile>>& fileVec = it->second;
+
+        if(fileVec.empty())
+            continue;
+
 		// create transfers per dst storage element
 		for(CStorageElement* dstStorageElement : mDstStorageElements)
 		{
-			const std::size_t numToCreate = numPerCount[fileAccessCount];
-
-			// create numToCreate many transfers
-			for(std::size_t numTransfersCreated=0; numTransfersCreated<numToCreate; ++numTransfersCreated)
+			// create numTransfersToCreate many transfers
+			for(std::size_t numTransfersCreated=0; numTransfersCreated<numTransfersToCreate; ++numTransfersCreated)
 			{
+                const std::size_t numFileSelectRetries = std::min<std::size_t>(fileVec.size(), 10);
+                std::uniform_int_distribution<std::size_t> fileRndSelector(0, fileVec.size() - 1);
+
 				//try to find a file that is not already on the dst storage element
-				SFile* fileToTransfer = nullptr;
-				for(std::size_t i=0; i<10 ; ++i)
+                std::size_t fileIdx;
+				std::shared_ptr<SFile> fileToTransfer = nullptr;
+				for(std::size_t i=0; (i<numFileSelectRetries) && !fileToTransfer ; ++i)
 				{
-					fileToTransfer = allFiles[fileRndSelector(rngEngine)].get();
+                    fileIdx = fileRndSelector(rngEngine);
+					fileToTransfer = fileVec[fileIdx].lock();
+                    if(!fileToTransfer)
+                    {
+                        std::swap(fileVec[fileIdx], fileVec.back());
+                        fileVec.pop_back();
+                        continue;
+                    }
 					if(fileToTransfer->mReplicas.empty() || ExistsFileAtStorageElement(fileToTransfer, dstStorageElement))
 						fileToTransfer = nullptr;
-					else
-						break;
 				}
 
 				if(!fileToTransfer)
@@ -985,7 +991,8 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
 						continue;
 
 					//handle cache miss here so that we didnt have to create the new cache replica before
-					if(!mCacheElements.empty())
+                    //dont create transfer to cache if element was accessed the last time
+					if(!mCacheElements.empty() && (it != mRatiosAndFilesPerAccessCount.rbegin()))
 					{
 						//todo: randomise cache element selection?
 						CStorageElement* cacheStorageElement = mCacheElements[0].mStorageElement;
@@ -1005,6 +1012,10 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
 						mTransferMgr->CreateTransfer(bestSrcReplica, newCacheReplica, now, 60);
 					}
 				}
+                else if(it == mRatiosAndFilesPerAccessCount.rbegin())
+                {
+                    //cache hit for file that will never be accessed again
+                }
 
 				std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(fileToTransfer);
 				assert(newReplica);
@@ -1018,10 +1029,10 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
 
 				mTransferMgr->CreateTransfer(bestSrcReplica, newReplica, now, 60);
 
-				std::swap(mFilesByAccessCount[fileAccessCount][fileIdx], mFilesByAccessCount.back());
-				mFilesByAccessCount[fileAccessCount].pop_back();
-				if ((fileAccessCount + 1) < mFilesByAccessCount.size())
-					mFilesByAccessCount[fileAccessCount + 1].push_back(fileToTransfer);
+                std::swap(fileVec[fileIdx], fileVec.back());
+                fileVec.pop_back();
+				if (it != mRatiosAndFilesPerAccessCount.rbegin())
+                    (it-1)->second.push_back(fileToTransfer);
 			}
 		}
 	}

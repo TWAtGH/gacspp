@@ -48,13 +48,15 @@ private:
     std::unique_ptr<std::thread> mThreads[NUM_REPEAR_THREADS];
 
 public:
-    std::vector<std::unique_ptr<SFile>> mFiles;
+    std::vector<std::shared_ptr<SFile>> mFiles;
     std::vector<std::unique_ptr<CGridSite>> mGridSites;
+
+    std::vector<std::vector<std::weak_ptr<SFile>>*> mFileCreationListeners;
 
     CRucio();
     ~CRucio();
 
-    auto CreateFile(const std::uint32_t size, const TickType expiresAt) -> SFile*;
+    auto CreateFile(const std::uint32_t size, const TickType expiresAt) -> std::shared_ptr<SFile>;
     auto CreateGridSite(std::string&& name, std::string&& locationName, const std::uint8_t multiLocationIdx) -> CGridSite*;
     auto RunReaper(const TickType now) -> std::size_t;
     void ReaperWorker(const std::size_t threadIdx);

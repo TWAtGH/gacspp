@@ -309,11 +309,10 @@ private:
     std::shared_ptr<CFixedTimeTransferManager> mTransferMgr;
     std::uint32_t mTickFreq;
 
-    bool ExistsFileAtStorageElement(const SFile* file, const CStorageElement* storageElement) const;
+    bool ExistsFileAtStorageElement(const std::shared_ptr<SFile>& file, const CStorageElement* storageElement) const;
     void ExpireReplica(CStorageElement* storageElement, const TickType now);
 
 public:
-	std::vector<std::vector<SFile*>> mFilesByAccessCount;
     struct SCacheElementInfo
     {
         std::size_t mCacheSize;
@@ -327,6 +326,7 @@ public:
                         const std::uint32_t tickFreq,
                         const TickType startTick=0 );
 
+    std::vector<std::pair<std::size_t, std::vector<std::weak_ptr<SFile>>>> mRatiosAndFilesPerAccessCount{ {50, {}}, {15, {}}, {4, {}}, {1, {}} };
     std::vector<CStorageElement*> mSrcStorageElements;
     std::vector<SCacheElementInfo> mCacheElements;
     std::vector<CStorageElement*> mDstStorageElements;

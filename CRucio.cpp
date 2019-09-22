@@ -32,10 +32,12 @@ CRucio::~CRucio()
         mThreads[i]->join();
 }
 
-auto CRucio::CreateFile(const std::uint32_t size, const TickType expiresAt) -> SFile*
+auto CRucio::CreateFile(const std::uint32_t size, const TickType expiresAt) -> std::shared_ptr<SFile>
 {
-    SFile* newFile = new SFile(size, expiresAt);
+    std::shared_ptr<SFile> newFile = std::make_shared<SFile>(size, expiresAt);
     mFiles.emplace_back(newFile);
+    for(std::vector<std::weak_ptr<SFile>>* listener : mFileCreationListeners)
+        listener->emplace_back(newFile);
     return newFile;
 }
 auto CRucio::CreateGridSite(std::string&& name, std::string&& locationName, const std::uint8_t multiLocationIdx) -> CGridSite*
@@ -63,11 +65,11 @@ void CRucio::ReaperWorker(const std::size_t threadIdx)
         const auto lastIdx = static_cast<std::size_t>(numElementsPerThread * (threadIdx + 1));
         for(std::size_t i = numElementsPerThread * threadIdx; i < lastIdx; ++i)
         {
-            std::unique_ptr<SFile>& curFile = mFiles[i];
+            std::shared_ptr<SFile>& curFile = mFiles[i];
             if(curFile->mExpiresAt <= mReaperWorkerNow)
             {
                 curFile->Remove(mReaperWorkerNow);
-                curFile.reset(nullptr);
+                curFile = nullptr;
             }
             else
                 curFile->RemoveExpiredReplicas(mReaperWorkerNow);
@@ -107,7 +109,7 @@ auto CRucio::RunReaper(const TickType now) -> std::size_t
 
     for(;frontIdx < backIdx; ++frontIdx)
     {
-        std::unique_ptr<SFile>& curFile = mFiles[frontIdx];
+        std::shared_ptr<SFile>& curFile = mFiles[frontIdx];
         if(curFile == nullptr)
         {
             std::swap(curFile, mFiles[backIdx]);

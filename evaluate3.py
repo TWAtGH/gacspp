@@ -9,6 +9,7 @@ import time
 
 import psycopg2
 import matplotlib.pyplot as plt
+import matplotlib.ticker as tick
 
 parser = argparse.ArgumentParser(description='Evaluates sim output')
 
@@ -41,20 +42,16 @@ def PlotFileSize(name, dbCursor):
 
     t1 = time.time()
     print('\tfetching...')
-    row = dbCursor.fetchone()
-    bins = [row[1], row[2]]
-    weights = [row[3]]
-    for row in dbCursor.fetchall():
-        bins.append(row[2])
-        weights.append(row[3])
+    x = [s[0] for s in dbCursor.fetchall()]
 
     print('\ttook: {}s'.format(time.time() - t1))
 
     t1 = time.time()
     print('\tplotting...')
-    plt.hist(bins[:-1], bins=bins, weights=weights)
+    plt.hist(x, 200)
     print('\ttook: {}s'.format(time.time() - t1))
 
+    plt.gcf().get_axes()[0].xaxis.set_major_formatter(tick.FuncFormatter(lambda x,y: int(x/(1024**2))))
     plt.xlabel('Filesize/MiB')
     plt.ylabel('Count')
     plt.legend()
@@ -241,8 +238,8 @@ dbCursor = conn.cursor()
 
 
 NewPlot('FileSize', PlotFileSize, dbCursor)
-NewPlot('TransferTimes', PlotTransferTimeStats, dbCursor)
-NewPlot('TransferCounts', PlotTransferNumStats, dbCursor, 3600*6)
+#NewPlot('TransferTimes', PlotTransferTimeStats, dbCursor)
+#NewPlot('TransferCounts', PlotTransferNumStats, dbCursor, 3600*6)
 #NewPlot('NumReplicasBNL_DATADISK', PlotNumReplicasAtStorageElement, dbCursor, 'BNL_DATADISK')
 #NewPlot('NumReplicasIowa_bucket', PlotNumReplicasAtStorageElement, dbCursor, 'iowa_bucket')
 

@@ -15,7 +15,9 @@
 
 #define ONE_MiB (1048576.0) //2^20
 #define ONE_GiB (1073741824.0) // 2^30
+#define BYTES_TO_MiB(x) ((x) / ONE_MiB)
 #define BYTES_TO_GiB(x) ((x) / ONE_GiB)
+#define MiB_TO_BYTES(x) ((x) * ONE_MiB)
 #define GiB_TO_BYTES(x) ((x) * ONE_GiB)
 
 #define SECONDS_PER_DAY (86400.0) // 60 * 60 * 24
