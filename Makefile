@@ -1,5 +1,18 @@
-gacspp:
-	g++ -O3 -march=native -std=c++17 -Wall -Wextra -pedantic $(wildcard *.cpp) -o gacspp.out -ldl -lpthread -lstdc++fs -lpq
-sqlite3:
-	gcc -O3 -march=native -DSQLITE_THREADSAFE=0 -DSQLITE_ENABLE_RTREE=1 -c sqlite3.c
-.PHONY: gacspp
+CXX = g++
+CC = $(CXX)
+CXXFLAGS = -O3 -march=native -std=c++17 -Wall -Wextra -pedantic
+LDLIBS = -ldl -lpthread -lstdc++fs -lpq
+
+COMPONENTS = clouds common infrastructure output sim
+
+HEADERS := $(wildcard $(COMPONENTS:%=gacspp/%/*.h*))
+SOURCES := $(wildcard $(COMPONENTS:%=gacspp/%/*.cpp))
+OBJFILES := $(SOURCES:%.cpp=%.o)
+OBJFILES := $(OBJFILES:gacspp/%=bin/%)
+
+gacspp.out: $(OBJFILES)
+	$(CXX) -o gacspp.out $(OBJFILES) $(LDLIBS)
+
+$(OBJFILES): bin/%.o: gacspp/%.cpp $(HEADERS)
+	$(CXX)  -c $(CXXFLAGS) $< -o $@
+	
