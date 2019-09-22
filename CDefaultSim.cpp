@@ -16,7 +16,7 @@
 
 void CDefaultSim::SetupDefaults(const json& profileJson)
 {
-	CConfigManager& configManager = CConfigManager::GetRef();
+    CConfigManager& configManager = CConfigManager::GetRef();
     COutput& output = COutput::GetRef();
 
     //CStorageElement::outputReplicaInsertQuery = output.CreatePreparedInsert("INSERT INTO Replicas VALUES(?, ?, ?, ?, ?)", '?');
@@ -27,54 +27,54 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
     // setup grid and clouds
     ////////////////////////////
     mRucio = std::make_unique<CRucio>();
-	try
-	{
-		json rucioCfg;
-		configManager.TryLoadProfileCfg(rucioCfg, configManager.GetFileNameFromObj(profileJson.at("rucio")));
-		mRucio->LoadConfig(rucioCfg);
-	}
-	catch(const json::out_of_range& error)
-	{
-		std::cout << "Failed to load rucio cfg: " << error.what() << std::endl;
-	}
+    try
+    {
+        json rucioCfg;
+        configManager.TryLoadProfileCfg(rucioCfg, configManager.GetFileNameFromObj(profileJson.at("rucio")));
+        mRucio->LoadConfig(rucioCfg);
+    }
+    catch(const json::out_of_range& error)
+    {
+        std::cout << "Failed to load rucio cfg: " << error.what() << std::endl;
+    }
 
-	try
-	{
-		for (const json& cloudJson : profileJson.at("clouds"))
-		{
-			std::unique_ptr<IBaseCloud> cloud;
-			try
-			{
-				const std::string cloudId = cloudJson.at("id").get<std::string>();
-				cloud = CCloudFactoryManager::GetRef().CreateCloud(cloudId, cloudJson.at("name").get<std::string>());
+    try
+    {
+        for (const json& cloudJson : profileJson.at("clouds"))
+        {
+            std::unique_ptr<IBaseCloud> cloud;
+            try
+            {
+                const std::string cloudId = cloudJson.at("id").get<std::string>();
+                cloud = CCloudFactoryManager::GetRef().CreateCloud(cloudId, cloudJson.at("name").get<std::string>());
 
-				if (!cloud)
-				{
-					std::cout << "Failed to create cloud with id: " << cloudId << std::endl;
-					continue;
-				}
-			}
-			catch (const json::exception& error)
-			{
-				std::cout << "Failed to load config for cloud: " << error.what() << std::endl;
-				continue;
-			}
+                if (!cloud)
+                {
+                    std::cout << "Failed to create cloud with id: " << cloudId << std::endl;
+                    continue;
+                }
+            }
+            catch (const json::exception& error)
+            {
+                std::cout << "Failed to load config for cloud: " << error.what() << std::endl;
+                continue;
+            }
 
-			json cloudCfg;
-			configManager.TryLoadProfileCfg(cloudCfg, configManager.GetFileNameFromObj(cloudJson));
-			cloud->LoadConfig(cloudCfg);
-			mClouds.emplace_back(std::move(cloud));
-		}
-	}
-	catch (const json::out_of_range& error)
-	{
-		std::cout << "Failed to load clouds cfg: " << error.what() << std::endl;
-	}
+            json cloudCfg;
+            configManager.TryLoadProfileCfg(cloudCfg, configManager.GetFileNameFromObj(cloudJson));
+            cloud->LoadConfig(cloudCfg);
+            mClouds.emplace_back(std::move(cloud));
+        }
+    }
+    catch (const json::out_of_range& error)
+    {
+        std::cout << "Failed to load clouds cfg: " << error.what() << std::endl;
+    }
 
     std::unordered_map<std::string, ISite*> nameToSite;
     std::unordered_map<std::string, CStorageElement*> nameToStorageElement;
-	std::stringstream dbIn;
-	bool ok = true;
+    std::stringstream dbIn;
+    bool ok = true;
     //add all grid sites and storage elements to output DB (before links)
     for(const std::unique_ptr<CGridSite>& gridSite : mRucio->mGridSites)
     {
@@ -133,10 +133,10 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
         }
     }
 
-	try
-	{
-		json linksCfg;
-		configManager.TryLoadProfileCfg(linksCfg, configManager.GetFileNameFromObj(profileJson.at("links")));
+    try
+    {
+        json linksCfg;
+        configManager.TryLoadProfileCfg(linksCfg, configManager.GetFileNameFromObj(profileJson.at("links")));
 
         for(const auto& [srcSiteName, dstNameCfgJson] : linksCfg.items())
         {
@@ -158,7 +158,7 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
                 try
                 {
                     std::uint32_t bandwidth = dstLinkCfgJson.at("bandwidth").get<std::uint32_t>();
-        			CNetworkLink* link = srcSite->CreateNetworkLink(dstSite, bandwidth);
+                    CNetworkLink* link = srcSite->CreateNetworkLink(dstSite, bandwidth);
                     dbIn.str(std::string());
                     dbIn << link->GetId() << ","
                          << link->GetSrcSiteId() << ","
@@ -169,24 +169,24 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
                         continue;
 
                     bandwidth = dstLinkCfgJson.at("receivingLink").at("bandwidth").get<std::uint32_t>();
-        			link = dstSite->CreateNetworkLink(srcSite, bandwidth);
+                    link = dstSite->CreateNetworkLink(srcSite, bandwidth);
                     dbIn.str(std::string());
                     dbIn << link->GetId() << ","
                          << link->GetSrcSiteId() << ","
                          << link->GetDstSiteId();
                     ok = ok && output.InsertRow("NetworkLinks", dbIn.str());
                 }
-            	catch (const json::out_of_range& error)
-            	{
-            		std::cout << "Failed to create link: " << error.what() << std::endl;
-            	}
+                catch (const json::out_of_range& error)
+                {
+                    std::cout << "Failed to create link: " << error.what() << std::endl;
+                }
             }
         }
     }
-	catch (const json::out_of_range& error)
-	{
-		std::cout << "Failed to load links cfg: " << error.what() << std::endl;
-	}
+    catch (const json::out_of_range& error)
+    {
+        std::cout << "Failed to load links cfg: " << error.what() << std::endl;
+    }
 
     assert(ok);
 
@@ -251,9 +251,9 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
         }
     }
     catch(const json::out_of_range& error)
-	{
-		std::cout << "Failed to load data gen cfg: " << error.what() << std::endl;
-	}
+    {
+        std::cout << "Failed to load data gen cfg: " << error.what() << std::endl;
+    }
 
 
     std::shared_ptr<CReaper> reaper;

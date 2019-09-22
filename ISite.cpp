@@ -8,7 +8,7 @@
 
 
 ISite::ISite(std::string&& name, std::string&& locationName, const std::uint8_t multiLocationIdx)
-	: mId(GetNewId()),
+    : mId(GetNewId()),
       mName(std::move(name)),
       mLocationName(std::move(locationName)),
       mMultiLocationIdx(multiLocationIdx)
@@ -35,8 +35,8 @@ auto ISite::GetNetworkLink(const ISite* const dstSite) -> CNetworkLink*
 
 auto ISite::GetNetworkLink(const ISite* const dstSite) const -> const CNetworkLink*
 {
-	auto result = mDstSiteIdToNetworkLinkIdx.find(dstSite->mId);
-	if (result == mDstSiteIdToNetworkLinkIdx.end())
-		return nullptr;
-	return mNetworkLinks[result->second].get();
+    auto result = mDstSiteIdToNetworkLinkIdx.find(dstSite->mId);
+    if (result == mDstSiteIdToNetworkLinkIdx.end())
+        return nullptr;
+    return mNetworkLinks[result->second].get();
 }

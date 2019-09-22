@@ -19,7 +19,7 @@ struct SFile
     SFile(SFile const&) = delete;
     SFile& operator=(SFile const&) = delete;
 
-	void Remove(const TickType now);
+    void Remove(const TickType now);
     auto RemoveExpiredReplicas(const TickType now) -> std::size_t;
 
     inline auto GetId() const -> IdType
@@ -46,10 +46,10 @@ struct SReplica
     SReplica& operator=(SReplica const&) = delete;
 
     auto Increase(std::uint32_t amount, const TickType now) -> std::uint32_t;
-	void OnRemoveByFile(const TickType now);
+    void OnRemoveByFile(const TickType now);
 
-	inline bool IsComplete() const
-	{return mCurSize == mFile->GetSize();}
+    inline bool IsComplete() const
+    {return mCurSize == mFile->GetSize();}
 
     inline auto GetId() const -> IdType
     {return mId;}
