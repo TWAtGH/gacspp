@@ -967,7 +967,10 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
                         for (const std::shared_ptr<SReplica>& r : fileToTransfer->mReplicas)
                         {
                             if (r->GetStorageElement() == cacheElement.mStorageElement)
+                            {
                                 bestSrcReplica = r;
+                                break;
+                            }
                         }
                         if (bestSrcReplica)
                             break;
@@ -1015,9 +1018,15 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
                         mTransferMgr->CreateTransfer(bestSrcReplica, newCacheReplica, now, 60);
                     }
                 }
+                else if(!bestSrcReplica->IsComplete())
+                {
+                    //replica is already going to be transferred to the cache
+                    continue;
+                }
                 else if(it == mRatiosAndFilesPerAccessCount.rbegin())
                 {
                     //cache hit for file that will never be accessed again
+                    //->delete after transfer
                 }
 
                 std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(fileToTransfer);

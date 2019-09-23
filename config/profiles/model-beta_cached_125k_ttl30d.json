@@ -52,7 +52,7 @@
     "defaultReplicaLifetime": 86400,
     "cacheStorageElements": [
             {
-                "size": 200000,
+                "size": 125000,
                 "defaultReplicaLifetime": 2592000,
                 "storageElement": "iowa_bucket"
             }
