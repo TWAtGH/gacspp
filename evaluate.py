@@ -135,7 +135,7 @@ def SimplePlotHandler(options, argsDict):
         dstFilePath = os.path.join(dstDirPath, srcFileName)
         plotFilePath = os.path.join(dstDirPath, options[0][0])
         if not os.path.isdir(dstDirPath):
-        	os.makedirs(dstDirPath)
+            os.makedirs(dstDirPath)
         if not os.path.isfile(dstFilePath) or args.Force:
             shutil.copy2(srcFilePath, dstFilePath)
         else:
@@ -167,7 +167,7 @@ def TrafficDiffPlotHandler(options, argsDict):
         dstRefFilePath = os.path.join(dstDirPath, refTrafficFileName)
         plotFilePath = os.path.join(dstDirPath, '{}-{}'.format(options[0][0], options[1][0]))
         if not os.path.isdir(dstDirPath):
-        	os.makedirs(dstDirPath)
+            os.makedirs(dstDirPath)
         if not os.path.isfile(dstSimFilePath) or args.Force:
             shutil.copy2(simTrafficFilePath, dstSimFilePath)
         else:

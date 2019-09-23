@@ -10,10 +10,10 @@
 std::shared_ptr<IPreparedInsert> CStorageElement::outputReplicaInsertQuery = nullptr;
 
 CStorageElement::CStorageElement(std::string&& name, const TickType accessLatency, ISite* const site)
-	: mId(GetNewId()),
+    : mId(GetNewId()),
       mName(std::move(name)),
       mAccessLatency(accessLatency),
-	  mSite(site)
+      mSite(site)
 {}
 
 CStorageElement::~CStorageElement() = default;

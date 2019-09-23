@@ -6,7 +6,7 @@
 
 
 CNetworkLink::CNetworkLink(const std::uint32_t bandwidth, ISite* srcSite, ISite* dstSite)
-	: mId(GetNewId()),
+    : mId(GetNewId()),
       mSrcSite(srcSite),
       mDstSite(dstSite),
       mBandwidth(bandwidth)

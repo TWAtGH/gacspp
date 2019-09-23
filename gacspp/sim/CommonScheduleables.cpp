@@ -178,16 +178,16 @@ CBillingGenerator::CBillingGenerator(IBaseSim* sim, const std::uint32_t tickFreq
       mSim(sim),
       mTickFreq(tickFreq)
 {
-	mCloudBillInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Bills(cloudName, month, bill) FROM STDIN with(FORMAT csv);", 3, '?');
+    mCloudBillInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Bills(cloudName, month, bill) FROM STDIN with(FORMAT csv);", 3, '?');
 }
 
 void CBillingGenerator::OnUpdate(const TickType now)
 {
     std::stringstream summary;
 
-	std::unique_ptr<IInsertValuesContainer> billInsertQueries = mCloudBillInsertQuery->CreateValuesContainer(3 * mSim->mClouds.size());
+    std::unique_ptr<IInsertValuesContainer> billInsertQueries = mCloudBillInsertQuery->CreateValuesContainer(3 * mSim->mClouds.size());
 
-	const std::uint32_t month = static_cast<std::uint32_t>(SECONDS_TO_MONTHS(now));
+    const std::uint32_t month = static_cast<std::uint32_t>(SECONDS_TO_MONTHS(now));
 
     const std::string caption = std::string(10, '=') + " Monthly Summary " + std::string(10, '=');
 
@@ -200,19 +200,19 @@ void CBillingGenerator::OnUpdate(const TickType now)
 
     for(const std::unique_ptr<IBaseCloud>& cloud : mSim->mClouds)
     {
-		std::string bill = cloud->ProcessBilling(now)->ToString();
+        std::string bill = cloud->ProcessBilling(now)->ToString();
         summary << std::endl;
         summary<<cloud->GetName()<<" - Billing for Month "<< month <<":\n";
         summary << bill;
-		billInsertQueries->AddValue(cloud->GetName());
-		billInsertQueries->AddValue(month);
-		billInsertQueries->AddValue(std::move(bill));
+        billInsertQueries->AddValue(cloud->GetName());
+        billInsertQueries->AddValue(month);
+        billInsertQueries->AddValue(std::move(bill));
     }
 
     summary << std::string(caption.length(), '=') << std::endl;
     std::cout << summary.str() << std::endl;
 
-	COutput::GetRef().QueueInserts(std::move(billInsertQueries));
+    COutput::GetRef().QueueInserts(std::move(billInsertQueries));
 
     mNextCallTick = now + mTickFreq;
 }
@@ -221,14 +221,14 @@ void CBillingGenerator::OnUpdate(const TickType now)
 
 CTransferManager::STransfer::STransfer( std::shared_ptr<SReplica> srcReplica,
                                         std::shared_ptr<SReplica> dstReplica,
-										CNetworkLink* const networkLink,
-										const TickType queuedAt,
-										const TickType startAt)
+                                        CNetworkLink* const networkLink,
+                                        const TickType queuedAt,
+                                        const TickType startAt)
     : mSrcReplica(srcReplica),
       mDstReplica(dstReplica),
       mNetworkLink(networkLink),
       mQueuedAt(queuedAt),
-	  mStartAt(startAt)
+      mStartAt(startAt)
 {}
 
 CTransferManager::CTransferManager(const std::uint32_t tickFreq, const TickType startTick)
@@ -236,7 +236,7 @@ CTransferManager::CTransferManager(const std::uint32_t tickFreq, const TickType 
       mTickFreq(tickFreq)
 {
     mActiveTransfers.reserve(1024*1024);
-	mQueuedTransfers.reserve(1024 * 1024);
+    mQueuedTransfers.reserve(1024 * 1024);
     //mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("INSERT INTO Transfers VALUES(?, ?, ?, ?, ?);", '?');
     mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Transfers(id, srcReplicaId, dstReplicaId, queuedAt, startedAt, finishedAt) FROM STDIN with(FORMAT csv);", 6, '?');
 }
@@ -245,32 +245,32 @@ void CTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcReplica, std:
 {
     assert(mQueuedTransfers.size() < mQueuedTransfers.capacity());
 
-	CStorageElement* const srcStorageElement = srcReplica->GetStorageElement();
-	CNetworkLink* const networkLink = srcStorageElement->GetSite()->GetNetworkLink( dstReplica->GetStorageElement()->GetSite() );
+    CStorageElement* const srcStorageElement = srcReplica->GetStorageElement();
+    CNetworkLink* const networkLink = srcStorageElement->GetSite()->GetNetworkLink( dstReplica->GetStorageElement()->GetSite() );
 
-	networkLink->mNumActiveTransfers += 1;
-	srcStorageElement->OnOperation(CStorageElement::GET);
-	const TickType startAt = now + (srcStorageElement->GetAccessLatency() / 1000);
-	mQueuedTransfers.emplace_back(srcReplica, dstReplica, networkLink, now, startAt);
+    networkLink->mNumActiveTransfers += 1;
+    srcStorageElement->OnOperation(CStorageElement::GET);
+    const TickType startAt = now + (srcStorageElement->GetAccessLatency() / 1000);
+    mQueuedTransfers.emplace_back(srcReplica, dstReplica, networkLink, now, startAt);
 }
 
 void CTransferManager::OnUpdate(const TickType now)
 {
     auto curRealtime = std::chrono::high_resolution_clock::now();
-	const std::uint32_t timeDiff = static_cast<std::uint32_t>(now - mLastUpdated);
+    const std::uint32_t timeDiff = static_cast<std::uint32_t>(now - mLastUpdated);
     mLastUpdated = now;
 
 
-	for (std::size_t i = 0; i < mQueuedTransfers.size(); ++i)
-	{
-		if (mQueuedTransfers[i].mStartAt <= now)
-		{
-			assert(mActiveTransfers.size() < mActiveTransfers.capacity());
-			mActiveTransfers.emplace_back(std::move(mQueuedTransfers[i]));
-			mQueuedTransfers[i] = std::move(mQueuedTransfers.back());
-			mQueuedTransfers.pop_back();
-		}
-	}
+    for (std::size_t i = 0; i < mQueuedTransfers.size(); ++i)
+    {
+        if (mQueuedTransfers[i].mStartAt <= now)
+        {
+            assert(mActiveTransfers.size() < mActiveTransfers.capacity());
+            mActiveTransfers.emplace_back(std::move(mQueuedTransfers[i]));
+            mQueuedTransfers[i] = std::move(mQueuedTransfers.back());
+            mQueuedTransfers.pop_back();
+        }
+    }
 
     std::size_t idx = 0;
     std::uint64_t summedTraffic = 0;
@@ -281,12 +281,12 @@ void CTransferManager::OnUpdate(const TickType now)
         STransfer& transfer = mActiveTransfers[idx];
         std::shared_ptr<SReplica> srcReplica = transfer.mSrcReplica.lock();
         std::shared_ptr<SReplica> dstReplica = transfer.mDstReplica.lock();
-		CNetworkLink* const networkLink = transfer.mNetworkLink;
+        CNetworkLink* const networkLink = transfer.mNetworkLink;
 
         if(!srcReplica || !dstReplica)
         {
-			networkLink->mFailedTransfers += 1;
-			networkLink->mNumActiveTransfers -= 1;
+            networkLink->mFailedTransfers += 1;
+            networkLink->mNumActiveTransfers -= 1;
             transfer = std::move(mActiveTransfers.back());
             mActiveTransfers.pop_back();
             continue; // handle same idx again
@@ -296,22 +296,22 @@ void CTransferManager::OnUpdate(const TickType now)
         std::uint32_t amount = static_cast<std::uint32_t>(sharedBandwidth * timeDiff);
         amount = dstReplica->Increase(amount, now);
         summedTraffic += amount;
-		networkLink->mUsedTraffic += amount;
+        networkLink->mUsedTraffic += amount;
 
         if(dstReplica->IsComplete())
         {
             transferInsertQueries->AddValue(GetNewId());
             transferInsertQueries->AddValue(srcReplica->GetId());
             transferInsertQueries->AddValue(dstReplica->GetId());
-			transferInsertQueries->AddValue(transfer.mQueuedAt);
+            transferInsertQueries->AddValue(transfer.mQueuedAt);
             transferInsertQueries->AddValue(transfer.mStartAt);
             transferInsertQueries->AddValue(now);
 
             ++mNumCompletedTransfers;
             mSummedTransferDuration += now - transfer.mStartAt;
 
-			networkLink->mDoneTransfers += 1;
-			networkLink->mNumActiveTransfers -= 1;
+            networkLink->mDoneTransfers += 1;
+            networkLink->mNumActiveTransfers -= 1;
             transfer = std::move(mActiveTransfers.back());
             mActiveTransfers.pop_back();
             continue; // handle same idx again
@@ -330,13 +330,13 @@ void CTransferManager::OnUpdate(const TickType now)
 CFixedTimeTransferManager::STransfer::STransfer( std::shared_ptr<SReplica> srcReplica,
                                                  std::shared_ptr<SReplica> dstReplica,
                                                  CNetworkLink* const networkLink,
-												 const TickType queuedAt,
-												 const TickType startAt,
+                                                 const TickType queuedAt,
+                                                 const TickType startAt,
                                                  const std::uint32_t increasePerTick)
     : mSrcReplica(srcReplica),
       mDstReplica(dstReplica),
       mNetworkLink(networkLink),
-	  mQueuedAt(queuedAt),
+      mQueuedAt(queuedAt),
       mStartAt(startAt),
       mIncreasePerTick(increasePerTick)
 {}
@@ -345,8 +345,8 @@ CFixedTimeTransferManager::CFixedTimeTransferManager(const std::uint32_t tickFre
     : CScheduleable(startTick),
       mTickFreq(tickFreq)
 {
-	mActiveTransfers.reserve(1024 * 1024);
-	mQueuedTransfers.reserve(1024 * 1024);
+    mActiveTransfers.reserve(1024 * 1024);
+    mQueuedTransfers.reserve(1024 * 1024);
     //mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("INSERT INTO Transfers VALUES(?, ?, ?, ?, ?);", '?');
     mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Transfers(id, srcReplicaId, dstReplicaId, queuedAt, startedAt, finishedAt) FROM STDIN with(FORMAT csv);", 6, '?');
 }
@@ -354,15 +354,15 @@ CFixedTimeTransferManager::CFixedTimeTransferManager(const std::uint32_t tickFre
 void CFixedTimeTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcReplica, std::shared_ptr<SReplica> dstReplica, const TickType now, const TickType duration)
 {
 
-	assert(mQueuedTransfers.size() < mQueuedTransfers.capacity());
+    assert(mQueuedTransfers.size() < mQueuedTransfers.capacity());
 
-	CStorageElement* const srcStorageElement = srcReplica->GetStorageElement();
-	CNetworkLink* const networkLink = srcStorageElement->GetSite()->GetNetworkLink(dstReplica->GetStorageElement()->GetSite());
+    CStorageElement* const srcStorageElement = srcReplica->GetStorageElement();
+    CNetworkLink* const networkLink = srcStorageElement->GetSite()->GetNetworkLink(dstReplica->GetStorageElement()->GetSite());
 
     std::uint32_t increasePerTick = static_cast<std::uint32_t>(static_cast<double>(srcReplica->GetFile()->GetSize()) / duration);
 
-	networkLink->mNumActiveTransfers += 1;
-	srcStorageElement->OnOperation(CStorageElement::GET);
+    networkLink->mNumActiveTransfers += 1;
+    srcStorageElement->OnOperation(CStorageElement::GET);
     const TickType startAt = now + (srcReplica->GetStorageElement()->GetAccessLatency() / 1000);
     mQueuedTransfers.emplace_back(srcReplica, dstReplica, networkLink, now, startAt, std::max(1U, increasePerTick));
 }
@@ -370,7 +370,7 @@ void CFixedTimeTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcRepl
 void CFixedTimeTransferManager::OnUpdate(const TickType now)
 {
     auto curRealtime = std::chrono::high_resolution_clock::now();
-	const std::uint32_t timeDiff = static_cast<std::uint32_t>(now - mLastUpdated);
+    const std::uint32_t timeDiff = static_cast<std::uint32_t>(now - mLastUpdated);
     mLastUpdated = now;
 
     std::size_t idx = 0;
@@ -382,12 +382,12 @@ void CFixedTimeTransferManager::OnUpdate(const TickType now)
         STransfer& transfer = mActiveTransfers[idx];
         std::shared_ptr<SReplica> srcReplica = transfer.mSrcReplica.lock();
         std::shared_ptr<SReplica> dstReplica = transfer.mDstReplica.lock();
-		CNetworkLink* const networkLink = transfer.mNetworkLink;
+        CNetworkLink* const networkLink = transfer.mNetworkLink;
 
         if(!srcReplica || !dstReplica)
         {
-			networkLink->mFailedTransfers += 1;
-			networkLink->mNumActiveTransfers -= 1;
+            networkLink->mFailedTransfers += 1;
+            networkLink->mNumActiveTransfers -= 1;
             transfer = std::move(mActiveTransfers.back());
             mActiveTransfers.pop_back();
             continue; // handle same idx again
@@ -395,22 +395,22 @@ void CFixedTimeTransferManager::OnUpdate(const TickType now)
 
         std::uint32_t amount = dstReplica->Increase(transfer.mIncreasePerTick * timeDiff, now);
         summedTraffic += amount;
-		networkLink->mUsedTraffic += amount;
+        networkLink->mUsedTraffic += amount;
 
         if(dstReplica->IsComplete())
         {
             transferInsertQueries->AddValue(GetNewId());
             transferInsertQueries->AddValue(srcReplica->GetId());
             transferInsertQueries->AddValue(dstReplica->GetId());
-			transferInsertQueries->AddValue(transfer.mQueuedAt);
-			transferInsertQueries->AddValue(transfer.mStartAt);
+            transferInsertQueries->AddValue(transfer.mQueuedAt);
+            transferInsertQueries->AddValue(transfer.mStartAt);
             transferInsertQueries->AddValue(now);
 
             ++mNumCompletedTransfers;
             mSummedTransferDuration += now - transfer.mStartAt;
 
-			networkLink->mDoneTransfers += 1;
-			networkLink->mNumActiveTransfers -= 1;
+            networkLink->mDoneTransfers += 1;
+            networkLink->mNumActiveTransfers -= 1;
             transfer = std::move(mActiveTransfers.back());
             mActiveTransfers.pop_back();
             continue; // handle same idx again
@@ -418,18 +418,18 @@ void CFixedTimeTransferManager::OnUpdate(const TickType now)
         ++idx;
     }
 
-	COutput::GetRef().QueueInserts(std::move(transferInsertQueries));
+    COutput::GetRef().QueueInserts(std::move(transferInsertQueries));
 
-	for (std::size_t i = 0; i < mQueuedTransfers.size(); ++i)
-	{
-		if (mQueuedTransfers[i].mStartAt <= now)
-		{
-			assert(mActiveTransfers.size() < mActiveTransfers.capacity());
-			mActiveTransfers.emplace_back(std::move(mQueuedTransfers[i]));
-			mQueuedTransfers[i] = std::move(mQueuedTransfers.back());
-			mQueuedTransfers.pop_back();
-		}
-	}
+    for (std::size_t i = 0; i < mQueuedTransfers.size(); ++i)
+    {
+        if (mQueuedTransfers[i].mStartAt <= now)
+        {
+            assert(mActiveTransfers.size() < mActiveTransfers.capacity());
+            mActiveTransfers.emplace_back(std::move(mQueuedTransfers[i]));
+            mQueuedTransfers[i] = std::move(mQueuedTransfers.back());
+            mQueuedTransfers.pop_back();
+        }
+    }
 
     mUpdateDurationSummed += std::chrono::high_resolution_clock::now() - curRealtime;
     mNextCallTick = now + mTickFreq;
@@ -927,118 +927,118 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
         if(fileVec.empty())
             continue;
 
-		// create transfers per dst storage element
-		for(CStorageElement* dstStorageElement : mDstStorageElements)
-		{
-			// create numTransfersToCreate many transfers
-			for(std::size_t numTransfersCreated=0; numTransfersCreated<numTransfersToCreate; ++numTransfersCreated)
-			{
+        // create transfers per dst storage element
+        for(CStorageElement* dstStorageElement : mDstStorageElements)
+        {
+            // create numTransfersToCreate many transfers
+            for(std::size_t numTransfersCreated=0; numTransfersCreated<numTransfersToCreate; ++numTransfersCreated)
+            {
                 const std::size_t numFileSelectRetries = std::min<std::size_t>(fileVec.size(), 10);
                 std::uniform_int_distribution<std::size_t> fileRndSelector(0, fileVec.size() - 1);
 
-				//try to find a file that is not already on the dst storage element
+                //try to find a file that is not already on the dst storage element
                 std::size_t fileIdx;
-				std::shared_ptr<SFile> fileToTransfer = nullptr;
-				for(std::size_t i=0; (i<numFileSelectRetries) && !fileToTransfer ; ++i)
-				{
+                std::shared_ptr<SFile> fileToTransfer = nullptr;
+                for(std::size_t i=0; (i<numFileSelectRetries) && !fileToTransfer ; ++i)
+                {
                     fileIdx = fileRndSelector(rngEngine);
-					fileToTransfer = fileVec[fileIdx].lock();
+                    fileToTransfer = fileVec[fileIdx].lock();
                     if(!fileToTransfer)
                     {
                         std::swap(fileVec[fileIdx], fileVec.back());
                         fileVec.pop_back();
                         continue;
                     }
-					if(fileToTransfer->mReplicas.empty() || ExistsFileAtStorageElement(fileToTransfer, dstStorageElement))
-						fileToTransfer = nullptr;
-				}
+                    if(fileToTransfer->mReplicas.empty() || ExistsFileAtStorageElement(fileToTransfer, dstStorageElement))
+                        fileToTransfer = nullptr;
+                }
 
-				if(!fileToTransfer)
-					continue;
+                if(!fileToTransfer)
+                    continue;
 
-				//find best src replica
-				std::shared_ptr<SReplica> bestSrcReplica = nullptr;
+                //find best src replica
+                std::shared_ptr<SReplica> bestSrcReplica = nullptr;
 
-				//check caches first
-				if(!mCacheElements.empty())
-				{
-					for(const SCacheElementInfo& cacheElement : mCacheElements)
-					{
-						for (const std::shared_ptr<SReplica>& r : fileToTransfer->mReplicas)
-						{
-							if (r->GetStorageElement() == cacheElement.mStorageElement)
-								bestSrcReplica = r;
-						}
-						if (bestSrcReplica)
-							break;
-					}
-				}
+                //check caches first
+                if(!mCacheElements.empty())
+                {
+                    for(const SCacheElementInfo& cacheElement : mCacheElements)
+                    {
+                        for (const std::shared_ptr<SReplica>& r : fileToTransfer->mReplicas)
+                        {
+                            if (r->GetStorageElement() == cacheElement.mStorageElement)
+                                bestSrcReplica = r;
+                        }
+                        if (bestSrcReplica)
+                            break;
+                    }
+                }
 
-				if(!bestSrcReplica)
-				{
-					double minWeight = 0;
-					for(std::shared_ptr<SReplica>& srcReplica : fileToTransfer->mReplicas)
-					{
-						if(!srcReplica->IsComplete())
-							continue;
+                if(!bestSrcReplica)
+                {
+                    double minWeight = 0;
+                    for(std::shared_ptr<SReplica>& srcReplica : fileToTransfer->mReplicas)
+                    {
+                        if(!srcReplica->IsComplete())
+                            continue;
 
-						const double weight = srcReplica->GetStorageElement()->GetSite()->GetNetworkLink(dstStorageElement->GetSite())->GetWeight();
-						if(!bestSrcReplica || weight < minWeight)
-						{
-							bestSrcReplica = srcReplica;
-							minWeight = weight;
-						}
-					}
+                        const double weight = srcReplica->GetStorageElement()->GetSite()->GetNetworkLink(dstStorageElement->GetSite())->GetWeight();
+                        if(!bestSrcReplica || weight < minWeight)
+                        {
+                            bestSrcReplica = srcReplica;
+                            minWeight = weight;
+                        }
+                    }
 
-					if(!bestSrcReplica)
-						continue;
+                    if(!bestSrcReplica)
+                        continue;
 
-					//handle cache miss here so that we didnt have to create the new cache replica before
+                    //handle cache miss here so that we didnt have to create the new cache replica before
                     //dont create transfer to cache if element was accessed the last time
-					if(!mCacheElements.empty() && (it != mRatiosAndFilesPerAccessCount.rbegin()))
-					{
-						//todo: randomise cache element selection?
-						CStorageElement* cacheStorageElement = mCacheElements[0].mStorageElement;
-						if(cacheStorageElement->mReplicas.size() >= mCacheElements[0].mCacheSize)
-							ExpireReplica(cacheStorageElement, now);
+                    if(!mCacheElements.empty() && (it != mRatiosAndFilesPerAccessCount.rbegin()))
+                    {
+                        //todo: randomise cache element selection?
+                        CStorageElement* cacheStorageElement = mCacheElements[0].mStorageElement;
+                        if(cacheStorageElement->mReplicas.size() >= mCacheElements[0].mCacheSize)
+                            ExpireReplica(cacheStorageElement, now);
 
-						std::shared_ptr<SReplica> newCacheReplica = cacheStorageElement->CreateReplica(fileToTransfer);
-						assert(newCacheReplica);
-						newCacheReplica->mExpiresAt = now + mCacheElements[0].mDefaultReplicaLifetime;
+                        std::shared_ptr<SReplica> newCacheReplica = cacheStorageElement->CreateReplica(fileToTransfer);
+                        assert(newCacheReplica);
+                        newCacheReplica->mExpiresAt = now + mCacheElements[0].mDefaultReplicaLifetime;
 
-						replicaInsertQueries->AddValue(newCacheReplica->GetId());
-						replicaInsertQueries->AddValue(fileToTransfer->GetId());
-						replicaInsertQueries->AddValue(cacheStorageElement->GetId());
-						replicaInsertQueries->AddValue(now);
-						replicaInsertQueries->AddValue(newCacheReplica->mExpiresAt);
+                        replicaInsertQueries->AddValue(newCacheReplica->GetId());
+                        replicaInsertQueries->AddValue(fileToTransfer->GetId());
+                        replicaInsertQueries->AddValue(cacheStorageElement->GetId());
+                        replicaInsertQueries->AddValue(now);
+                        replicaInsertQueries->AddValue(newCacheReplica->mExpiresAt);
 
-						mTransferMgr->CreateTransfer(bestSrcReplica, newCacheReplica, now, 60);
-					}
-				}
+                        mTransferMgr->CreateTransfer(bestSrcReplica, newCacheReplica, now, 60);
+                    }
+                }
                 else if(it == mRatiosAndFilesPerAccessCount.rbegin())
                 {
                     //cache hit for file that will never be accessed again
                 }
 
-				std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(fileToTransfer);
-				assert(newReplica);
-				newReplica->mExpiresAt = now + mDefaultReplicaLifetime;
+                std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(fileToTransfer);
+                assert(newReplica);
+                newReplica->mExpiresAt = now + mDefaultReplicaLifetime;
 
-				replicaInsertQueries->AddValue(newReplica->GetId());
-				replicaInsertQueries->AddValue(fileToTransfer->GetId());
-				replicaInsertQueries->AddValue(dstStorageElement->GetId());
-				replicaInsertQueries->AddValue(now);
-				replicaInsertQueries->AddValue(newReplica->mExpiresAt);
+                replicaInsertQueries->AddValue(newReplica->GetId());
+                replicaInsertQueries->AddValue(fileToTransfer->GetId());
+                replicaInsertQueries->AddValue(dstStorageElement->GetId());
+                replicaInsertQueries->AddValue(now);
+                replicaInsertQueries->AddValue(newReplica->mExpiresAt);
 
-				mTransferMgr->CreateTransfer(bestSrcReplica, newReplica, now, 60);
+                mTransferMgr->CreateTransfer(bestSrcReplica, newReplica, now, 60);
 
                 std::swap(fileVec[fileIdx], fileVec.back());
                 fileVec.pop_back();
-				if (it != mRatiosAndFilesPerAccessCount.rbegin())
+                if (it != mRatiosAndFilesPerAccessCount.rbegin())
                     (it-1)->second.push_back(fileToTransfer);
-			}
-		}
-	}
+            }
+        }
+    }
 
     COutput::GetRef().QueueInserts(std::move(replicaInsertQueries));
 
@@ -1095,10 +1095,10 @@ void CHeartbeat::OnUpdate(const TickType now)
         mC2CTransferMgr->mSummedTransferDuration = 0;
     }
 
-	std::size_t maxW = 0;
-	for (auto it : mProccessDurations)
-		if (it.first.size() > maxW)
-			maxW = it.first.size();
+    std::size_t maxW = 0;
+    for (auto it : mProccessDurations)
+        if (it.first.size() > maxW)
+            maxW = it.first.size();
 
     statusOutput << "  " << std::setw(maxW) << "Duration" << ": " << std::setw(6) << timeDiff.count() << "s\n";
     for(auto it : mProccessDurations)

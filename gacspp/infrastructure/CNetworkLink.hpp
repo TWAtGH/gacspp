@@ -19,7 +19,7 @@ public:
     std::uint32_t mFailedTransfers = 0;
 
 public:
-	CNetworkLink(const std::uint32_t bandwidth, ISite* srcSite, ISite* dstSite);
+    CNetworkLink(const std::uint32_t bandwidth, ISite* srcSite, ISite* dstSite);
 
     inline auto GetId() const -> IdType
     {return mId;}
@@ -29,10 +29,10 @@ public:
     auto GetDstSiteId() const -> IdType;
 
     inline auto GetWeight() const -> double
-	{
-		//todo, since traffic cost stored in regions now
-		return 0;
-	}
+    {
+        //todo, since traffic cost stored in regions now
+        return 0;
+    }
 
     std::uint64_t mUsedTraffic = 0;
     std::uint32_t mNumActiveTransfers = 0;

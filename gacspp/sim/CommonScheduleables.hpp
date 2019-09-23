@@ -94,7 +94,7 @@ public:
 class CBillingGenerator : public CScheduleable
 {
 private:
-	std::shared_ptr<IPreparedInsert> mCloudBillInsertQuery;
+    std::shared_ptr<IPreparedInsert> mCloudBillInsertQuery;
 
     IBaseSim* mSim;
     std::uint32_t mTickFreq;
@@ -118,19 +118,19 @@ private:
     {
         std::weak_ptr<SReplica> mSrcReplica;
         std::weak_ptr<SReplica> mDstReplica;
-		CNetworkLink* mNetworkLink;
-		TickType mQueuedAt;
-		TickType mStartAt;
+        CNetworkLink* mNetworkLink;
+        TickType mQueuedAt;
+        TickType mStartAt;
 
         STransfer(  std::shared_ptr<SReplica> srcReplica,
                     std::shared_ptr<SReplica> dstReplica,
-					CNetworkLink* const networkLink,
-					const TickType queudAt,
-					const TickType startAt);
+                    CNetworkLink* const networkLink,
+                    const TickType queudAt,
+                    const TickType startAt);
     };
 
     std::vector<STransfer> mActiveTransfers;
-	std::vector<STransfer> mQueuedTransfers;
+    std::vector<STransfer> mQueuedTransfers;
 
 public:
     std::uint32_t mNumCompletedTransfers = 0;
@@ -160,16 +160,16 @@ private:
     {
         std::weak_ptr<SReplica> mSrcReplica;
         std::weak_ptr<SReplica> mDstReplica;
-		CNetworkLink* mNetworkLink;
-		TickType mQueuedAt;
-		TickType mStartAt;
+        CNetworkLink* mNetworkLink;
+        TickType mQueuedAt;
+        TickType mStartAt;
 
         std::uint32_t mIncreasePerTick;
 
         STransfer(  std::shared_ptr<SReplica> srcReplica,
                     std::shared_ptr<SReplica> dstReplica,
-					CNetworkLink* const networkLink,
-					const TickType queuedAt,
+                    CNetworkLink* const networkLink,
+                    const TickType queuedAt,
                     const TickType startAt,
                     const std::uint32_t increasePerTick);
     };

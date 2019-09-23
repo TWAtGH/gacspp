@@ -23,16 +23,16 @@ class CGridSite : public ISite
 public:
     using ISite::ISite;
 
-	std::vector<std::unique_ptr<CStorageElement>> mStorageElements;
+    std::vector<std::unique_ptr<CStorageElement>> mStorageElements;
 
-	CGridSite(std::string&& name, std::string&& locationName);
-	CGridSite(CGridSite&&) = default;
-	CGridSite& operator=(CGridSite&&) = default;
+    CGridSite(std::string&& name, std::string&& locationName);
+    CGridSite(CGridSite&&) = default;
+    CGridSite& operator=(CGridSite&&) = default;
 
-	CGridSite(CGridSite const&) = delete;
-	CGridSite& operator=(CGridSite const&) = delete;
+    CGridSite(CGridSite const&) = delete;
+    CGridSite& operator=(CGridSite const&) = delete;
 
-	auto CreateStorageElement(std::string&& name, const TickType accessLatency) -> CStorageElement*;
+    auto CreateStorageElement(std::string&& name, const TickType accessLatency) -> CStorageElement*;
 };
 
 class CRucio : public IConfigConsumer

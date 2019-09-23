@@ -129,63 +129,63 @@ auto CRucio::RunReaper(const TickType now) -> std::size_t
 
 bool CRucio::LoadConfig(const json& config)
 {
-	if (!config.contains("rucio"))
-		return false;
+    if (!config.contains("rucio"))
+        return false;
 
-	const json& rucioCfgJson = config["rucio"];
+    const json& rucioCfgJson = config["rucio"];
 
-	try
-	{
-		for (const json& siteJson : rucioCfgJson.at("sites"))
-		{
-			std::unordered_map<std::string, std::string> customConfig;
-			CGridSite* site = nullptr;
-			try
-			{
-				site = CreateGridSite(siteJson.at("name").get<std::string>(),
-					siteJson.at("location").get<std::string>(),
-					siteJson.at("multiLocationIdx").get<std::uint8_t>());
+    try
+    {
+        for (const json& siteJson : rucioCfgJson.at("sites"))
+        {
+            std::unordered_map<std::string, std::string> customConfig;
+            CGridSite* site = nullptr;
+            try
+            {
+                site = CreateGridSite(siteJson.at("name").get<std::string>(),
+                    siteJson.at("location").get<std::string>(),
+                    siteJson.at("multiLocationIdx").get<std::uint8_t>());
 
-				for (const auto& [siteJsonKey, siteJsonValue] : siteJson.items())
-				{
-					if (siteJsonKey == "storageElements")
-					{
-						assert(siteJsonValue.is_array());
-						for (const json& storageElementJson : siteJsonValue)
-						{
-							try
-							{
-								site->CreateStorageElement(storageElementJson.at("name").get<std::string>(),
+                for (const auto& [siteJsonKey, siteJsonValue] : siteJson.items())
+                {
+                    if (siteJsonKey == "storageElements")
+                    {
+                        assert(siteJsonValue.is_array());
+                        for (const json& storageElementJson : siteJsonValue)
+                        {
+                            try
+                            {
+                                site->CreateStorageElement(storageElementJson.at("name").get<std::string>(),
                                                            storageElementJson.at("accessLatency").get<TickType>());
-							}
-							catch (const json::out_of_range& error)
-							{
-								std::cout << "Failed to add storage element: " << error.what() << std::endl;
-								continue;
-							}
-						}
-					}
-					else if ((siteJsonKey == "name") || (siteJsonKey == "location") || (siteJsonKey == "multiLocationIdx"))
-						continue;
-					else if (siteJsonValue.type() == json::value_t::string)
-						customConfig[siteJsonKey] = siteJsonValue.get<std::string>();
-					else
-						customConfig[siteJsonKey] = siteJsonValue.dump();
-				}
-				site->mCustomConfig = std::move(customConfig);
-			}
-			catch (const json::out_of_range& error)
-			{
-				std::cout << "Failed to add site: " << error.what() << std::endl;
-				continue;
-			}
-		}
-	}
-	catch (const json::exception& error)
-	{
-		std::cout << "Failed to load sites: " << error.what() << std::endl;
-		return false;
-	}
+                            }
+                            catch (const json::out_of_range& error)
+                            {
+                                std::cout << "Failed to add storage element: " << error.what() << std::endl;
+                                continue;
+                            }
+                        }
+                    }
+                    else if ((siteJsonKey == "name") || (siteJsonKey == "location") || (siteJsonKey == "multiLocationIdx"))
+                        continue;
+                    else if (siteJsonValue.type() == json::value_t::string)
+                        customConfig[siteJsonKey] = siteJsonValue.get<std::string>();
+                    else
+                        customConfig[siteJsonKey] = siteJsonValue.dump();
+                }
+                site->mCustomConfig = std::move(customConfig);
+            }
+            catch (const json::out_of_range& error)
+            {
+                std::cout << "Failed to add site: " << error.what() << std::endl;
+                continue;
+            }
+        }
+    }
+    catch (const json::exception& error)
+    {
+        std::cout << "Failed to load sites: " << error.what() << std::endl;
+        return false;
+    }
 
     return true;
 }
