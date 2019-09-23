@@ -1,4 +1,8 @@
+#include <atomic>
+#include <condition_variable>
 #include <iostream>
+#include <mutex>
+#include <thread>
 
 #include "CRucio.hpp"
 #include "CStorageElement.hpp"
@@ -6,48 +10,50 @@
 
 #include "third_party/json.hpp"
 
+#define NUM_REPEAR_THREADS 1
 
 
-auto CGridSite::CreateStorageElement(std::string&& name, const TickType accessLatency) -> CStorageElement*
+class CReaper
 {
-    CStorageElement* newStorageElement = new CStorageElement(std::move(name), accessLatency, this);
-    mStorageElements.emplace_back(newStorageElement);
-    return newStorageElement;
-}
+private:
+    CRucio* mRucio;
 
+    TickType mReaperWorkerNow = 0;
+    std::atomic_bool mAreThreadsRunning = true;
 
+    std::condition_variable mStartCondition;
+    std::condition_variable mFinishCondition;
+    std::mutex mConditionMutex;
+    std::atomic_size_t mNumWorkingReapers = 0;
 
-CRucio::CRucio()
+    std::unique_ptr<std::thread> mThreads[NUM_REPEAR_THREADS];
+
+    std::vector<std::vector<std::shared_ptr<SFile>>> mRemovedFilesPerThread{NUM_REPEAR_THREADS};
+    std::vector<std::vector<std::shared_ptr<SReplica>>> mRemovedReplicasPerThread{NUM_REPEAR_THREADS};
+
+public:
+    CReaper(CRucio* rucio);
+    ~CReaper();
+    void ReaperWorker(const std::size_t threadIdx);
+    auto RunReaper(const TickType now) -> std::size_t;
+};
+
+CReaper::CReaper(CRucio* rucio)
+    : mRucio(rucio)
 {
-    mFiles.reserve(150000);
     for(std::size_t i = 0; i<NUM_REPEAR_THREADS; ++i)
-        mThreads[i].reset(new std::thread(&CRucio::ReaperWorker, this, i));
+        mThreads[i].reset(new std::thread(&CReaper::ReaperWorker, this, i));
 }
 
-CRucio::~CRucio()
+CReaper::~CReaper()
 {
     mAreThreadsRunning = false;
     mStartCondition.notify_all();
-    for(std::size_t i = 0; i<NUM_REPEAR_THREADS; ++i)
-        mThreads[i]->join();
+    for(std::unique_ptr<std::thread>& thread : mThreads)
+        thread->join();
 }
 
-auto CRucio::CreateFile(const std::uint32_t size, const TickType expiresAt) -> std::shared_ptr<SFile>
-{
-    std::shared_ptr<SFile> newFile = std::make_shared<SFile>(size, expiresAt);
-    mFiles.emplace_back(newFile);
-    for(std::vector<std::weak_ptr<SFile>>* listener : mFileCreationListeners)
-        listener->emplace_back(newFile);
-    return newFile;
-}
-auto CRucio::CreateGridSite(std::string&& name, std::string&& locationName, const std::uint8_t multiLocationIdx) -> CGridSite*
-{
-    CGridSite* newSite = new CGridSite(std::move(name), std::move(locationName), multiLocationIdx);
-    mGridSites.emplace_back(newSite);
-    return newSite;
-}
-
-void CRucio::ReaperWorker(const std::size_t threadIdx)
+void CReaper::ReaperWorker(const std::size_t threadIdx)
 {
     TickType lastNow = 0;
     auto waitFunc = [&]{return (lastNow < mReaperWorkerNow) || !mAreThreadsRunning;};
@@ -61,18 +67,31 @@ void CRucio::ReaperWorker(const std::size_t threadIdx)
         if(!mAreThreadsRunning)
             return;
 
-        const float numElementsPerThread = mFiles.size() / static_cast<float>(NUM_REPEAR_THREADS);
+        std::vector<std::shared_ptr<SFile>>& files = mRucio->mFiles;
+        std::vector<std::shared_ptr<SFile>>& removedFiles = mRemovedFilesPerThread[threadIdx];
+        std::vector<std::shared_ptr<SReplica>>& removedReplicas = mRemovedReplicasPerThread[threadIdx];
+        const float numElementsPerThread = files.size() / static_cast<float>(NUM_REPEAR_THREADS);
         const auto lastIdx = static_cast<std::size_t>(numElementsPerThread * (threadIdx + 1));
         for(std::size_t i = numElementsPerThread * threadIdx; i < lastIdx; ++i)
         {
-            std::shared_ptr<SFile>& curFile = mFiles[i];
+            std::shared_ptr<SFile>& curFile = files[i];
             if(curFile->mExpiresAt <= mReaperWorkerNow)
             {
+                if(!mRucio->mReplicaActionListeners.empty())
+                    for(std::shared_ptr<SReplica>& replica : curFile->mReplicas)
+                        removedReplicas.emplace_back(replica);
+
                 curFile->Remove(mReaperWorkerNow);
-                curFile = nullptr;
+
+                if(mRucio->mFileActionListeners.empty())
+                    curFile = nullptr;
+                else
+                    removedFiles.emplace_back(std::move(curFile));
             }
-            else
+            else if(mRucio->mReplicaActionListeners.empty())
                 curFile->RemoveExpiredReplicas(mReaperWorkerNow);
+            else
+                curFile->ExtractExpiredReplicas(mReaperWorkerNow, removedReplicas);
         }
 
         lastNow = mReaperWorkerNow;
@@ -81,9 +100,10 @@ void CRucio::ReaperWorker(const std::size_t threadIdx)
     }
 }
 
-auto CRucio::RunReaper(const TickType now) -> std::size_t
+auto CReaper::RunReaper(const TickType now) -> std::size_t
 {
-    const std::size_t numFiles = mFiles.size();
+    std::vector<std::shared_ptr<SFile>>& files = mRucio->mFiles;
+    const std::size_t numFiles = files.size();
     if(numFiles < NUM_REPEAR_THREADS)
         return 0;
 
@@ -101,30 +121,160 @@ auto CRucio::RunReaper(const TickType now) -> std::size_t
     std::size_t frontIdx = 0;
     std::size_t backIdx = numFiles - 1;
 
-    while(backIdx > frontIdx && mFiles[backIdx] == nullptr)
+    while(backIdx > frontIdx && files[backIdx] == nullptr)
     {
-        mFiles.pop_back();
+        files.pop_back();
         --backIdx;
     }
 
     for(;frontIdx < backIdx; ++frontIdx)
     {
-        std::shared_ptr<SFile>& curFile = mFiles[frontIdx];
+        std::shared_ptr<SFile>& curFile = files[frontIdx];
         if(curFile == nullptr)
         {
-            std::swap(curFile, mFiles[backIdx]);
+            std::swap(curFile, files[backIdx]);
             do
             {
-                mFiles.pop_back();
+                files.pop_back();
                 --backIdx;
-            } while(backIdx > frontIdx && mFiles[backIdx] == nullptr);
+            } while(backIdx > frontIdx && files[backIdx] == nullptr);
         }
     }
 
-    if(backIdx == 0 && mFiles.back() == nullptr)
-        mFiles.pop_back();
+    if(backIdx == 0 && files.back() == nullptr)
+        files.pop_back();
 
-    return numFiles - mFiles.size();
+    std::vector<std::weak_ptr<IFileActionListener>>& fileListeners = mRucio->mFileActionListeners;
+    std::vector<std::weak_ptr<IReplicaActionListener>> replicaListeners = mRucio->mReplicaActionListeners;
+    if(!fileListeners.empty())
+    {
+        //get num to reserve mem
+        std::size_t numRemoved = 0;
+        for(std::vector<std::shared_ptr<SFile>>& removedFilesPerThread : mRemovedFilesPerThread)
+            numRemoved += removedFilesPerThread.size();
+
+        //put files in continous mem in form of weak_ptr
+        std::vector<std::weak_ptr<SFile>> removedFiles;
+        removedFiles.reserve(numRemoved);
+        for(std::vector<std::shared_ptr<SFile>>& removedFilesPerThread : mRemovedFilesPerThread)
+            for(std::shared_ptr<SFile>& file : removedFilesPerThread)
+                removedFiles.emplace_back(file);
+
+        //notify all listeners
+        for(std::size_t i=0; i<fileListeners.size();)
+        {
+            std::shared_ptr<IFileActionListener> listener = fileListeners[i].lock();
+            if(!listener)
+            {
+                //remove invalid listeners
+                fileListeners[i] = std::move(fileListeners.back());
+                fileListeners.pop_back();
+                continue;
+            }
+
+            listener->OnFilesDeleted(now, removedFiles);
+
+            ++i;
+        }
+
+        //clear refs to deleted files
+        for(std::vector<std::shared_ptr<SFile>>& removedFilesPerThread : mRemovedFilesPerThread)
+            removedFilesPerThread.clear();
+    }
+
+
+    if(!replicaListeners.empty())
+    {
+        //get num to reserve mem
+        std::size_t numRemoved = 0;
+        for(std::vector<std::shared_ptr<SReplica>>& removedReplicasPerThread : mRemovedReplicasPerThread)
+            numRemoved += removedReplicasPerThread.size();
+
+        //put files in continous mem in form of weak_ptr
+        std::vector<std::weak_ptr<SReplica>> removedReplicas;
+        removedReplicas.reserve(numRemoved);
+        for(std::vector<std::shared_ptr<SReplica>>& removedReplicasPerThread : mRemovedReplicasPerThread)
+            for(std::shared_ptr<SReplica>& replica : removedReplicasPerThread)
+                removedReplicas.emplace_back(replica);
+
+        //notify all listeners
+        for(std::size_t i=0; i<replicaListeners.size();)
+        {
+            std::shared_ptr<IReplicaActionListener> listener = replicaListeners[i].lock();
+            if(!listener)
+            {
+                //remove invalid listeners
+                replicaListeners[i] = std::move(replicaListeners.back());
+                replicaListeners.pop_back();
+                continue;
+            }
+
+            listener->OnReplicasDeleted(now, removedReplicas);
+
+            ++i;
+        }
+
+        //clear refs to deleted files
+        for(std::vector<std::shared_ptr<SReplica>>& removedReplicasPerThread : mRemovedReplicasPerThread)
+            removedReplicasPerThread.clear();
+    }
+
+    return numFiles - files.size();
+}
+
+
+
+auto CGridSite::CreateStorageElement(std::string&& name, const TickType accessLatency) -> CStorageElement*
+{
+    CStorageElement* newStorageElement = new CStorageElement(std::move(name), accessLatency, this);
+    mStorageElements.emplace_back(newStorageElement);
+    return newStorageElement;
+}
+
+
+
+CRucio::CRucio()
+{
+    mReaper = std::make_unique<CReaper>(this);
+}
+
+CRucio::~CRucio() = default;
+
+auto CRucio::CreateFile(const std::uint32_t size, const TickType now, const TickType lifetime) -> std::shared_ptr<SFile>
+{
+    std::shared_ptr<SFile> newFile = std::make_shared<SFile>(size, now, lifetime);
+    mFiles.emplace_back(newFile);
+
+    //notify all listeners
+    for(std::size_t i=0; i<mFileActionListeners.size();)
+    {
+        std::shared_ptr<IFileActionListener> listener = mFileActionListeners[i].lock();
+        if(!listener)
+        {
+            //remove invalid listeners
+            mFileActionListeners[i] = std::move(mFileActionListeners.back());
+            mFileActionListeners.pop_back();
+            continue;
+        }
+
+        listener->OnFileCreated(now, newFile);
+
+        ++i;
+    }
+
+    return newFile;
+}
+
+auto CRucio::CreateGridSite(std::string&& name, std::string&& locationName, const std::uint8_t multiLocationIdx) -> CGridSite*
+{
+    CGridSite* newSite = new CGridSite(std::move(name), std::move(locationName), multiLocationIdx);
+    mGridSites.emplace_back(newSite);
+    return newSite;
+}
+
+auto CRucio::RunReaper(const TickType now) -> std::size_t
+{
+    return mReaper->RunReaper(now);
 }
 
 bool CRucio::LoadConfig(const json& config)

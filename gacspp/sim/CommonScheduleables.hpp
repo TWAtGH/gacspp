@@ -5,6 +5,8 @@
 
 #include "CScheduleable.hpp"
 
+#include "infrastructure/CRucio.hpp"
+
 #include "common/constants.h"
 
 
@@ -46,8 +48,6 @@ public:
 class CDataGenerator : public CScheduleable
 {
 private:
-    std::shared_ptr<IPreparedInsert> mOutputFileInsertQuery;
-
     IBaseSim* mSim;
 
     std::unique_ptr<IValueGenerator> mNumFilesRNG;
@@ -79,14 +79,14 @@ public:
 };
 
 
-class CReaper : public CScheduleable
+class CReaperCaller : public CScheduleable
 {
 private:
     CRucio *mRucio;
     std::uint32_t mTickFreq;
 
 public:
-    CReaper(CRucio *rucio, const std::uint32_t tickFreq, const TickType startTick=600);
+    CReaperCaller(CRucio *rucio, const std::uint32_t tickFreq, const TickType startTick=600);
 
     void OnUpdate(const TickType now) final;
 };
@@ -217,6 +217,8 @@ private:
     std::shared_ptr<CTransferManager> mTransferMgr;
     std::uint32_t mTickFreq;
 
+    std::shared_ptr<IPreparedInsert> mReplicaInsertQuery;
+
 public:
     std::shared_ptr<CWavedTransferNumGen> mTransferNumGen;
     std::vector<CStorageElement*> mSrcStorageElements;
@@ -239,6 +241,8 @@ private:
     IBaseSim* mSim;
     std::shared_ptr<CTransferManager> mTransferMgr;
     std::uint32_t mTickFreq;
+
+    std::shared_ptr<IPreparedInsert> mReplicaInsertQuery;
 
 public:
     std::shared_ptr<CWavedTransferNumGen> mTransferNumGen;
@@ -263,6 +267,8 @@ private:
     std::shared_ptr<CTransferManager> mTransferMgr;
     std::uint32_t mTickFreq;
 
+    std::shared_ptr<IPreparedInsert> mReplicaInsertQuery;
+
 public:
     std::shared_ptr<CWavedTransferNumGen> mTransferNumGen;
     std::unordered_map<IdType, int> mSrcStorageElementIdToPrio;
@@ -286,6 +292,8 @@ private:
     std::shared_ptr<CFixedTimeTransferManager> mTransferMgr;
     std::uint32_t mTickFreq;
 
+    std::shared_ptr<IPreparedInsert> mReplicaInsertQuery;
+
 public:
 
     struct SJobSlotInfo
@@ -307,12 +315,15 @@ public:
 };
 
 
-class CCachedSrcTransferGen : public CScheduleable
+class CCachedSrcTransferGen : public CScheduleable, public IFileActionListener, public IReplicaActionListener
 {
 private:
     IBaseSim* mSim;
     std::shared_ptr<CFixedTimeTransferManager> mTransferMgr;
     std::uint32_t mTickFreq;
+
+    std::shared_ptr<IPreparedInsert> mFileInsertQuery;
+    std::shared_ptr<IPreparedInsert> mReplicaInsertQuery;
 
     bool ExistsFileAtStorageElement(const std::shared_ptr<SFile>& file, const CStorageElement* storageElement) const;
     void ExpireReplica(CStorageElement* storageElement, const TickType now);
@@ -338,6 +349,12 @@ public:
     TickType mDefaultReplicaLifetime;
 
     void OnUpdate(const TickType now) final;
+    void Shutdown(const TickType now) final;
+
+    void OnFileCreated(const TickType now, std::shared_ptr<SFile> file) final;
+    void OnFilesDeleted(const TickType now, const std::vector<std::weak_ptr<SFile>>& deletedFiles) final;
+    void OnReplicaCreated(const TickType now, std::shared_ptr<SReplica> replica) final;
+    void OnReplicasDeleted(const TickType now, const std::vector<std::weak_ptr<SReplica>>& deletedReplicas) final;
 };
 
 

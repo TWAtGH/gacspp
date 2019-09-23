@@ -52,9 +52,7 @@ CDataGenerator::CDataGenerator( IBaseSim* sim,
       mFileSizeRNG(std::move(fileSizeRNG)),
       mFileLifetimeRNG(std::move(fileLifetimeRNG)),
       mTickFreq(tickFreq)
-{
-    mOutputFileInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Files(id, createdAt, expiredAt, filesize) FROM STDIN with(FORMAT csv);", 4, '?');
-}
+{}
 
 auto CDataGenerator::GetRandomFileSize() -> std::uint32_t
 {
@@ -87,9 +85,6 @@ auto CDataGenerator::CreateFilesAndReplicas(const std::uint32_t numFiles, const 
 
     assert(numReplicasPerFile <= numStorageElements);
 
-    std::unique_ptr<IInsertValuesContainer> fileInsertQueries = mOutputFileInsertQuery->CreateValuesContainer(numFiles * 4);
-    std::unique_ptr<IInsertValuesContainer> replicaInsertQueries = CStorageElement::outputReplicaInsertQuery->CreateValuesContainer(numFiles * numReplicasPerFile * 2);
-
     std::uniform_int_distribution<std::uint32_t> rngSampler(0, numStorageElements);
     std::uint64_t bytesOfFilesGen = 0;
     for(std::uint32_t i = 0; i < numFiles; ++i)
@@ -97,12 +92,7 @@ auto CDataGenerator::CreateFilesAndReplicas(const std::uint32_t numFiles, const 
         const std::uint32_t fileSize = GetRandomFileSize();
         const TickType lifetime = GetRandomLifeTime();
 
-        std::shared_ptr<SFile> file = mSim->mRucio->CreateFile(fileSize, now + lifetime);
-
-        fileInsertQueries->AddValue(file->GetId());
-        fileInsertQueries->AddValue(now);
-        fileInsertQueries->AddValue(now + lifetime);
-        fileInsertQueries->AddValue(fileSize);
+        std::shared_ptr<SFile> file = mSim->mRucio->CreateFile(fileSize, now, lifetime);
 
         bytesOfFilesGen += fileSize;
 
@@ -113,14 +103,12 @@ auto CDataGenerator::CreateFilesAndReplicas(const std::uint32_t numFiles, const 
         {
             if(mSelectStorageElementsRandomly)
                 selectedElementIt = mStorageElements.begin() + (rngSampler(mSim->mRNGEngine) % (numStorageElements - numCreated));
-            std::shared_ptr<SReplica> r = (*selectedElementIt)->CreateReplica(file);
+
+            std::shared_ptr<SReplica> r = (*selectedElementIt)->CreateReplica(file, now);
+
             r->Increase(fileSize, now);
             r->mExpiresAt = now + (lifetime / numReplicasPerFile);
-            replicaInsertQueries->AddValue(r->GetId());
-            replicaInsertQueries->AddValue(file->GetId());
-            replicaInsertQueries->AddValue((*selectedElementIt)->GetId());
-            replicaInsertQueries->AddValue(now);
-            replicaInsertQueries->AddValue(r->mExpiresAt);
+
             if(mSelectStorageElementsRandomly)
             {
                 std::iter_swap(selectedElementIt, reverseRSEIt);
@@ -130,8 +118,7 @@ auto CDataGenerator::CreateFilesAndReplicas(const std::uint32_t numFiles, const 
                 ++selectedElementIt;
         }
     }
-    COutput::GetRef().QueueInserts(std::move(fileInsertQueries));
-    COutput::GetRef().QueueInserts(std::move(replicaInsertQueries));
+
     return bytesOfFilesGen;
 }
 
@@ -156,13 +143,13 @@ void CDataGenerator::OnUpdate(const TickType now)
 
 
 
-CReaper::CReaper(CRucio *rucio, const std::uint32_t tickFreq, const TickType startTick)
+CReaperCaller::CReaperCaller(CRucio *rucio, const std::uint32_t tickFreq, const TickType startTick)
     : CScheduleable(startTick),
       mRucio(rucio),
       mTickFreq(tickFreq)
 {}
 
-void CReaper::OnUpdate(const TickType now)
+void CReaperCaller::OnUpdate(const TickType now)
 {
     auto curRealtime = std::chrono::high_resolution_clock::now();
     mRucio->RunReaper(now);
@@ -464,7 +451,9 @@ CUniformTransferGen::CUniformTransferGen(IBaseSim* sim,
       mTransferMgr(transferMgr),
       mTickFreq(tickFreq),
       mTransferNumGen(transferNumGen)
-{}
+{
+    mReplicaInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Replicas(id, fileId, storageElementId, createdAt, expiredAt, deletedAt) FROM STDIN with(FORMAT csv);", 6, '?');
+}
 
 void CUniformTransferGen::OnUpdate(const TickType now)
 {
@@ -479,7 +468,7 @@ void CUniformTransferGen::OnUpdate(const TickType now)
     const std::uint32_t numToCreate = mTransferNumGen->GetNumToCreate(rngEngine, numActive, now);
     const std::uint32_t numToCreatePerRSE = static_cast<std::uint32_t>( numToCreate/static_cast<double>(mSrcStorageElements.size()) );
 
-    std::unique_ptr<IInsertValuesContainer> replicaInsertQueries = CStorageElement::outputReplicaInsertQuery->CreateValuesContainer(numToCreate * 2);
+    std::unique_ptr<IInsertValuesContainer> replicaInsertQueries = mReplicaInsertQuery->CreateValuesContainer(numToCreate * 2);
 
     std::uint32_t totalTransfersCreated = 0;
     for(CStorageElement* srcStorageElement : mSrcStorageElements)
@@ -497,7 +486,7 @@ void CUniformTransferGen::OnUpdate(const TickType now)
             {
                 std::shared_ptr<SFile> file = curReplica->GetFile();
                 CStorageElement* const dstStorageElement = mDstStorageElements[dstStorageElementRndChooser(rngEngine)];
-                std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(file);
+                std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(file, now);
                 if(newReplica != nullptr)
                 {
                     replicaInsertQueries->AddValue(newReplica->GetId());
@@ -535,7 +524,9 @@ CExponentialTransferGen::CExponentialTransferGen(IBaseSim* sim,
       mTransferMgr(transferMgr),
       mTickFreq(tickFreq),
       mTransferNumGen(transferNumGen)
-{}
+{
+    mReplicaInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Replicas(id, fileId, storageElementId, createdAt, expiredAt, deletedAt) FROM STDIN with(FORMAT csv);", 6, '?');
+}
 
 void CExponentialTransferGen::OnUpdate(const TickType now)
 {
@@ -551,7 +542,7 @@ void CExponentialTransferGen::OnUpdate(const TickType now)
     const std::uint32_t numActive = static_cast<std::uint32_t>(mTransferMgr->GetNumActiveTransfers());
     const std::uint32_t numToCreate = mTransferNumGen->GetNumToCreate(rngEngine, numActive, now);
 
-    std::unique_ptr<IInsertValuesContainer> replicaInsertQueries = CStorageElement::outputReplicaInsertQuery->CreateValuesContainer(numToCreate * 2);
+    std::unique_ptr<IInsertValuesContainer> replicaInsertQueries = mReplicaInsertQuery->CreateValuesContainer(numToCreate * 2);
 
     for(std::uint32_t totalTransfersCreated=0; totalTransfersCreated<numToCreate; ++totalTransfersCreated)
     {
@@ -569,7 +560,7 @@ void CExponentialTransferGen::OnUpdate(const TickType now)
                 if(curReplica->IsComplete())
                 {
                     std::shared_ptr<SFile> file = curReplica->GetFile();
-                    std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(file);
+                    std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(file, now);
                     if(newReplica != nullptr)
                     {
                         replicaInsertQueries->AddValue(newReplica->GetId());
@@ -611,7 +602,9 @@ CSrcPrioTransferGen::CSrcPrioTransferGen(IBaseSim* sim,
       mTransferMgr(transferMgr),
       mTickFreq(tickFreq),
       mTransferNumGen(transferNumGen)
-{}
+{
+    mReplicaInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Replicas(id, fileId, storageElementId, createdAt, expiredAt, deletedAt) FROM STDIN with(FORMAT csv);", 6, '?');
+}
 
 void CSrcPrioTransferGen::OnUpdate(const TickType now)
 {
@@ -628,7 +621,7 @@ void CSrcPrioTransferGen::OnUpdate(const TickType now)
     const std::uint32_t numActive = static_cast<std::uint32_t>(mTransferMgr->GetNumActiveTransfers());
     const std::uint32_t numToCreate = mTransferNumGen->GetNumToCreate(rngEngine, numActive, now);
 
-    std::unique_ptr<IInsertValuesContainer> replicaInsertQueries = CStorageElement::outputReplicaInsertQuery->CreateValuesContainer(numToCreate * 2);
+    std::unique_ptr<IInsertValuesContainer> replicaInsertQueries = mReplicaInsertQuery->CreateValuesContainer(numToCreate * 2);
     std::uint32_t flexCreationLimit = numToCreate;
     for(std::uint32_t totalTransfersCreated=0; totalTransfersCreated< flexCreationLimit; ++totalTransfersCreated)
     {
@@ -645,7 +638,7 @@ void CSrcPrioTransferGen::OnUpdate(const TickType now)
             continue;
         }
 
-        std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(fileToTransfer);
+        std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(fileToTransfer, now);
         if(newReplica != nullptr)
         {
             newReplica->mExpiresAt = now + SECONDS_PER_DAY;
@@ -722,7 +715,9 @@ CJobSlotTransferGen::CJobSlotTransferGen(IBaseSim* sim,
       mSim(sim),
       mTransferMgr(transferMgr),
       mTickFreq(tickFreq)
-{}
+{
+    mReplicaInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Replicas(id, fileId, storageElementId, createdAt, expiredAt, deletedAt) FROM STDIN with(FORMAT csv);", 6, '?');
+}
 
 void CJobSlotTransferGen::OnUpdate(const TickType now)
 {
@@ -735,7 +730,7 @@ void CJobSlotTransferGen::OnUpdate(const TickType now)
     std::uniform_int_distribution<std::size_t> fileRndSelector(0, allFiles.size() - 1);
 
 
-    std::unique_ptr<IInsertValuesContainer> replicaInsertQueries = CStorageElement::outputReplicaInsertQuery->CreateValuesContainer(512);
+    std::unique_ptr<IInsertValuesContainer> replicaInsertQueries = mReplicaInsertQuery->CreateValuesContainer(512);
     for(auto& dstInfo : mDstInfo)
     {
         CStorageElement* const dstStorageElement = dstInfo.first;
@@ -775,7 +770,7 @@ void CJobSlotTransferGen::OnUpdate(const TickType now)
                 continue;
             }
 
-            std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(fileToTransfer);
+            std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(fileToTransfer, now);
             if(newReplica != nullptr)
             {
                 newReplica->mExpiresAt = now + SECONDS_PER_DAY;
@@ -859,7 +854,8 @@ CCachedSrcTransferGen::CCachedSrcTransferGen(IBaseSim* sim,
       mTickFreq(tickFreq),
       mDefaultReplicaLifetime(defaultReplicaLifetime)
 {
-    mSim->mRucio->mFileCreationListeners.push_back(&(mRatiosAndFilesPerAccessCount[0].second));
+    mFileInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Files(id, createdAt, expiredAt, filesize) FROM STDIN with(FORMAT csv);", 4, '?');
+    mReplicaInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Replicas(id, fileId, storageElementId, createdAt, expiredAt) FROM STDIN with(FORMAT csv);", 5, '?');
 }
 
 bool CCachedSrcTransferGen::ExistsFileAtStorageElement(const std::shared_ptr<SFile>& file, const CStorageElement* storageElement) const
@@ -908,8 +904,19 @@ void CCachedSrcTransferGen::ExpireReplica(CStorageElement* storageElement, const
             replicasIt++;
         }
     }
-    (*oldestReplicaIt)->mExpiresAt = 0;
-    (*oldestReplicaIt)->GetFile()->RemoveExpiredReplicas(now);
+    std::vector<std::shared_ptr<SReplica>> expiredReplicas;
+    (*oldestReplicaIt)->mExpiresAt = now;
+    (*oldestReplicaIt)->GetFile()->ExtractExpiredReplicas(now, expiredReplicas);
+
+    std::vector<std::weak_ptr<SReplica>> expiredWeakReplicas;
+    expiredWeakReplicas.reserve(expiredReplicas.size());
+    for(std::shared_ptr<SReplica>& r : expiredReplicas)
+        expiredWeakReplicas.emplace_back(r);
+    for(std::weak_ptr<IReplicaActionListener> replicaListener : mSim->mRucio->mReplicaActionListeners)
+    {
+        if(std::shared_ptr<IReplicaActionListener> listener = replicaListener.lock())
+            listener->OnReplicasDeleted(now, expiredWeakReplicas);
+    }
 }
 
 void CCachedSrcTransferGen::OnUpdate(const TickType now)
@@ -917,7 +924,6 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
     auto curRealtime = std::chrono::high_resolution_clock::now();
 
     RNGEngineType& rngEngine = mSim->mRNGEngine;
-    std::unique_ptr<IInsertValuesContainer> replicaInsertQueries = CStorageElement::outputReplicaInsertQuery->CreateValuesContainer(512);
 
     for(auto it=mRatiosAndFilesPerAccessCount.rbegin(); it!=mRatiosAndFilesPerAccessCount.rend(); ++it)
     {
@@ -1005,15 +1011,9 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
                         if(cacheStorageElement->mReplicas.size() >= mCacheElements[0].mCacheSize)
                             ExpireReplica(cacheStorageElement, now);
 
-                        std::shared_ptr<SReplica> newCacheReplica = cacheStorageElement->CreateReplica(fileToTransfer);
+                        std::shared_ptr<SReplica> newCacheReplica = cacheStorageElement->CreateReplica(fileToTransfer, now);
                         assert(newCacheReplica);
                         newCacheReplica->mExpiresAt = now + mCacheElements[0].mDefaultReplicaLifetime;
-
-                        replicaInsertQueries->AddValue(newCacheReplica->GetId());
-                        replicaInsertQueries->AddValue(fileToTransfer->GetId());
-                        replicaInsertQueries->AddValue(cacheStorageElement->GetId());
-                        replicaInsertQueries->AddValue(now);
-                        replicaInsertQueries->AddValue(newCacheReplica->mExpiresAt);
 
                         mTransferMgr->CreateTransfer(bestSrcReplica, newCacheReplica, now, 60);
                     }
@@ -1029,15 +1029,9 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
                     //->delete after transfer
                 }
 
-                std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(fileToTransfer);
+                std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(fileToTransfer, now);
                 assert(newReplica);
                 newReplica->mExpiresAt = now + mDefaultReplicaLifetime;
-
-                replicaInsertQueries->AddValue(newReplica->GetId());
-                replicaInsertQueries->AddValue(fileToTransfer->GetId());
-                replicaInsertQueries->AddValue(dstStorageElement->GetId());
-                replicaInsertQueries->AddValue(now);
-                replicaInsertQueries->AddValue(newReplica->mExpiresAt);
 
                 mTransferMgr->CreateTransfer(bestSrcReplica, newReplica, now, 60);
 
@@ -1049,12 +1043,74 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
         }
     }
 
-    COutput::GetRef().QueueInserts(std::move(replicaInsertQueries));
-
     mUpdateDurationSummed += std::chrono::high_resolution_clock::now() - curRealtime;
     mNextCallTick = now + mTickFreq;
 }
 
+void CCachedSrcTransferGen::Shutdown(const TickType now)
+{
+    std::vector<std::weak_ptr<SFile>> files;
+    files.reserve(mSim->mRucio->mFiles.size());
+    std::vector<std::weak_ptr<SReplica>> replicas;
+    replicas.reserve(files.size() * 4);
+    for(std::shared_ptr<SFile>& file : mSim->mRucio->mFiles)
+    {
+        files.emplace_back(file);
+        for(std::shared_ptr<SReplica>& replica : file->mReplicas)
+            replicas.emplace_back(replica);
+    }
+    OnFilesDeleted(now, files);
+    OnReplicasDeleted(now, replicas);
+}
+
+void CCachedSrcTransferGen::OnFileCreated(const TickType now, std::shared_ptr<SFile> file)
+{
+    (void)now;
+    mRatiosAndFilesPerAccessCount[0].second.emplace_back(file);
+}
+
+void CCachedSrcTransferGen::OnFilesDeleted(const TickType now, const std::vector<std::weak_ptr<SFile>>& deletedFiles)
+{
+    (void)now;
+    std::unique_ptr<IInsertValuesContainer> fileInsertQueries = mFileInsertQuery->CreateValuesContainer(deletedFiles.size() * 4);
+    for(const std::weak_ptr<SFile>& weakFile : deletedFiles)
+    {
+        std::shared_ptr<SFile> file = weakFile.lock();
+
+        assert(file);
+
+        fileInsertQueries->AddValue(file->GetId());
+        fileInsertQueries->AddValue(file->GetCreatedAt());
+        fileInsertQueries->AddValue(file->mExpiresAt);
+        fileInsertQueries->AddValue(file->GetSize());
+    }
+    COutput::GetRef().QueueInserts(std::move(fileInsertQueries));
+}
+
+void CCachedSrcTransferGen::OnReplicaCreated(const TickType now, std::shared_ptr<SReplica> replica)
+{
+    (void)now;
+    (void)replica;
+}
+
+void CCachedSrcTransferGen::OnReplicasDeleted(const TickType now, const std::vector<std::weak_ptr<SReplica>>& deletedReplicas)
+{
+    (void)now;
+    std::unique_ptr<IInsertValuesContainer> replicaInsertQueries = mReplicaInsertQuery->CreateValuesContainer(deletedReplicas.size() * 5);
+    for(const std::weak_ptr<SReplica>& weakReplica : deletedReplicas)
+    {
+        std::shared_ptr<SReplica> replica = weakReplica.lock();
+
+        assert(replica);
+
+        replicaInsertQueries->AddValue(replica->GetId());
+        replicaInsertQueries->AddValue(replica->GetFile()->GetId());
+        replicaInsertQueries->AddValue(replica->GetStorageElement()->GetId());
+        replicaInsertQueries->AddValue(replica->GetCreatedAt());
+        replicaInsertQueries->AddValue(replica->mExpiresAt);
+    }
+    COutput::GetRef().QueueInserts(std::move(replicaInsertQueries));
+}
 
 
 CHeartbeat::CHeartbeat(IBaseSim* sim, std::shared_ptr<CFixedTimeTransferManager> g2cTransferMgr, std::shared_ptr<CTransferManager> c2cTransferMgr, const std::uint32_t tickFreq, const TickType startTick)

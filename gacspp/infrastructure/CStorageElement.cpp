@@ -7,8 +7,6 @@
 #include "output/COutput.hpp"
 
 
-std::shared_ptr<IPreparedInsert> CStorageElement::outputReplicaInsertQuery = nullptr;
-
 CStorageElement::CStorageElement(std::string&& name, const TickType accessLatency, ISite* const site)
     : mId(GetNewId()),
       mName(std::move(name)),
@@ -23,14 +21,14 @@ void CStorageElement::OnOperation(const OPERATION op)
     (void)op;
 }
 
-auto CStorageElement::CreateReplica(std::shared_ptr<SFile>& file) -> std::shared_ptr<SReplica>
+auto CStorageElement::CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica>
 {
     const auto result = mFileIds.insert(file->GetId());
 
     if (!result.second)
         return nullptr;
 
-    auto newReplica = std::make_shared<SReplica>(file, this, mReplicas.size());
+    auto newReplica = std::make_shared<SReplica>(file, this, now, mReplicas.size());
     file->mReplicas.emplace_back(newReplica);
     mReplicas.emplace_back(newReplica);
 

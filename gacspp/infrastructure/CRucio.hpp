@@ -1,11 +1,7 @@
 #pragma once
 
-#include <atomic>
-#include <condition_variable>
 #include <memory>
-#include <mutex>
 #include <string>
-#include <thread>
 #include <vector>
 
 #include "ISite.hpp"
@@ -13,10 +9,10 @@
 #include "common/constants.h"
 #include "common/IConfigConsumer.hpp"
 
-
 struct SFile;
+struct SReplica;
+class CReaper;
 
-#define NUM_REPEAR_THREADS 16
 
 class CGridSite : public ISite
 {
@@ -35,32 +31,41 @@ public:
     auto CreateStorageElement(std::string&& name, const TickType accessLatency) -> CStorageElement*;
 };
 
+
+class IFileActionListener
+{
+public:
+    virtual void OnFileCreated(const TickType now, std::shared_ptr<SFile> file) = 0;
+    virtual void OnFilesDeleted(const TickType now, const std::vector<std::weak_ptr<SFile>>& deletedFiles) = 0;
+};
+
+
+class IReplicaActionListener
+{
+public:
+    virtual void OnReplicaCreated(const TickType now, std::shared_ptr<SReplica> replica) = 0;
+    virtual void OnReplicasDeleted(const TickType now, const std::vector<std::weak_ptr<SReplica>>& deletedReplicas) = 0;
+};
+
+
 class CRucio : public IConfigConsumer
 {
 private:
-    TickType mReaperWorkerNow = 0;
-    std::atomic_bool mAreThreadsRunning = true;
-
-    std::condition_variable mStartCondition;
-    std::condition_variable mFinishCondition;
-    std::mutex mConditionMutex;
-    std::atomic_size_t mNumWorkingReapers = 0;
-
-    std::unique_ptr<std::thread> mThreads[NUM_REPEAR_THREADS];
+    std::unique_ptr<CReaper> mReaper;
 
 public:
     std::vector<std::shared_ptr<SFile>> mFiles;
     std::vector<std::unique_ptr<CGridSite>> mGridSites;
 
-    std::vector<std::vector<std::weak_ptr<SFile>>*> mFileCreationListeners;
+    std::vector<std::weak_ptr<IFileActionListener>> mFileActionListeners;
+    std::vector<std::weak_ptr<IReplicaActionListener>> mReplicaActionListeners;
 
     CRucio();
     ~CRucio();
 
-    auto CreateFile(const std::uint32_t size, const TickType expiresAt) -> std::shared_ptr<SFile>;
+    auto CreateFile(const std::uint32_t size, const TickType now, const TickType lifetime) -> std::shared_ptr<SFile>;
     auto CreateGridSite(std::string&& name, std::string&& locationName, const std::uint8_t multiLocationIdx) -> CGridSite*;
     auto RunReaper(const TickType now) -> std::size_t;
-    void ReaperWorker(const std::size_t threadIdx);
 
     bool LoadConfig(const json& config) final;
 };

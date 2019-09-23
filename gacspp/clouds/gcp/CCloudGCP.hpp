@@ -99,9 +99,8 @@ namespace gcp
         bool LoadConfig(const json& config) final;
 
     private:
-        //todo: use smart pointers (destructor invisible?)
-        json* mSKUSettings = nullptr;
-        json* mNetworkPrices = nullptr;
+        std::unique_ptr<json> mSKUSettings;
+        std::unique_ptr<json> mNetworkPrices;
 
         auto GetTieredRateFromSKUId(const std::string& skuId) const -> TieredPriceType;
     };

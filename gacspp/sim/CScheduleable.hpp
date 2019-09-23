@@ -19,6 +19,7 @@ public:
 
     virtual ~CScheduleable() = default;
     virtual void OnUpdate(const TickType now) = 0;
+    virtual void Shutdown(const TickType now){};
 };
 
 struct SSchedulePrioComparer

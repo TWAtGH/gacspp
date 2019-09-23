@@ -25,4 +25,9 @@ void IBaseSim::Run(const TickType maxTick)
         if(element->mNextCallTick > mCurrentTick)
             mSchedule.push(element);
     }
+    while(!mSchedule.empty())
+    {
+        mSchedule.top()->Shutdown(mCurrentTick);
+        mSchedule.pop();
+    }
 }

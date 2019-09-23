@@ -187,19 +187,7 @@ namespace gcp
 
 
 
-    CCloud::~CCloud()
-    {
-        if(mSKUSettings)
-        {
-            delete mSKUSettings;
-            mSKUSettings = nullptr;
-        }
-        if (mNetworkPrices)
-        {
-            delete mNetworkPrices;
-            mNetworkPrices = nullptr;
-        }
-    }
+    CCloud::~CCloud() = default;
 
     auto CCloud::CreateRegion(  std::string&& name,
                                 std::string&& locationName,
@@ -276,7 +264,7 @@ namespace gcp
                 CConfigManager::GetRef().TryLoadCfg(skuIdsJson, filePath);
             }
 
-            mSKUSettings = new json;
+            mSKUSettings = std::make_unique<json>();
             for (const json& skuJson : skuIdsJson.at("skus"))
             {
                 try
@@ -311,7 +299,7 @@ namespace gcp
                 CConfigManager::GetRef().TryLoadCfg(networkPricesJson, filePath);
             }
 
-            mNetworkPrices = new json(networkPricesJson);
+            mNetworkPrices = std::make_unique<json>(networkPricesJson);
         }
         catch (const json::exception& error)
         {

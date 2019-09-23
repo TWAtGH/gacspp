@@ -23,9 +23,6 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
     CConfigManager& configManager = CConfigManager::GetRef();
     COutput& output = COutput::GetRef();
 
-    //CStorageElement::outputReplicaInsertQuery = output.CreatePreparedInsert("INSERT INTO Replicas VALUES(?, ?, ?, ?, ?)", '?');
-    CStorageElement::outputReplicaInsertQuery = output.CreatePreparedInsert("COPY Replicas(id, fileId, storageElementId, createdAt, expiredAt) FROM STDIN with(FORMAT csv);", 5, '?');
-
 
     ////////////////////////////
     // setup grid and clouds
@@ -201,6 +198,47 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
     ////////////////////////////
     // setup scheuleables
     ////////////////////////////
+    std::shared_ptr<CCachedSrcTransferGen> transferGen;
+    std::shared_ptr<CFixedTimeTransferManager> manager;
+    try
+    {
+        const json& transferGenCfg = profileJson.at("cachedTransferGen");
+        const std::string managerType = transferGenCfg.at("managerType").get<std::string>();
+        const TickType tickFreq = transferGenCfg.at("tickFreq").get<TickType>();
+        const TickType startTick = transferGenCfg.at("startTick").get<TickType>();
+        const TickType managerTickFreq = transferGenCfg.at("managerTickFreq").get<TickType>();
+        const TickType managerStartTick = transferGenCfg.at("managerStartTick").get<TickType>();
+        const TickType defaultReplicaLifetime = transferGenCfg.at("defaultReplicaLifetime").get<TickType>();
+        if(managerType == "fixedTime")
+        {
+            manager = std::make_shared<CFixedTimeTransferManager>(managerTickFreq, managerStartTick);
+            transferGen = std::make_shared<CCachedSrcTransferGen>(this, manager, defaultReplicaLifetime, tickFreq, startTick);
+
+            for(const json& srcStorageElementName : transferGenCfg.at("srcStorageElements"))
+                transferGen->mSrcStorageElements.push_back( nameToStorageElement[srcStorageElementName.get<std::string>()] );
+            for(const json& cacheStorageElementJson : transferGenCfg.at("cacheStorageElements"))
+            {
+                const std::size_t cacheSize = cacheStorageElementJson.at("size").get<std::size_t>();
+                const TickType defaultReplicaLifetime = cacheStorageElementJson.at("defaultReplicaLifetime").get<TickType>();
+                CStorageElement* storageElement = nameToStorageElement[cacheStorageElementJson.at("storageElement").get<std::string>()];
+                transferGen->mCacheElements.push_back( {cacheSize, defaultReplicaLifetime, storageElement} );
+            }
+            for(const json& dstStorageElementName : transferGenCfg.at("dstStorageElements"))
+                transferGen->mDstStorageElements.push_back( nameToStorageElement[dstStorageElementName.get<std::string>()] );
+        }
+        else
+        {
+            std::cout << "Failed to load reaper cached transfer gen cfg: only fixed transfer implemented" << std::endl;
+        }
+    }
+    catch(const json::out_of_range& error)
+    {
+        std::cout << "Failed to load reaper cached transfer gen cfg: " << error.what() << std::endl;
+    }
+
+    mRucio->mFileActionListeners.emplace_back(transferGen);
+    mRucio->mReplicaActionListeners.emplace_back(transferGen);
+
     try
     {
         for(const json& dataGenCfg : profileJson.at("dataGens"))
@@ -260,59 +298,19 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
     }
 
 
-    std::shared_ptr<CReaper> reaper;
+    std::shared_ptr<CReaperCaller> reaper;
     try
     {
         const json& reaperCfg = profileJson.at("reaper");
         const TickType tickFreq = reaperCfg.at("tickFreq").get<TickType>();
         const TickType startTick = reaperCfg.at("startTick").get<TickType>();
-        reaper = std::make_shared<CReaper>(mRucio.get(), tickFreq, startTick);
+        reaper = std::make_shared<CReaperCaller>(mRucio.get(), tickFreq, startTick);
     }
     catch(const json::out_of_range& error)
     {
         std::cout << "Failed to load reaper cfg: " << error.what() << std::endl;
-        reaper = std::make_shared<CReaper>(mRucio.get(), 600, 600);
+        reaper = std::make_shared<CReaperCaller>(mRucio.get(), 600, 600);
     }
-
-
-    std::shared_ptr<CCachedSrcTransferGen> transferGen;
-    std::shared_ptr<CFixedTimeTransferManager> manager;
-    try
-    {
-        const json& transferGenCfg = profileJson.at("cachedTransferGen");
-        const std::string managerType = transferGenCfg.at("managerType").get<std::string>();
-        const TickType tickFreq = transferGenCfg.at("tickFreq").get<TickType>();
-        const TickType startTick = transferGenCfg.at("startTick").get<TickType>();
-        const TickType managerTickFreq = transferGenCfg.at("managerTickFreq").get<TickType>();
-        const TickType managerStartTick = transferGenCfg.at("managerStartTick").get<TickType>();
-        const TickType defaultReplicaLifetime = transferGenCfg.at("defaultReplicaLifetime").get<TickType>();
-        if(managerType == "fixedTime")
-        {
-            manager = std::make_shared<CFixedTimeTransferManager>(managerTickFreq, managerStartTick);
-            transferGen = std::make_shared<CCachedSrcTransferGen>(this, manager, defaultReplicaLifetime, tickFreq, startTick);
-
-            for(const json& srcStorageElementName : transferGenCfg.at("srcStorageElements"))
-                transferGen->mSrcStorageElements.push_back( nameToStorageElement[srcStorageElementName.get<std::string>()] );
-            for(const json& cacheStorageElementJson : transferGenCfg.at("cacheStorageElements"))
-            {
-                const std::size_t cacheSize = cacheStorageElementJson.at("size").get<std::size_t>();
-                const TickType defaultReplicaLifetime = cacheStorageElementJson.at("defaultReplicaLifetime").get<TickType>();
-                CStorageElement* storageElement = nameToStorageElement[cacheStorageElementJson.at("storageElement").get<std::string>()];
-                transferGen->mCacheElements.push_back( {cacheSize, defaultReplicaLifetime, storageElement} );
-            }
-            for(const json& dstStorageElementName : transferGenCfg.at("dstStorageElements"))
-                transferGen->mDstStorageElements.push_back( nameToStorageElement[dstStorageElementName.get<std::string>()] );
-        }
-        else
-        {
-            std::cout << "Failed to load reaper cached transfer gen cfg: only fixed transfer implemented" << std::endl;
-        }
-    }
-    catch(const json::out_of_range& error)
-    {
-        std::cout << "Failed to load reaper cached transfer gen cfg: " << error.what() << std::endl;
-    }
-
 
     auto heartbeat = std::make_shared<CHeartbeat>(this, manager, nullptr, static_cast<std::uint32_t>(SECONDS_PER_DAY), static_cast<TickType>(SECONDS_PER_DAY));
     //heartbeat->mProccessDurations["DataGen"] = &(dataGen->mUpdateDurationSummed);
