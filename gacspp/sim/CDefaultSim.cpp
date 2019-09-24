@@ -208,11 +208,12 @@ void CDefaultSim::SetupDefaults(const json& profileJson)
         const TickType startTick = transferGenCfg.at("startTick").get<TickType>();
         const TickType managerTickFreq = transferGenCfg.at("managerTickFreq").get<TickType>();
         const TickType managerStartTick = transferGenCfg.at("managerStartTick").get<TickType>();
+        const std::size_t numPerDay = transferGenCfg.at("numPerDay").get<std::size_t>();
         const TickType defaultReplicaLifetime = transferGenCfg.at("defaultReplicaLifetime").get<TickType>();
         if(managerType == "fixedTime")
         {
             manager = std::make_shared<CFixedTimeTransferManager>(managerTickFreq, managerStartTick);
-            transferGen = std::make_shared<CCachedSrcTransferGen>(this, manager, defaultReplicaLifetime, tickFreq, startTick);
+            transferGen = std::make_shared<CCachedSrcTransferGen>(this, manager, numPerDay, defaultReplicaLifetime, tickFreq, startTick);
 
             for(const json& srcStorageElementName : transferGenCfg.at("srcStorageElements"))
                 transferGen->mSrcStorageElements.push_back( nameToStorageElement[srcStorageElementName.get<std::string>()] );

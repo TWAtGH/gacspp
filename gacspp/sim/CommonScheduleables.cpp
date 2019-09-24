@@ -845,6 +845,7 @@ void CJobSlotTransferGen::OnUpdate(const TickType now)
 
 CCachedSrcTransferGen::CCachedSrcTransferGen(IBaseSim* sim,
                                              std::shared_ptr<CFixedTimeTransferManager> transferMgr,
+                                             const std::size_t numPerDay,
                                              const TickType defaultReplicaLifetime,
                                              const std::uint32_t tickFreq,
                                              const TickType startTick)
@@ -852,6 +853,7 @@ CCachedSrcTransferGen::CCachedSrcTransferGen(IBaseSim* sim,
       mSim(sim),
       mTransferMgr(transferMgr),
       mTickFreq(tickFreq),
+      mNumPerDay(numPerDay),
       mDefaultReplicaLifetime(defaultReplicaLifetime)
 {
     mFileInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Files(id, createdAt, expiredAt, filesize) FROM STDIN with(FORMAT csv);", 4, '?');
@@ -925,9 +927,10 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
 
     RNGEngineType& rngEngine = mSim->mRNGEngine;
 
+    const std::size_t numTotalTransfersPerUpdate = static_cast<std::size_t>((mNumPerDay * mTickFreq) / SECONDS_PER_DAY);
     for(auto it=mRatiosAndFilesPerAccessCount.rbegin(); it!=mRatiosAndFilesPerAccessCount.rend(); ++it)
     {
-        const std::size_t numTransfersToCreate = it->first; //shouldnt be per dst element
+        const std::size_t numTransfersToCreate = 1 + static_cast<std::size_t>(numTotalTransfersPerUpdate * it->first);
         std::vector<std::weak_ptr<SFile>>& fileVec = it->second;
 
         if(fileVec.empty())

@@ -338,14 +338,16 @@ public:
 
     CCachedSrcTransferGen(IBaseSim* sim,
                         std::shared_ptr<CFixedTimeTransferManager> transferMgr,
+                        const std::size_t numPerDay,
                         const TickType defaultReplicaLifetime,
                         const std::uint32_t tickFreq,
                         const TickType startTick=0 );
 
-    std::vector<std::pair<std::size_t, std::vector<std::weak_ptr<SFile>>>> mRatiosAndFilesPerAccessCount{ {50, {}}, {15, {}}, {4, {}}, {1, {}} };
+    std::vector<std::pair<float, std::vector<std::weak_ptr<SFile>>>> mRatiosAndFilesPerAccessCount{ {0.62f, {}}, {0.16f, {}}, {0.08f, {}}, {0.05f, {}} };
     std::vector<CStorageElement*> mSrcStorageElements;
     std::vector<SCacheElementInfo> mCacheElements;
     std::vector<CStorageElement*> mDstStorageElements;
+    std::size_t mNumPerDay;
     TickType mDefaultReplicaLifetime;
 
     void OnUpdate(const TickType now) final;
