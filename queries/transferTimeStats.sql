@@ -1,4 +1,4 @@
-SELECT startedat, avg(startedat - queuedat), avg(finishedat - queuedat) 
+SELECT queuedat, avg(startedat - queuedat), avg(finishedat - queuedat) 
 FROM transfers
-GROUP BY startedat
-ORDER BY startedat;
+GROUP BY queuedat
+ORDER BY queuedat;

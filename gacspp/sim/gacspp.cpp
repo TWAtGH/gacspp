@@ -29,11 +29,21 @@ int main(int argc, char** argv)
     //try to load sim profile
     json profileJson;
     if (argc > 1)
-        configManager.TryLoadProfileCfg(profileJson, argv[1]);
+        if(configManager.TryLoadProfileCfg(profileJson, argv[1]))
+            std::cout<<"Using profile: "<<argv[1]<<std::endl;
 
-    if (profileJson.empty() && configJson.contains("profile"))
-        configManager.TryLoadProfileCfg(profileJson, configJson["profile"].get<std::string>());
-
+    if (profileJson.empty())
+    {
+        try
+        {
+            if(configManager.TryLoadProfileCfg(profileJson, configJson.at("profile").get<std::string>()))
+                std::cout<<"Using profile: "<<configJson.at("profile").get<std::string>()<<std::endl;
+        }
+        catch(const json::out_of_range& error)
+        {
+        }
+    }
+    
     if (profileJson.empty())
     {
         std::cout << "Failed to load a profile file..." << std::endl;
