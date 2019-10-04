@@ -289,7 +289,7 @@ inline __m128i _mm_cmpgt_epi8_fixed(__m128i a, __m128i b) {
   #pragma GCC diagnostic ignored "-Woverflow"
 
   if (std::is_unsigned<char>::value) {
-    const __m128i mask = _mm_set1_epi8(0x80);
+    const __m128i mask = _mm_set1_epi8(static_cast<char>(0x80));
     const __m128i diff = _mm_subs_epi8(b, a);
     return _mm_cmpeq_epi8(_mm_and_si128(diff, mask), mask);
   }
@@ -1202,6 +1202,8 @@ public:
         // compared to destruction of the elements of the container. So we pick the
         // largest bucket_count() threshold for which iteration is still fast and
         // past that we simply deallocate the array.
+        if (empty())
+            return;
         if (capacity_ > 127) {
             destroy_slots();
         } else if (capacity_) {
@@ -1532,6 +1534,14 @@ public:
         }
     }
 
+#ifndef PHMAP_NON_DETERMINISTIC
+    template<typename OutputArchive>
+    bool dump(OutputArchive&);
+
+    template<typename InputArchive>
+    bool load(InputArchive&);
+#endif
+
     void rehash(size_t n) {
         if (n == 0 && capacity_ == 0) return;
         if (n == 0 && size_ == 0) {
@@ -1541,7 +1551,7 @@ public:
         }
         // bitor is a faster way of doing `max` here. We will round up to the next
         // power-of-2-minus-1, so bitor is good enough.
-        auto m = NormalizeCapacity(n | GrowthToLowerboundCapacity(size()));
+        auto m = NormalizeCapacity((std::max)(n, size()));
         // n == 0 unconditionally rehashes as per the standard.
         if (n == 0 || m > capacity_) {
             resize(m);
@@ -2244,14 +2254,16 @@ public:
     template <class K = key_type, class P = Policy>
     MappedReference<P> at(const key_arg<K>& key) {
         auto it = this->find(key);
-        if (it == this->end()) std::abort();
+        if (it == this->end()) 
+            phmap::base_internal::ThrowStdOutOfRange("phmap at(): lookup non-existent key");
         return Policy::value(&*it);
     }
 
     template <class K = key_type, class P = Policy>
     MappedConstReference<P> at(const key_arg<K>& key) const {
         auto it = this->find(key);
-        if (it == this->end()) std::abort();
+        if (it == this->end())
+            phmap::base_internal::ThrowStdOutOfRange("phmap at(): lookup non-existent key");
         return Policy::value(&*it);
     }
 
@@ -3008,7 +3020,12 @@ public:
         }
     }
 
-    void reserve(size_t n) { rehash(GrowthToLowerboundCapacity(n)); }
+    void reserve(size_t n) 
+    {
+        size_t target = GrowthToLowerboundCapacity(n);
+        size_t normalized = 16 * NormalizeCapacity(n / num_tables);
+        rehash(normalized > target ? normalized : target); 
+    }
 
     // Extension API: support for heterogeneous keys.
     //
@@ -3131,6 +3148,14 @@ public:
                      parallel_hash_set& b) noexcept(noexcept(a.swap(b))) {
         a.swap(b);
     }
+
+#ifndef PHMAP_NON_DETERMINISTIC
+    template<typename OutputArchive>
+    bool dump(OutputArchive& ar);
+
+    template<typename InputArchive>
+    bool load(InputArchive& ar);
+#endif
 
 private:
     template <class Container, typename Enabler>
@@ -3387,14 +3412,16 @@ public:
     template <class K = key_type, class P = Policy>
     MappedReference<P> at(const key_arg<K>& key) {
         auto it = this->find(key);
-        if (it == this->end()) std::abort();
+        if (it == this->end()) 
+            phmap::base_internal::ThrowStdOutOfRange("phmap at(): lookup non-existent key");
         return Policy::value(&*it);
     }
 
     template <class K = key_type, class P = Policy>
     MappedConstReference<P> at(const key_arg<K>& key) const {
         auto it = this->find(key);
-        if (it == this->end()) std::abort();
+        if (it == this->end()) 
+            phmap::base_internal::ThrowStdOutOfRange("phmap at(): lookup non-existent key");
         return Policy::value(&*it);
     }
 
