@@ -240,7 +240,7 @@ CRucio::CRucio()
 
 CRucio::~CRucio() = default;
 
-auto CRucio::CreateFile(const std::uint32_t size, const TickType now, const TickType lifetime) -> std::shared_ptr<SFile>
+auto CRucio::CreateFile(const SpaceType size, const TickType now, const TickType lifetime) -> std::shared_ptr<SFile>
 {
     std::shared_ptr<SFile> newFile = std::make_shared<SFile>(size, now, lifetime);
     mFiles.emplace_back(newFile);

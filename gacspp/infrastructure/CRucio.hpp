@@ -63,7 +63,7 @@ public:
     CRucio();
     ~CRucio();
 
-    auto CreateFile(const std::uint32_t size, const TickType now, const TickType lifetime) -> std::shared_ptr<SFile>;
+    auto CreateFile(const SpaceType size, const TickType now, const TickType lifetime) -> std::shared_ptr<SFile>;
     auto CreateGridSite(std::string&& name, std::string&& locationName, const std::uint8_t multiLocationIdx) -> CGridSite*;
     auto RunReaper(const TickType now) -> std::size_t;
 

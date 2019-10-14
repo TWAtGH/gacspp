@@ -70,7 +70,7 @@ namespace gcp
         }
     }
 
-    void CBucket::OnIncreaseReplica(std::uint64_t amount, TickType now)
+    void CBucket::OnIncreaseReplica(const SpaceType amount, const TickType now)
     {
         if (now > mTimeLastCostUpdate)
         {
@@ -80,7 +80,7 @@ namespace gcp
         CStorageElement::OnIncreaseReplica(amount, now);
     }
 
-    void CBucket::OnRemoveReplica(const SReplica* replica, TickType now)
+    void CBucket::OnRemoveReplica(const SReplica* replica, const TickType now)
     {
         std::unique_lock<std::mutex> lock(mReplicaRemoveMutex);
         if (now > mTimeLastCostUpdate)
@@ -91,7 +91,7 @@ namespace gcp
         CStorageElement::OnRemoveReplica(replica, now, false);
     }
 
-    auto CBucket::CalculateStorageCosts(TickType now) -> double
+    auto CBucket::CalculateStorageCosts(const TickType now) -> double
     {
         if (now > mTimeLastCostUpdate)
         {
@@ -146,7 +146,7 @@ namespace gcp
         return newBucket;
     }
 
-    double CRegion::CalculateStorageCosts(TickType now)
+    double CRegion::CalculateStorageCosts(const TickType now)
     {
         double regionStorageCosts = 0;
         for (const std::unique_ptr<CBucket>& bucket : mStorageElements)
@@ -198,7 +198,7 @@ namespace gcp
         return newRegion;
     }
 
-    auto CCloud::ProcessBilling(TickType now) -> std::unique_ptr<ICloudBill>
+    auto CCloud::ProcessBilling(const TickType now) -> std::unique_ptr<ICloudBill>
     {
         double totalStorageCosts = 0;
         double totalOperationCosts = 0;

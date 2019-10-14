@@ -54,10 +54,10 @@ namespace gcp
 
         virtual void OnOperation(const CStorageElement::OPERATION op) final;
 
-        virtual void OnIncreaseReplica(std::uint64_t amount, TickType now) final;
-        virtual void OnRemoveReplica(const SReplica* replica, TickType now) final;
+        virtual void OnIncreaseReplica(const SpaceType amount, const TickType now) final;
+        virtual void OnRemoveReplica(const SReplica* replica, const TickType now) final;
 
-        auto CalculateStorageCosts(TickType now) -> double;
+        auto CalculateStorageCosts(const TickType now) -> double;
         auto CalculateOperationCosts() -> double;
 
         auto GetCurStoragePrice() const -> long double;
@@ -74,7 +74,7 @@ namespace gcp
         using ISite::ISite;
 
         auto CreateStorageElement(std::string&& name, const TickType accessLatency) -> CBucket* final;
-        auto CalculateStorageCosts(TickType now) -> double;
+        auto CalculateStorageCosts(const TickType now) -> double;
         auto CalculateOperationCosts(std::size_t& numClassA, std::size_t& numClassB) -> double;
         auto CalculateNetworkCosts(double& sumUsedTraffic, std::uint64_t& sumDoneTransfers) -> double;
 
@@ -93,7 +93,7 @@ namespace gcp
                           std::string&& locationName,
                           const std::uint8_t multiLocationIdx) -> CRegion* final;
 
-        auto ProcessBilling(TickType now) -> std::unique_ptr<ICloudBill> final;
+        auto ProcessBilling(const TickType now) -> std::unique_ptr<ICloudBill> final;
         void InitialiseNetworkLinks() final;
 
         bool LoadConfig(const json& config) final;

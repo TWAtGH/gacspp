@@ -54,22 +54,22 @@ CDataGenerator::CDataGenerator( IBaseSim* sim,
       mTickFreq(tickFreq)
 {}
 
-auto CDataGenerator::GetRandomFileSize() -> std::uint32_t
+auto CDataGenerator::GetRandomFileSize() const -> SpaceType
 {
     assert(mFileSizeRNG);
     constexpr double min = MiB_TO_BYTES(64);
     constexpr double max = static_cast<double>(std::numeric_limits<std::uint32_t>::max());
     const double val = min + GiB_TO_BYTES(std::abs(mFileSizeRNG->GetValue(mSim->mRNGEngine)));
-    return static_cast<std::uint32_t>(std::min(val, max));
+    return static_cast<SpaceType>(std::min(val, max));
 }
 
-auto CDataGenerator::GetRandomNumFilesToGenerate() -> std::uint32_t
+auto CDataGenerator::GetRandomNumFilesToGenerate() const -> std::uint32_t
 {
     assert(mNumFilesRNG);
     return static_cast<std::uint32_t>( std::max(1.0, mNumFilesRNG->GetValue(mSim->mRNGEngine)) );
 }
 
-auto CDataGenerator::GetRandomLifeTime() -> TickType
+auto CDataGenerator::GetRandomLifeTime() const -> TickType
 {
     assert(mFileLifetimeRNG);
     float val = DAYS_TO_SECONDS(std::abs(mFileLifetimeRNG->GetValue(mSim->mRNGEngine)));

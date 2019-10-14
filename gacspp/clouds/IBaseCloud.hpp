@@ -32,7 +32,7 @@ public:
                               std::string&& locationName,
                               const std::uint8_t multiLocationIdx) -> ISite* = 0;
 
-    virtual auto ProcessBilling(TickType now) -> std::unique_ptr<ICloudBill> = 0;
+    virtual auto ProcessBilling(const TickType now) -> std::unique_ptr<ICloudBill> = 0;
     virtual void InitialiseNetworkLinks() = 0;
 
     inline auto GetName() const -> const std::string&

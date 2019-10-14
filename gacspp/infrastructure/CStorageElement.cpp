@@ -37,7 +37,7 @@ auto CStorageElement::CreateReplica(std::shared_ptr<SFile>& file, const TickType
     return newReplica;
 }
 
-void CStorageElement::OnIncreaseReplica(const std::uint64_t amount, const TickType now)
+void CStorageElement::OnIncreaseReplica(const SpaceType amount, const TickType now)
 {
     (void)now;
     mUsedStorage += amount;
@@ -46,7 +46,7 @@ void CStorageElement::OnIncreaseReplica(const std::uint64_t amount, const TickTy
 void CStorageElement::OnRemoveReplica(const SReplica* const replica, const TickType now, bool needLock)
 {
     (void)now;
-    const std::uint32_t curSize = replica->GetCurSize();
+    const SpaceType curSize = replica->GetCurSize();
 
     std::unique_lock<std::mutex> lock(mReplicaRemoveMutex, std::defer_lock);
     if(needLock)

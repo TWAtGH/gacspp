@@ -56,9 +56,9 @@ private:
 
     std::uint32_t mTickFreq;
 
-    std::uint32_t GetRandomFileSize();
-    std::uint32_t GetRandomNumFilesToGenerate();
-    TickType GetRandomLifeTime();
+    auto GetRandomFileSize() const -> SpaceType;
+    auto GetRandomNumFilesToGenerate() const -> std::uint32_t;
+    auto GetRandomLifeTime() const -> TickType;
 
 public:
 
@@ -73,7 +73,7 @@ public:
                     const std::uint32_t tickFreq,
                     const TickType startTick=0);
 
-    std::uint64_t CreateFilesAndReplicas(const std::uint32_t numFiles, const std::uint32_t numReplicasPerFile, const TickType now);
+    auto CreateFilesAndReplicas(const std::uint32_t numFiles, const std::uint32_t numReplicasPerFile, const TickType now) -> std::uint64_t;
 
     void OnUpdate(const TickType now) final;
 };

@@ -27,6 +27,7 @@
 
 typedef std::minstd_rand RNGEngineType;
 
+typedef std::uint64_t SpaceType;
 typedef std::uint64_t TickType;
 typedef std::uint64_t IdType;
 inline IdType GetNewId()

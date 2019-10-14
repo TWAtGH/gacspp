@@ -11,7 +11,7 @@ struct SReplica;
 
 struct SFile
 {
-    SFile(const std::uint32_t size, const TickType createdAt, const TickType lifetime);
+    SFile(const SpaceType size, const TickType createdAt, const TickType lifetime);
     SFile(SFile&&) = default;
     SFile& operator=(SFile&&) = default;
 
@@ -26,7 +26,7 @@ struct SFile
     {return mId;}
     inline auto GetCreatedAt() const -> TickType
     {return mCreatedAt;}
-    inline auto GetSize() const -> std::uint32_t
+    inline auto GetSize() const -> SpaceType
     {return mSize;}
 
     std::vector<std::shared_ptr<SReplica>> mReplicas;
@@ -35,7 +35,7 @@ struct SFile
 private:
     IdType mId;
     TickType mCreatedAt;
-    std::uint32_t mSize;
+    SpaceType mSize;
 };
 
 struct SReplica
@@ -48,7 +48,7 @@ struct SReplica
     SReplica(SReplica const&) = delete;
     SReplica& operator=(SReplica const&) = delete;
 
-    auto Increase(std::uint32_t amount, const TickType now) -> std::uint32_t;
+    auto Increase(const SpaceType amount, const TickType now) -> SpaceType;
     void OnRemoveByFile(const TickType now);
 
     inline bool IsComplete() const
@@ -64,7 +64,7 @@ struct SReplica
     {return mFile;}
     inline auto GetStorageElement() -> CStorageElement*
     {return mStorageElement;}
-    inline auto GetCurSize() const -> std::uint32_t
+    inline auto GetCurSize() const -> SpaceType
     {return mCurSize;}
 
 
@@ -76,5 +76,5 @@ private:
     TickType mCreatedAt;
     std::shared_ptr<SFile> mFile;
     CStorageElement* mStorageElement;
-    std::uint32_t mCurSize = 0;
+    SpaceType mCurSize = 0;
 };

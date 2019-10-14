@@ -41,7 +41,7 @@ public:
     virtual void OnOperation(const OPERATION op);
 
     virtual auto CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica>;
-    virtual void OnIncreaseReplica(const std::uint64_t amount, const TickType now);
+    virtual void OnIncreaseReplica(const SpaceType amount, const TickType now);
     virtual void OnRemoveReplica(const SReplica* replica, const TickType now, bool needLock=true);
 
     inline auto GetId() const -> IdType
@@ -65,7 +65,7 @@ protected:
     std::mutex mReplicaRemoveMutex;
 
     ISite* mSite;
-    std::uint64_t mUsedStorage = 0;
+    SpaceType mUsedStorage = 0;
 
 public:
     std::vector<std::shared_ptr<SReplica>> mReplicas;

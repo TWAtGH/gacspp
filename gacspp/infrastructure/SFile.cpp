@@ -3,7 +3,7 @@
 
 
 
-SFile::SFile(const std::uint32_t size, const TickType createdAt, const TickType lifetime)
+SFile::SFile(const SpaceType size, const TickType createdAt, const TickType lifetime)
     : mExpiresAt(createdAt+lifetime),
       mId(GetNewId()),
       mCreatedAt(createdAt),
@@ -119,18 +119,12 @@ SReplica::SReplica(std::shared_ptr<SFile>& file, CStorageElement* const storageE
       mStorageElement(storageElement)
 {}
 
-auto SReplica::Increase(std::uint32_t amount, const TickType now) -> std::uint32_t
+auto SReplica::Increase(const SpaceType amount, const TickType now) -> SpaceType
 {
-    const std::uint32_t maxSize = mFile->GetSize();
-    std::uint64_t newSize = mCurSize + amount;
-    if (newSize >= maxSize)
-    {
-        amount = maxSize - mCurSize;
-        newSize = maxSize;
-    }
-    mCurSize = static_cast<std::uint32_t>(newSize);
-    mStorageElement->OnIncreaseReplica(amount, now);
-    return amount;
+    SpaceType increment = std::min(amount, mFile->GetSize() - mCurSize);
+    mCurSize += increment;
+    mStorageElement->OnIncreaseReplica(increment, now);
+    return increment;
 }
 
 void SReplica::OnRemoveByFile(const TickType now)
