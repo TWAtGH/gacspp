@@ -31,7 +31,7 @@ public:
     std::unique_ptr<CRucio> mRucio;
     std::vector<std::unique_ptr<IBaseCloud>> mClouds;
 
-    virtual void SetupDefaults(const json& profileJson) = 0;
+    virtual bool SetupDefaults(const json& profileJson) = 0;
     virtual void Run(const TickType maxTick);
 
 protected:

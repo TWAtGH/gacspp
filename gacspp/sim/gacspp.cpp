@@ -1,7 +1,7 @@
 #include <iomanip>
 #include <iostream>
 
-#include "CDefaultSim.hpp"
+#include "CTestSim.hpp"
 
 #include "common/CConfigManager.hpp"
 
@@ -43,7 +43,7 @@ int main(int argc, char** argv)
         {
         }
     }
-    
+
     if (profileJson.empty())
     {
         std::cout << "Failed to load a profile file..." << std::endl;
@@ -117,8 +117,12 @@ int main(int argc, char** argv)
     std::cout<<"MaxTick="<<maxTick<<std::endl;
 
     std::cout<<"Setting up sim..."<<std::endl;
-    std::unique_ptr<IBaseSim> sim = std::make_unique<CDefaultSim>();
-    sim->SetupDefaults(profileJson);
+    std::unique_ptr<CTestSim> sim = std::make_unique<CTestSim>();
+    if(!sim->SetupDefaults(profileJson))
+    {
+        std::cout<<"Setting up sim failed"<<std::endl;
+        return 1;
+    }
 
     std::cout<<"Running sim..."<<std::endl;
     output.StartConsumer();
