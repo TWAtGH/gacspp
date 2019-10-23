@@ -44,6 +44,7 @@ private:
         filePathBuilder << mFilePathTmpl.substr(end, std::string::npos);
 
         mDataFile.open(filePathBuilder.str());
+        std::cout<<"Loading: "<<filePathBuilder.str()<<" - "<<mDataFile.is_open()<<std::endl;
 
         return mDataFile.is_open();
     }

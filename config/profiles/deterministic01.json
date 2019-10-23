@@ -19,7 +19,7 @@
     },
 "deterministicTransferGen": {
     "fileDataFileFirstIdx": 0,
-    "fileDataFilePathTmpl": "/eos/user/t/twegner/jobfiledump/part-$$$$$-e195666a-1fe6-40dc-945c-0329809093b2-c000.json",
+    "fileDataFilePathTmpl": "/eos/user/t/twegner/jobfiledumpcsv/part-$$$$$-991509f1-3433-4750-8042-d73e36e14f11-c000.csv",
     "managerType": "fixedTime",
     "managerTickFreq": 10,
     "managerStartTick": 0,
