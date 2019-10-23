@@ -1,7 +1,5 @@
 {
 "maxTick": 7776000,
-"fileDataFileFirstIdx": 0,
-"fileDataFilePathTmpl": "/eos/user/t/twegner/jobfiledump/part-$$$$$-e195666a-1fe6-40dc-945c-0329809093b2-c000.json",
 "clouds": [
 		{
 			"id": "gcp",
@@ -20,6 +18,8 @@
         "startTick": 300
     },
 "deterministicTransferGen": {
+    "fileDataFileFirstIdx": 0,
+    "fileDataFilePathTmpl": "/eos/user/t/twegner/jobfiledump/part-$$$$$-e195666a-1fe6-40dc-945c-0329809093b2-c000.json",
     "managerType": "fixedTime",
     "managerTickFreq": 10,
     "managerStartTick": 0,
