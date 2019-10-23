@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "CTestSim.hpp"
+#include "CDeterministicSim01.hpp"
 
 #include "common/CConfigManager.hpp"
 
@@ -117,7 +118,7 @@ int main(int argc, char** argv)
     std::cout<<"MaxTick="<<maxTick<<std::endl;
 
     std::cout<<"Setting up sim..."<<std::endl;
-    std::unique_ptr<CTestSim> sim = std::make_unique<CTestSim>();
+    std::unique_ptr<CDeterministicSim01> sim = std::make_unique<CDeterministicSim01>();
     if(!sim->SetupDefaults(profileJson))
     {
         std::cout<<"Setting up sim failed"<<std::endl;

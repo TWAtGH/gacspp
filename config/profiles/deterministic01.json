@@ -1,0 +1,29 @@
+{
+"maxTick": 7776000,
+"fileDataFileFirstIdx": 0,
+"fileDataFilePathTmpl": "/eos/user/t/twegner/jobfiledump/part-$$$$$-e195666a-1fe6-40dc-945c-0329809093b2-c000.json",
+"clouds": [
+		{
+			"id": "gcp",
+			"name": "gcp_default",
+			"config": {"_file_": "gcp_default.json"}
+		}
+	],
+"rucio": {
+	"config": {"_file_": "rucio_default.json"}
+	},
+"links": {
+	"config": {"_file_": "links_default.json"}
+    },
+"reaper": {
+        "tickFreq": 300,
+        "startTick": 300
+    },
+"deterministicTransferGen": {
+    "managerType": "fixedTime",
+    "managerTickFreq": 10,
+    "managerStartTick": 0,
+    "srcStorageElements": ["BNL_DATATAPE"],
+    "dstStorageElements": ["BNL_DATADISK"]
+    }
+}
