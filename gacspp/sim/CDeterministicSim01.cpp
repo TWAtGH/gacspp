@@ -223,7 +223,7 @@ bool CDeterministicSim01::SetupDefaults(const json& profileJson)
             {
                 CStorageElement* storageElement = GetStorageElementByName(mRucio->mGridSites, storageElementName.get<std::string>());
                 if(storageElement)
-                    transferGen->mDstStorageElement = storageElement;
+                    transferGen->mSrcStorageElement = storageElement;
                 else
                     std::cout<<"Failed to find srcStorageElement: "<<storageElementName.get<std::string>()<<std::endl;
             }
