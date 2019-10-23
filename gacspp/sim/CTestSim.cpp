@@ -48,12 +48,14 @@ bool CTestSim::SetupDefaults(const json& profileJson)
         }
         else
         {
-            std::cout << "Failed to load reaper cached transfer gen cfg: only fixed transfer implemented" << std::endl;
+            std::cout << "Failed to load cached transfer gen cfg: only fixed transfer implemented" << std::endl;
+            return false;
         }
     }
     catch(const json::out_of_range& error)
     {
-        std::cout << "Failed to load reaper cached transfer gen cfg: " << error.what() << std::endl;
+        std::cout << "Failed to load cached transfer gen cfg: " << error.what() << std::endl;
+        return false;
     }
 
     mRucio->mFileActionListeners.emplace_back(transferGen);
