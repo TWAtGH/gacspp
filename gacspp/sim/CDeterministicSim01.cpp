@@ -179,9 +179,14 @@ public:
 
 
             std::shared_ptr<SReplica> r = mDstStorageElement->CreateReplica(file, now);
-            assert(r);
-
-            mTransferMgr->CreateTransfer(srcReplica, r, now, mCurRow.mStageInDuration);
+            if(r)
+            {
+                mTransferMgr->CreateTransfer(srcReplica, r, now, mCurRow.mStageInDuration);
+            }
+            else
+            {
+                //r->mExpiresAt = 
+            }
 
             if(ReadNextRow())
                 mNextCallTick = mCurRow.mStartTime;
