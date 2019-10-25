@@ -316,16 +316,27 @@ public:
     void OnUpdate(const TickType now) final;
 };
 
+class CBaseOnDeletionInsert : public IFileActionListener, public IReplicaActionListener
+{
+private:
+    std::shared_ptr<IPreparedInsert> mFileInsertQuery;
+    std::shared_ptr<IPreparedInsert> mReplicaInsertQuery;
 
-class CCachedSrcTransferGen : public CScheduleable, public IFileActionListener, public IReplicaActionListener
+public:
+    CBaseOnDeletionInsert();
+
+    void OnFileCreated(const TickType now, std::shared_ptr<SFile> file) override;
+    void OnFilesDeleted(const TickType now, const std::vector<std::weak_ptr<SFile>>& deletedFiles) override;
+    void OnReplicaCreated(const TickType now, std::shared_ptr<SReplica> replica) override;
+    void OnReplicasDeleted(const TickType now, const std::vector<std::weak_ptr<SReplica>>& deletedReplicas) override;
+};
+
+class CCachedSrcTransferGen : public CScheduleable, public CBaseOnDeletionInsert
 {
 private:
     IBaseSim* mSim;
     std::shared_ptr<CFixedTimeTransferManager> mTransferMgr;
     std::uint32_t mTickFreq;
-
-    std::shared_ptr<IPreparedInsert> mFileInsertQuery;
-    std::shared_ptr<IPreparedInsert> mReplicaInsertQuery;
 
     bool ExistsFileAtStorageElement(const std::shared_ptr<SFile>& file, const CStorageElement* storageElement) const;
     void ExpireReplica(CStorageElement* storageElement, const TickType now);
@@ -356,9 +367,6 @@ public:
     void Shutdown(const TickType now) final;
 
     void OnFileCreated(const TickType now, std::shared_ptr<SFile> file) final;
-    void OnFilesDeleted(const TickType now, const std::vector<std::weak_ptr<SFile>>& deletedFiles) final;
-    void OnReplicaCreated(const TickType now, std::shared_ptr<SReplica> replica) final;
-    void OnReplicasDeleted(const TickType now, const std::vector<std::weak_ptr<SReplica>>& deletedReplicas) final;
 };
 
 

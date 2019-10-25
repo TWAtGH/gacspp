@@ -843,6 +843,64 @@ void CJobSlotTransferGen::OnUpdate(const TickType now)
 
 
 
+CBaseOnDeletionInsert::CBaseOnDeletionInsert()
+{
+    mFileInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Files(id, createdAt, expiredAt, filesize) FROM STDIN with(FORMAT csv);", 4, '?');
+    mReplicaInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Replicas(id, fileId, storageElementId, createdAt, expiredAt) FROM STDIN with(FORMAT csv);", 5, '?');
+}
+
+void CBaseOnDeletionInsert::OnFileCreated(const TickType now, std::shared_ptr<SFile> file)
+{
+    (void)now;
+    (void)file;
+}
+
+void CBaseOnDeletionInsert::OnFilesDeleted(const TickType now, const std::vector<std::weak_ptr<SFile>>& deletedFiles)
+{
+    (void)now;
+    std::unique_ptr<IInsertValuesContainer> fileInsertQueries = mFileInsertQuery->CreateValuesContainer(deletedFiles.size() * 4);
+    for(const std::weak_ptr<SFile>& weakFile : deletedFiles)
+    {
+        std::shared_ptr<SFile> file = weakFile.lock();
+
+        assert(file);
+
+        fileInsertQueries->AddValue(file->GetId());
+        fileInsertQueries->AddValue(file->GetCreatedAt());
+        fileInsertQueries->AddValue(file->mExpiresAt);
+        fileInsertQueries->AddValue(file->GetSize());
+    }
+    COutput::GetRef().QueueInserts(std::move(fileInsertQueries));
+}
+
+void CBaseOnDeletionInsert::OnReplicaCreated(const TickType now, std::shared_ptr<SReplica> replica)
+{
+    (void)now;
+    (void)replica;
+}
+
+void CBaseOnDeletionInsert::OnReplicasDeleted(const TickType now, const std::vector<std::weak_ptr<SReplica>>& deletedReplicas)
+{
+    (void)now;
+    std::unique_ptr<IInsertValuesContainer> replicaInsertQueries = mReplicaInsertQuery->CreateValuesContainer(deletedReplicas.size() * 5);
+    for(const std::weak_ptr<SReplica>& weakReplica : deletedReplicas)
+    {
+        std::shared_ptr<SReplica> replica = weakReplica.lock();
+
+        assert(replica);
+
+        replicaInsertQueries->AddValue(replica->GetId());
+        replicaInsertQueries->AddValue(replica->GetFile()->GetId());
+        replicaInsertQueries->AddValue(replica->GetStorageElement()->GetId());
+        replicaInsertQueries->AddValue(replica->GetCreatedAt());
+        replicaInsertQueries->AddValue(replica->mExpiresAt);
+    }
+    COutput::GetRef().QueueInserts(std::move(replicaInsertQueries));
+}
+
+
+
+
 CCachedSrcTransferGen::CCachedSrcTransferGen(IBaseSim* sim,
                                              std::shared_ptr<CFixedTimeTransferManager> transferMgr,
                                              const std::size_t numPerDay,
@@ -855,10 +913,7 @@ CCachedSrcTransferGen::CCachedSrcTransferGen(IBaseSim* sim,
       mTickFreq(tickFreq),
       mNumPerDay(numPerDay),
       mDefaultReplicaLifetime(defaultReplicaLifetime)
-{
-    mFileInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Files(id, createdAt, expiredAt, filesize) FROM STDIN with(FORMAT csv);", 4, '?');
-    mReplicaInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Replicas(id, fileId, storageElementId, createdAt, expiredAt) FROM STDIN with(FORMAT csv);", 5, '?');
-}
+{}
 
 bool CCachedSrcTransferGen::ExistsFileAtStorageElement(const std::shared_ptr<SFile>& file, const CStorageElement* storageElement) const
 {
@@ -1068,52 +1123,10 @@ void CCachedSrcTransferGen::Shutdown(const TickType now)
 
 void CCachedSrcTransferGen::OnFileCreated(const TickType now, std::shared_ptr<SFile> file)
 {
-    (void)now;
+    CBaseOnDeletionInsert::OnFileCreated(now, file);
     mRatiosAndFilesPerAccessCount[0].second.emplace_back(file);
 }
 
-void CCachedSrcTransferGen::OnFilesDeleted(const TickType now, const std::vector<std::weak_ptr<SFile>>& deletedFiles)
-{
-    (void)now;
-    std::unique_ptr<IInsertValuesContainer> fileInsertQueries = mFileInsertQuery->CreateValuesContainer(deletedFiles.size() * 4);
-    for(const std::weak_ptr<SFile>& weakFile : deletedFiles)
-    {
-        std::shared_ptr<SFile> file = weakFile.lock();
-
-        assert(file);
-
-        fileInsertQueries->AddValue(file->GetId());
-        fileInsertQueries->AddValue(file->GetCreatedAt());
-        fileInsertQueries->AddValue(file->mExpiresAt);
-        fileInsertQueries->AddValue(file->GetSize());
-    }
-    COutput::GetRef().QueueInserts(std::move(fileInsertQueries));
-}
-
-void CCachedSrcTransferGen::OnReplicaCreated(const TickType now, std::shared_ptr<SReplica> replica)
-{
-    (void)now;
-    (void)replica;
-}
-
-void CCachedSrcTransferGen::OnReplicasDeleted(const TickType now, const std::vector<std::weak_ptr<SReplica>>& deletedReplicas)
-{
-    (void)now;
-    std::unique_ptr<IInsertValuesContainer> replicaInsertQueries = mReplicaInsertQuery->CreateValuesContainer(deletedReplicas.size() * 5);
-    for(const std::weak_ptr<SReplica>& weakReplica : deletedReplicas)
-    {
-        std::shared_ptr<SReplica> replica = weakReplica.lock();
-
-        assert(replica);
-
-        replicaInsertQueries->AddValue(replica->GetId());
-        replicaInsertQueries->AddValue(replica->GetFile()->GetId());
-        replicaInsertQueries->AddValue(replica->GetStorageElement()->GetId());
-        replicaInsertQueries->AddValue(replica->GetCreatedAt());
-        replicaInsertQueries->AddValue(replica->mExpiresAt);
-    }
-    COutput::GetRef().QueueInserts(std::move(replicaInsertQueries));
-}
 
 
 CHeartbeat::CHeartbeat(IBaseSim* sim, std::shared_ptr<CFixedTimeTransferManager> g2cTransferMgr, std::shared_ptr<CTransferManager> c2cTransferMgr, const std::uint32_t tickFreq, const TickType startTick)

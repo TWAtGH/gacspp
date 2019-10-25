@@ -16,7 +16,7 @@
 #include "third_party/json.hpp"
 
 
-class CDeterministicTransferGen : public CScheduleable
+class CDeterministicTransferGen : public CScheduleable, public CBaseOnDeletionInsert
 {
 private:
     IBaseSim* mSim;
@@ -127,8 +127,6 @@ public:
         assert(ok);
         ok = ReadNextRow();
         assert(ok);
-        mFileInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Files(id, createdAt, expiredAt, filesize) FROM STDIN with(FORMAT csv);", 4, '?');
-        mReplicaInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Replicas(id, fileId, storageElementId, createdAt, expiredAt) FROM STDIN with(FORMAT csv);", 5, '?');
     }
 
     void OnUpdate(const TickType now)
@@ -145,8 +143,6 @@ public:
 
         assert(mSrcStorageElement && mDstStorageElement);
 
-        std::unique_ptr<IInsertValuesContainer> fileInsertQueries = mFileInsertQuery->CreateValuesContainer();
-        std::unique_ptr<IInsertValuesContainer> replicaInsertQueries = mReplicaInsertQuery->CreateValuesContainer();
         while(mCurRow.mStartTime <= now)
         {
             std::shared_ptr<SReplica> srcReplica;
@@ -161,17 +157,6 @@ public:
                 assert(srcReplica);
 
                 srcReplica->Increase(mCurRow.mFileSize, now);
-
-                fileInsertQueries->AddValue(file->GetId());
-                fileInsertQueries->AddValue(file->GetCreatedAt());
-                fileInsertQueries->AddValue(file->mExpiresAt);
-                fileInsertQueries->AddValue(file->GetSize());
-
-                replicaInsertQueries->AddValue(srcReplica->GetId());
-                replicaInsertQueries->AddValue(srcReplica->GetFile()->GetId());
-                replicaInsertQueries->AddValue(srcReplica->GetStorageElement()->GetId());
-                replicaInsertQueries->AddValue(srcReplica->GetCreatedAt());
-                replicaInsertQueries->AddValue(srcReplica->mExpiresAt);
             }
             else
                 file = insertResult.first->second;
@@ -203,14 +188,26 @@ public:
             if(!ReadNextRow())
             {
                 mNextCallTick = now + 20;
-                COutput::GetRef().QueueInserts(std::move(fileInsertQueries));
-                COutput::GetRef().QueueInserts(std::move(replicaInsertQueries));
                 return;
             }
         }
         mNextCallTick = mCurRow.mStartTime;
-        COutput::GetRef().QueueInserts(std::move(fileInsertQueries));
-        COutput::GetRef().QueueInserts(std::move(replicaInsertQueries));
+    }
+
+    void Shutdown(const TickType now)
+    {
+        std::vector<std::weak_ptr<SFile>> files;
+        files.reserve(mSim->mRucio->mFiles.size());
+        std::vector<std::weak_ptr<SReplica>> replicas;
+        replicas.reserve(files.size() * 4);
+        for(std::shared_ptr<SFile>& file : mSim->mRucio->mFiles)
+        {
+            files.emplace_back(file);
+            for(std::shared_ptr<SReplica>& replica : file->mReplicas)
+                replicas.emplace_back(replica);
+        }
+        OnFilesDeleted(now, files);
+        OnReplicasDeleted(now, replicas);
     }
 };
 
@@ -266,6 +263,9 @@ bool CDeterministicSim01::SetupDefaults(const json& profileJson)
             std::cout << "Failed to load deterministic transfer gen cfg: only fixed transfer implemented" << std::endl;
             return false;
         }
+
+        mRucio->mFileActionListeners.emplace_back(transferGen);
+        mRucio->mReplicaActionListeners.emplace_back(transferGen);
     }
     catch(const json::out_of_range& error)
     {
