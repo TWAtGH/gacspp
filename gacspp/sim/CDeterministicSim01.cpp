@@ -145,6 +145,8 @@ public:
 
         assert(mSrcStorageElement && mDstStorageElement);
 
+        std::unique_ptr<IInsertValuesContainer> fileInsertQueries = mFileInsertQuery->CreateValuesContainer();
+        std::unique_ptr<IInsertValuesContainer> replicaInsertQueries = mReplicaInsertQuery->CreateValuesContainer();
         while(mCurRow.mStartTime <= now)
         {
             std::shared_ptr<SReplica> srcReplica;
@@ -155,8 +157,21 @@ public:
                 file = mSim->mRucio->CreateFile(mCurRow.mFileSize, now, SECONDS_PER_MONTH * 13);
                 insertResult.first->second = file;
                 srcReplica = mSrcStorageElement->CreateReplica(file, now);
+
                 assert(srcReplica);
+
                 srcReplica->Increase(mCurRow.mFileSize, now);
+
+                fileInsertQueries->AddValue(file->GetId());
+                fileInsertQueries->AddValue(file->GetCreatedAt());
+                fileInsertQueries->AddValue(file->mExpiresAt);
+                fileInsertQueries->AddValue(file->GetSize());
+
+                replicaInsertQueries->AddValue(srcReplica->GetId());
+                replicaInsertQueries->AddValue(srcReplica->GetFile()->GetId());
+                replicaInsertQueries->AddValue(srcReplica->GetStorageElement()->GetId());
+                replicaInsertQueries->AddValue(srcReplica->GetCreatedAt());
+                replicaInsertQueries->AddValue(srcReplica->mExpiresAt);
             }
             else
                 file = insertResult.first->second;
@@ -188,10 +203,14 @@ public:
             if(!ReadNextRow())
             {
                 mNextCallTick = now + 20;
+                COutput::GetRef().QueueInserts(std::move(fileInsertQueries));
+                COutput::GetRef().QueueInserts(std::move(replicaInsertQueries));
                 return;
             }
         }
         mNextCallTick = mCurRow.mStartTime;
+        COutput::GetRef().QueueInserts(std::move(fileInsertQueries));
+        COutput::GetRef().QueueInserts(std::move(replicaInsertQueries));
     }
 };
 
