@@ -43,7 +43,7 @@ private:
         filePathBuilder << std::setw(end-start) << (mCurFileIdx++);
         filePathBuilder << mFilePathTmpl.substr(end, std::string::npos);
 
-        mDataFile.open(filePathBuilder.str());
+        mDataFile = std::ifstream(filePathBuilder.str());
         std::cout<<"Loading: "<<filePathBuilder.str()<<" - "<<mDataFile.is_open()<<std::endl;
 
         return mDataFile.is_open();
@@ -69,10 +69,7 @@ private:
         char comma;
         std::string eol;
 
-        if(!mDataFile)
-            LoadNextFile();
-
-        while(mDataFile && !mDataFile.eof())
+        while(mDataFile.is_open())
         {
             mDataFile >> mCurRow.mStartTime;
             mDataFile >> comma;
@@ -103,11 +100,11 @@ private:
             mDataFile >> mCurRow.mFileSize;
             std::getline(mDataFile, eol);
 
-            if(mCurRow.mType == "input" || mCurRow.mType == "output")
-                return true;
-
             if(mDataFile.eof())
                 LoadNextFile();
+
+            if(mCurRow.mType == "input" || mCurRow.mType == "output")
+                return true;
         }
         return false;
     }
@@ -126,7 +123,9 @@ public:
         : mSim(sim), mTransferMgr(transferMgr),
           mFilePathTmpl(filePathTmpl), mCurFileIdx(startFileIdx)
     {
-        bool ok = ReadNextRow();
+        bool ok = LoadNextFile();
+        assert(ok);
+        ok = ReadNextRow();
         assert(ok);
         mFileInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Files(id, createdAt, expiredAt, filesize) FROM STDIN with(FORMAT csv);", 4, '?');
         mReplicaInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Replicas(id, fileId, storageElementId, createdAt, expiredAt) FROM STDIN with(FORMAT csv);", 5, '?');
@@ -254,9 +253,16 @@ bool CDeterministicSim01::SetupDefaults(const json& profileJson)
         std::cout << "Failed to load deterministic transfer gen cfg: " << error.what() << std::endl;
         return false;
     }
+    
+    auto heartbeat = std::make_shared<CHeartbeat>(this, manager, nullptr, static_cast<std::uint32_t>(SECONDS_PER_DAY), static_cast<TickType>(SECONDS_PER_DAY));
+    //heartbeat->mProccessDurations["DataGen"] = &(dataGen->mUpdateDurationSummed);
+    heartbeat->mProccessDurations["TransferUpdate"] = &(manager->mUpdateDurationSummed);
+    heartbeat->mProccessDurations["TransferGen"] = &(transferGen->mUpdateDurationSummed);
+    //heartbeat->mProccessDurations["Reaper"] = &(reaper->mUpdateDurationSummed);
 
     mSchedule.push(manager);
     mSchedule.push(transferGen);
+    mSchedule.push(heartbeat);
 
     return true;
 }
