@@ -133,21 +133,20 @@ public:
 
     void OnUpdate(const TickType now)
     {
+        if(!mDataFile.is_open())
+        {
+            if((mTransferMgr->GetNumQueuedTransfers() + mTransferMgr->GetNumActiveTransfers()) == 0)
+            {
+                mSim->Stop();
+                return;
+            }
+            mNextCallTick = now + 20;
+        }
+
         assert(mSrcStorageElement && mDstStorageElement);
 
         while(mCurRow.mStartTime <= now)
         {
-            /*
-            std::uint64_t mStartTime;
-            std::uint64_t mStageInDuration;
-            std::uint64_t mJobDuration;
-            std::uint64_t mStageOutDuration;
-            std::uint64_t mPandaId;
-            std::uint64_t mFileSize;
-            std::string mLFN;
-            std::string mType;
-            */
-
             std::shared_ptr<SReplica> srcReplica;
             std::shared_ptr<SFile> file;
             auto insertResult = mLFNToFile.insert({mCurRow.mLFN, file});
@@ -176,7 +175,6 @@ public:
 
             assert(srcReplica);
 
-
             std::shared_ptr<SReplica> r = mDstStorageElement->CreateReplica(file, now);
             if(r)
             {
@@ -187,11 +185,13 @@ public:
                 //r->mExpiresAt =
             }
 
-            if(ReadNextRow())
-                mNextCallTick = mCurRow.mStartTime;
-            else
-                mSim->Stop();
+            if(!ReadNextRow())
+            {
+                mNextCallTick = now + 20;
+                return;
+            }
         }
+        mNextCallTick = mCurRow.mStartTime;
     }
 };
 
