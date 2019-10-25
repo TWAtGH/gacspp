@@ -188,6 +188,8 @@ public:
 
     void CreateTransfer(std::shared_ptr<SReplica> srcReplica, std::shared_ptr<SReplica> dstReplica, const TickType now, const TickType duration);
 
+    inline auto GetNumQueuedTransfers() const -> std::size_t
+    {return mQueuedTransfers.size();}
     inline auto GetNumActiveTransfers() const -> std::size_t
     {return mActiveTransfers.size();}
 };

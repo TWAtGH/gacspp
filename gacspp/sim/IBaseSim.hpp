@@ -34,7 +34,10 @@ public:
     virtual bool SetupDefaults(const json& profileJson) = 0;
     virtual void Run(const TickType maxTick);
 
+    void Stop();
+
 protected:
+    bool mIsRunning = false;
     ScheduleType mSchedule;
 
 private:

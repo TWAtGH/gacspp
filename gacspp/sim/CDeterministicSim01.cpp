@@ -184,13 +184,13 @@ public:
             }
             else
             {
-                //r->mExpiresAt = 
+                //r->mExpiresAt =
             }
 
             if(ReadNextRow())
                 mNextCallTick = mCurRow.mStartTime;
             else
-                mNextCallTick = 0;
+                mSim->Stop();
         }
     }
 };
@@ -253,7 +253,7 @@ bool CDeterministicSim01::SetupDefaults(const json& profileJson)
         std::cout << "Failed to load deterministic transfer gen cfg: " << error.what() << std::endl;
         return false;
     }
-    
+
     auto heartbeat = std::make_shared<CHeartbeat>(this, manager, nullptr, static_cast<std::uint32_t>(SECONDS_PER_DAY), static_cast<TickType>(SECONDS_PER_DAY));
     //heartbeat->mProccessDurations["DataGen"] = &(dataGen->mUpdateDurationSummed);
     heartbeat->mProccessDurations["TransferUpdate"] = &(manager->mUpdateDurationSummed);

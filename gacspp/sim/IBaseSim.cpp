@@ -13,7 +13,8 @@ IBaseSim::~IBaseSim() = default;
 void IBaseSim::Run(const TickType maxTick)
 {
     mCurrentTick = 0;
-    while(mCurrentTick<=maxTick && !mSchedule.empty())
+    mIsRunning = true;
+    while(mIsRunning && (mCurrentTick <= maxTick) && !mSchedule.empty())
     {
         std::shared_ptr<CScheduleable> element = mSchedule.top();
         mSchedule.pop();
@@ -24,10 +25,20 @@ void IBaseSim::Run(const TickType maxTick)
         element->OnUpdate(mCurrentTick);
         if(element->mNextCallTick > mCurrentTick)
             mSchedule.push(element);
+        else
+            element->Shutdown(mCurrentTick);
     }
+
+    mIsRunning = false;
+
     while(!mSchedule.empty())
     {
         mSchedule.top()->Shutdown(mCurrentTick);
         mSchedule.pop();
     }
+}
+
+void IBaseSim::Stop()
+{
+    mIsRunning = false;
 }
