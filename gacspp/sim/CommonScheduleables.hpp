@@ -164,14 +164,14 @@ private:
         TickType mQueuedAt;
         TickType mStartAt;
 
-        std::uint32_t mIncreasePerTick;
+        SpaceType mIncreasePerTick;
 
         STransfer(  std::shared_ptr<SReplica> srcReplica,
                     std::shared_ptr<SReplica> dstReplica,
                     CNetworkLink* const networkLink,
                     const TickType queuedAt,
                     const TickType startAt,
-                    const std::uint32_t increasePerTick);
+                    const SpaceType increasePerTick);
     };
 
     std::vector<STransfer> mActiveTransfers;

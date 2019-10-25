@@ -319,7 +319,7 @@ CFixedTimeTransferManager::STransfer::STransfer( std::shared_ptr<SReplica> srcRe
                                                  CNetworkLink* const networkLink,
                                                  const TickType queuedAt,
                                                  const TickType startAt,
-                                                 const std::uint32_t increasePerTick)
+                                                 const SpaceType increasePerTick)
     : mSrcReplica(srcReplica),
       mDstReplica(dstReplica),
       mNetworkLink(networkLink),
@@ -346,12 +346,12 @@ void CFixedTimeTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcRepl
     CStorageElement* const srcStorageElement = srcReplica->GetStorageElement();
     CNetworkLink* const networkLink = srcStorageElement->GetSite()->GetNetworkLink(dstReplica->GetStorageElement()->GetSite());
 
-    std::uint32_t increasePerTick = static_cast<std::uint32_t>(static_cast<double>(srcReplica->GetFile()->GetSize()) / duration);
+    SpaceType increasePerTick = static_cast<SpaceType>(static_cast<double>(srcReplica->GetFile()->GetSize()) / duration);
 
     networkLink->mNumActiveTransfers += 1;
     srcStorageElement->OnOperation(CStorageElement::GET);
     const TickType startAt = now + (srcReplica->GetStorageElement()->GetAccessLatency() / 1000);
-    mQueuedTransfers.emplace_back(srcReplica, dstReplica, networkLink, now, startAt, std::max(1U, increasePerTick));
+    mQueuedTransfers.emplace_back(srcReplica, dstReplica, networkLink, now, startAt, std::max(1UL, increasePerTick));
 }
 
 void CFixedTimeTransferManager::OnUpdate(const TickType now)
@@ -361,7 +361,7 @@ void CFixedTimeTransferManager::OnUpdate(const TickType now)
     mLastUpdated = now;
 
     std::size_t idx = 0;
-    std::uint64_t summedTraffic = 0;
+    SpaceType summedTraffic = 0;
     auto transferInsertQueries = mOutputTransferInsertQuery->CreateValuesContainer(6 + mActiveTransfers.size());
 
     while (idx < mActiveTransfers.size())
@@ -380,7 +380,7 @@ void CFixedTimeTransferManager::OnUpdate(const TickType now)
             continue; // handle same idx again
         }
 
-        std::uint32_t amount = dstReplica->Increase(transfer.mIncreasePerTick * timeDiff, now);
+        SpaceType amount = dstReplica->Increase(transfer.mIncreasePerTick * timeDiff, now);
         summedTraffic += amount;
         networkLink->mUsedTraffic += amount;
 
@@ -1136,9 +1136,9 @@ void CHeartbeat::OnUpdate(const TickType now)
     std::stringstream statusOutput;
     statusOutput << std::fixed << std::setprecision(2);
 
-    statusOutput << "[" << std::setw(6) << static_cast<std::uint32_t>(now / 1000) << "k]: ";
+    statusOutput << "[" << std::setw(6) << static_cast<TickType>(now / 1000.0) << "k]: ";
     statusOutput << "Runtime: " << mUpdateDurationSummed.count() << "s; ";
-    statusOutput << "numFiles: " << mSim->mRucio->mFiles.size() / 1000.0 << "k; ";
+    statusOutput << "numFiles: " << static_cast<std::size_t>(mSim->mRucio->mFiles.size() / 1000.0) << "k; ";
 
     statusOutput << "activeTransfers: " << mG2CTransferMgr->GetNumActiveTransfers();
     if(mC2CTransferMgr)
@@ -1150,9 +1150,17 @@ void CHeartbeat::OnUpdate(const TickType now)
         statusOutput << " + " << mC2CTransferMgr->mNumCompletedTransfers;
     statusOutput << "; ";
 
-    statusOutput << "AvgTransferDuration: " << (mG2CTransferMgr->mSummedTransferDuration / mG2CTransferMgr->mNumCompletedTransfers);
+    double avgTransferDuration = 0;
+    if(mG2CTransferMgr->mNumCompletedTransfers > 0)
+        avgTransferDuration = (mG2CTransferMgr->mSummedTransferDuration / mG2CTransferMgr->mNumCompletedTransfers);
+    statusOutput << "AvgTransferDuration: " << avgTransferDuration;
     if(mC2CTransferMgr)
-        statusOutput << " + " << (mC2CTransferMgr->mSummedTransferDuration / mC2CTransferMgr->mNumCompletedTransfers);
+    {
+        avgTransferDuration = 0;
+        if(mC2CTransferMgr->mNumCompletedTransfers > 0)
+            avgTransferDuration = (mC2CTransferMgr->mSummedTransferDuration / mC2CTransferMgr->mNumCompletedTransfers);
+        statusOutput << " + " << avgTransferDuration;
+    }
     statusOutput << std::endl;
 
     mG2CTransferMgr->mNumCompletedTransfers = 0;
