@@ -1,6 +1,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <list>
 #include <sstream>
 
 #include "CDeterministicSim01.hpp"
@@ -27,6 +28,25 @@ private:
     std::uint32_t mCurFileIdx;
     std::ifstream mDataFile;
 
+    std::ifstream::char_type mTypeJobDelim;
+    std::ifstream::char_type mTypeInputDelim;
+    std::ifstream::char_type mTypeOutputDelim;
+    std::ifstream::char_type mLineDelim;
+
+    struct SJob
+    {
+        TickType mStageInDuration;
+        TickType mJobDuration;
+        TickType mStageOutDuration;
+        std::vector<std::pair<std::string, SpaceType>> mInputFiles;
+        std::vector<std::pair<std::string, SpaceType>> mOutputFiles;
+    };
+
+    typedef std::pair<TickType, std::vector<SJob>> JobBatchType;
+
+    std::list<JobBatchType> mJobBatchList;
+    std::list<JobBatchType>::iterator mCurJobBatch;
+
     std::unordered_map<std::string, std::shared_ptr<SFile>> mLFNToFile;
 
     bool LoadNextFile()
@@ -44,77 +64,79 @@ private:
         filePathBuilder << mFilePathTmpl.substr(end, std::string::npos);
 
         mDataFile = std::ifstream(filePathBuilder.str());
+
         std::cout<<"Loading: "<<filePathBuilder.str()<<" - "<<mDataFile.is_open()<<std::endl;
+
+        if(mDataFile.is_open())
+        {
+            mTypeJobDelim = mDataFile.widen('j');
+            mTypeInputDelim = mDataFile.widen('i');
+            mTypeOutputDelim = mDataFile.widen('o');
+            mLineDelim = mDataFile.widen('\n');
+        }
 
         return mDataFile.is_open();
     }
 
-    struct SDataRow
+    bool ReadNextJobBatch()
     {
-        std::uint64_t mStartTime;
-        std::uint64_t mStageInDuration;
-        std::uint64_t mJobDuration;
-        std::uint64_t mStageOutDuration;
-        std::uint64_t mPandaId;
-        std::uint64_t mFileSize;
-        std::string mLFN;
-        std::string mType;
-    };
+        if(!mDataFile.is_open() || mDataFile.eof())
+            if(!LoadNextFile())
+                return false;
 
-    SDataRow mCurRow;
+        mJobBatchList.emplace_front();
+        mCurJobBatch = mJobBatchList.begin();
 
-    bool ReadNextRow()
-    {
-        std::uint64_t tmpInt;
-        char comma;
-        std::string eol;
+        mDataFile >> mCurJobBatch->first;
+        mDataFile.ignore(1);
 
-        while(mDataFile.is_open())
+        while(mDataFile.peek() == mTypeJobDelim)
         {
-            mDataFile >> mCurRow.mStartTime;
-            mDataFile >> comma;
+            SJob& newJob = mCurJobBatch->second.emplace_back();
 
-            mDataFile >> tmpInt;
-            mDataFile >> comma;
+            mDataFile.ignore(2); // "j,"
 
-            mDataFile >> mCurRow.mStageInDuration;
-            mCurRow.mStageInDuration += tmpInt;
-            mDataFile >> comma;
+            mDataFile >> newJob.mStageInDuration;
+            mDataFile.ignore(1);
 
-            mDataFile >> mCurRow.mJobDuration;
-            mDataFile >> comma;
+            mDataFile >> newJob.mJobDuration;
+            mDataFile.ignore(1);
 
-            mDataFile >> mCurRow.mStageOutDuration;
-            mDataFile >> comma;
+            mDataFile >> newJob.mStageOutDuration;
+            mDataFile.ignore(1);
 
-            mDataFile >> tmpInt;
-            mCurRow.mStageOutDuration += tmpInt;
-            mDataFile >> comma;
+            std::ifstream::char_type type = mDataFile.peek();
+            while(type == mTypeInputDelim || type == mTypeOutputDelim)
+            {
+                mDataFile.ignore(2); // "i," or "o,"
 
-            mDataFile >> mCurRow.mPandaId;
-            mDataFile >> comma;
+                std::pair<std::string, SpaceType> file;
 
-            std::getline(mDataFile, mCurRow.mLFN, ',');
-            std::getline(mDataFile, mCurRow.mType, ',');
+                std::getline(mDataFile, file.first, ',');
 
-            mDataFile >> mCurRow.mFileSize;
-            std::getline(mDataFile, eol);
+                mDataFile >> file.second;
+                mDataFile.ignore(1);
 
-            if(mDataFile.eof())
-                LoadNextFile();
+                if(type == mTypeInputDelim)
+                    newJob.mInputFiles.push_back(std::move(file));
+                else
+                    newJob.mOutputFiles.push_back(std::move(file));
 
-            if(mCurRow.mType == "input" || mCurRow.mType == "output")
-                return true;
+                type = mDataFile.peek();
+            }
         }
-        return false;
+
+        mDataFile.ignore(2, mLineDelim);
+
+        return true;
     }
 
     std::shared_ptr<IPreparedInsert> mFileInsertQuery;
     std::shared_ptr<IPreparedInsert> mReplicaInsertQuery;
 
 public:
-    CStorageElement* mSrcStorageElement = nullptr;
-    CStorageElement* mDstStorageElement = nullptr;
+    CStorageElement* mDiskStorageElement = nullptr;
+    CStorageElement* mComputingStorageElement = nullptr;
 
     CDeterministicTransferGen(IBaseSim* sim,
                               std::shared_ptr<CFixedTimeTransferManager> transferMgr,
@@ -123,75 +145,106 @@ public:
         : mSim(sim), mTransferMgr(transferMgr),
           mFilePathTmpl(filePathTmpl), mCurFileIdx(startFileIdx)
     {
-        bool ok = LoadNextFile();
+        bool ok = ReadNextJobBatch();
         assert(ok);
-        ok = ReadNextRow();
-        assert(ok);
+        mNextCallTick = mCurJobBatch->first;
     }
 
     void OnUpdate(const TickType now)
     {
-        if(!mDataFile.is_open())
+        if(!mDataFile.is_open() && mJobBatchList.empty() && (mTransferMgr->GetNumQueuedTransfers() + mTransferMgr->GetNumActiveTransfers()) == 0)
         {
-            if((mTransferMgr->GetNumQueuedTransfers() + mTransferMgr->GetNumActiveTransfers()) == 0)
-            {
-                mSim->Stop();
-                return;
-            }
-            mNextCallTick = now + 20;
+            mSim->Stop();
+            return;
         }
 
-        assert(mSrcStorageElement && mDstStorageElement);
+        assert(mDiskStorageElement && mComputingStorageElement);
 
-        while(mCurRow.mStartTime <= now)
+        //STAGE-OUT
+        mNextCallTick = now;
+        for(auto it=mJobBatchList.begin(); it!=mJobBatchList.end(); ++it)
         {
-            std::shared_ptr<SReplica> srcReplica;
-            std::shared_ptr<SFile> file;
-            auto insertResult = mLFNToFile.insert({mCurRow.mLFN, file});
-            if(insertResult.second == true)
+            const TickType start = it->first;
+            for(const SJob& job : mCurJobBatch->second)
             {
-                file = mSim->mRucio->CreateFile(mCurRow.mFileSize, now, SECONDS_PER_MONTH * 13);
-                insertResult.first->second = file;
-                srcReplica = mSrcStorageElement->CreateReplica(file, now);
-
-                assert(srcReplica);
-
-                srcReplica->Increase(mCurRow.mFileSize, now);
-            }
-            else
-                file = insertResult.first->second;
-
-            if(!srcReplica)
-            {
-                for(const std::shared_ptr<SReplica>& replica : file->mReplicas)
+                const TickType durationSum = start + job.mStageInDuration + job.mJobDuration;
+                if(now >= durationSum)
                 {
-                    if(replica->GetStorageElement() == mSrcStorageElement)
+                    for(const std::pair<std::string, SpaceType>& outFile : job.mOutputFiles)
                     {
-                        srcReplica = replica;
-                        break;
+                        std::shared_ptr<SFile> file;
+                        auto insertResult = mLFNToFile.insert({outFile.first, file});
+
+                        assert(insertResult.second);
+
+                        insertResult.first->second = file = mSim->mRucio->CreateFile(outFile.second, now, SECONDS_PER_MONTH * 13);
+                        std::shared_ptr<SReplica> srcReplica = mComputingStorageElement->CreateReplica(file, now);
+
+                        assert(srcReplica);
+
+                        srcReplica->Increase(outFile.second, now);
+
+                        std::shared_ptr<SReplica> r = mDiskStorageElement->CreateReplica(file, now);
+                        mTransferMgr->CreateTransfer(srcReplica, r, now, job.mStageOutDuration);
                     }
                 }
-            }
-
-            assert(srcReplica);
-
-            std::shared_ptr<SReplica> r = mDstStorageElement->CreateReplica(file, now);
-            if(r)
-            {
-                mTransferMgr->CreateTransfer(srcReplica, r, now, mCurRow.mStageInDuration);
-            }
-            else
-            {
-                //r->mExpiresAt =
-            }
-
-            if(!ReadNextRow())
-            {
-                mNextCallTick = now + 20;
-                return;
+                else if(mNextCallTick == now)
+                    mNextCallTick = durationSum;
+                else
+                    mNextCallTick = std::min(mNextCallTick, durationSum);
             }
         }
-        mNextCallTick = mCurRow.mStartTime;
+
+        if(!mDataFile.is_open())
+        {
+            if(mNextCallTick == now)
+                mNextCallTick = now + 20;
+            return;
+        }
+
+        //STAGE-IN
+        for(const SJob& job : mCurJobBatch->second)
+        {
+            for(const std::pair<std::string, SpaceType>& inFile : job.mInputFiles)
+            {
+                std::shared_ptr<SReplica> srcReplica;
+                std::shared_ptr<SFile> file;
+                auto insertResult = mLFNToFile.insert({inFile.first, file});
+                if(insertResult.second == true)
+                {
+                    file = mSim->mRucio->CreateFile(inFile.second, now, SECONDS_PER_MONTH * 13);
+                    insertResult.first->second = file;
+                    srcReplica = mDiskStorageElement->CreateReplica(file, now);
+
+                    assert(srcReplica);
+
+                    srcReplica->Increase(inFile.second, now);
+                }
+                else
+                    file = insertResult.first->second;
+
+                if(!srcReplica)
+                {
+                    for(const std::shared_ptr<SReplica>& replica : file->mReplicas)
+                    {
+                        if(replica->GetStorageElement() == mDiskStorageElement)
+                        {
+                            srcReplica = replica;
+                            break;
+                        }
+                    }
+                }
+
+                assert(srcReplica);
+                std::shared_ptr<SReplica> r = mComputingStorageElement->CreateReplica(file, now);
+                mTransferMgr->CreateTransfer(srcReplica, r, now, job.mStageInDuration);
+            }
+        }
+
+        if(!ReadNextJobBatch() && (mNextCallTick == now))
+            mNextCallTick = now + 20;
+        else if(mNextCallTick == now)
+            mNextCallTick = mCurJobBatch->first;
     }
 
     void Shutdown(const TickType now)
@@ -240,22 +293,22 @@ bool CDeterministicSim01::SetupDefaults(const json& profileJson)
             manager = std::make_shared<CFixedTimeTransferManager>(managerTickFreq, managerStartTick);
             transferGen = std::make_shared<CDeterministicTransferGen>(this, manager, fileDataFilePathTmpl, fileDataFileFirstIdx);
 
-            for(const json& storageElementName : transferGenCfg.at("srcStorageElements"))
+            for(const json& storageElementName : transferGenCfg.at("diskStorageElements"))
             {
                 CStorageElement* storageElement = GetStorageElementByName(mRucio->mGridSites, storageElementName.get<std::string>());
                 if(storageElement)
-                    transferGen->mSrcStorageElement = storageElement;
+                    transferGen->mDiskStorageElement = storageElement;
                 else
-                    std::cout<<"Failed to find srcStorageElement: "<<storageElementName.get<std::string>()<<std::endl;
+                    std::cout<<"Failed to find diskStorageElements: "<<storageElementName.get<std::string>()<<std::endl;
             }
 
-            for(const json& storageElementName : transferGenCfg.at("dstStorageElements"))
+            for(const json& storageElementName : transferGenCfg.at("computingStorageElements"))
             {
                 CStorageElement* storageElement = GetStorageElementByName(mRucio->mGridSites, storageElementName.get<std::string>());
                 if(storageElement)
-                    transferGen->mDstStorageElement = storageElement;
+                    transferGen->mComputingStorageElement = storageElement;
                 else
-                    std::cout<<"Failed to find dstStorageElement: "<<storageElementName.get<std::string>()<<std::endl;
+                    std::cout<<"Failed to find computingStorageElements: "<<storageElementName.get<std::string>()<<std::endl;
             }
         }
         else

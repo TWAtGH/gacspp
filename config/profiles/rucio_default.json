@@ -16,6 +16,10 @@
                 {
                     "name": "BNL_DATADISK",
                     "accessLatency": 500
+                },
+                {
+                    "name": "BNL_JOBS",
+                    "accessLatency": 0
                 }
             ]
         }

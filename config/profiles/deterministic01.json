@@ -19,11 +19,11 @@
     },
 "deterministicTransferGen": {
     "fileDataFileFirstIdx": 0,
-    "fileDataFilePathTmpl": "/eos/user/t/twegner/jobfiledumpcsv/part-$$$$$-991509f1-3433-4750-8042-d73e36e14f11-c000.csv",
+    "fileDataFilePathTmpl": "/eos/user/t/twegner/csvmerge/jobfiledump_merged_$$$$$.csv",
     "managerType": "fixedTime",
     "managerTickFreq": 10,
     "managerStartTick": 0,
-    "srcStorageElements": ["BNL_DATATAPE"],
-    "dstStorageElements": ["BNL_DATADISK"]
+    "diskStorageElements": ["BNL_DATADISK"],
+    "computingStorageElements": ["BNL_JOBS"]
     }
 }
