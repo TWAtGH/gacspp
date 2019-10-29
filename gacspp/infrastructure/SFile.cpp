@@ -109,6 +109,20 @@ auto SFile::ExtractExpiredReplicas(const TickType now, std::vector<std::shared_p
     return numReplicas - mReplicas.size();
 }
 
+void SFile::ExtendExpirationTime(const TickType newExpiresAt)
+{
+    if (newExpiresAt > mExpiresAt)
+        mExpiresAt = newExpiresAt;
+}
+
+auto SFile::GetReplicaByStorageElement(const CStorageElement* storageElement) -> std::shared_ptr<SReplica>
+{
+    for (std::shared_ptr<SReplica> replica : mReplicas)
+        if (replica->GetStorageElement()->GetId() == storageElement->GetId())
+            return replica;
+    return std::shared_ptr<SReplica>();
+}
+
 
 SReplica::SReplica(std::shared_ptr<SFile>& file, CStorageElement* const storageElement, const TickType createdAt, const std::size_t indexAtStorageElement)
     : mIndexAtStorageElement(indexAtStorageElement),
@@ -130,4 +144,13 @@ auto SReplica::Increase(const SpaceType amount, const TickType now) -> SpaceType
 void SReplica::OnRemoveByFile(const TickType now)
 {
     mStorageElement->OnRemoveReplica(this, now);
+}
+
+void SReplica::ExtendExpirationTime(const TickType newExpiresAt)
+{
+    if (newExpiresAt > mExpiresAt)
+    {
+        mExpiresAt = newExpiresAt;
+        mFile->ExtendExpirationTime(newExpiresAt);
+    }
 }

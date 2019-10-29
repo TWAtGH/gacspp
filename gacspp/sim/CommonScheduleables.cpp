@@ -19,6 +19,21 @@
 
 
 
+CScopedTimeDiff::CScopedTimeDiff(std::chrono::duration<double>* set, std::chrono::duration<double>* add)
+    :mStartTime(std::chrono::high_resolution_clock::now()), mSet(set), mAdd(add)
+{}
+
+CScopedTimeDiff::~CScopedTimeDiff()
+{
+    auto duration = std::chrono::high_resolution_clock::now() - mStartTime;
+    if (mSet)
+        (*mSet) = duration;
+    if (mAdd)
+        (*mAdd) += duration;
+}
+
+
+
 CFixedValueGenerator::CFixedValueGenerator(const double value)
     : mValue(value)
 {}
@@ -124,7 +139,8 @@ auto CDataGenerator::CreateFilesAndReplicas(const std::uint32_t numFiles, const 
 
 void CDataGenerator::OnUpdate(const TickType now)
 {
-    auto curRealtime = std::chrono::high_resolution_clock::now();
+    CScopedTimeDiff durationUpdate(nullptr, &mUpdateDurationSummed);
+
     const std::uint32_t totalFilesToGen = GetRandomNumFilesToGenerate();
 
     float numReplicaRatio = mNumReplicaRatio.empty() ? 1 : mNumReplicaRatio[0];
@@ -137,7 +153,6 @@ void CDataGenerator::OnUpdate(const TickType now)
         CreateFilesAndReplicas(numFilesToGen, i+1, now);
     }
 
-    mUpdateDurationSummed += std::chrono::high_resolution_clock::now() - curRealtime;
     mNextCallTick = now + mTickFreq;
 }
 
@@ -151,10 +166,10 @@ CReaperCaller::CReaperCaller(CRucio *rucio, const std::uint32_t tickFreq, const 
 
 void CReaperCaller::OnUpdate(const TickType now)
 {
-    auto curRealtime = std::chrono::high_resolution_clock::now();
+    CScopedTimeDiff durationUpdate(nullptr, &mUpdateDurationSummed);
+
     mRucio->RunReaper(now);
 
-    mUpdateDurationSummed += std::chrono::high_resolution_clock::now() - curRealtime;
     mNextCallTick = now + mTickFreq;
 }
 
@@ -243,7 +258,8 @@ void CTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcReplica, std:
 
 void CTransferManager::OnUpdate(const TickType now)
 {
-    auto curRealtime = std::chrono::high_resolution_clock::now();
+    CScopedTimeDiff durationUpdate(nullptr, &mUpdateDurationSummed);
+
     const std::uint32_t timeDiff = static_cast<std::uint32_t>(now - mLastUpdated);
     mLastUpdated = now;
 
@@ -308,7 +324,6 @@ void CTransferManager::OnUpdate(const TickType now)
 
     COutput::GetRef().QueueInserts(std::move(transferInsertQueries));
 
-    mUpdateDurationSummed += std::chrono::high_resolution_clock::now() - curRealtime;
     mNextCallTick = now + mTickFreq;
 }
 
@@ -328,7 +343,7 @@ CFixedTimeTransferManager::STransfer::STransfer( std::shared_ptr<SReplica> srcRe
       mIncreasePerTick(increasePerTick)
 {}
 
-CFixedTimeTransferManager::CFixedTimeTransferManager(const std::uint32_t tickFreq, const TickType startTick)
+CFixedTimeTransferManager::CFixedTimeTransferManager(const TickType tickFreq, const TickType startTick)
     : CScheduleable(startTick),
       mTickFreq(tickFreq)
 {
@@ -351,12 +366,13 @@ void CFixedTimeTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcRepl
     networkLink->mNumActiveTransfers += 1;
     srcStorageElement->OnOperation(CStorageElement::GET);
     const TickType startAt = now + (srcReplica->GetStorageElement()->GetAccessLatency() / 1000);
-    mQueuedTransfers.emplace_back(srcReplica, dstReplica, networkLink, now, startAt, std::max(1UL, increasePerTick));
+    mQueuedTransfers.emplace_back(srcReplica, dstReplica, networkLink, now, startAt, std::max(SpaceType(1), increasePerTick ));
 }
 
 void CFixedTimeTransferManager::OnUpdate(const TickType now)
 {
-    auto curRealtime = std::chrono::high_resolution_clock::now();
+    CScopedTimeDiff durationUpdate(nullptr, &mUpdateDurationSummed);
+
     const std::uint32_t timeDiff = static_cast<std::uint32_t>(now - mLastUpdated);
     mLastUpdated = now;
 
@@ -418,7 +434,6 @@ void CFixedTimeTransferManager::OnUpdate(const TickType now)
         }
     }
 
-    mUpdateDurationSummed += std::chrono::high_resolution_clock::now() - curRealtime;
     mNextCallTick = now + mTickFreq;
 }
 
@@ -459,7 +474,7 @@ void CUniformTransferGen::OnUpdate(const TickType now)
 {
     assert(mSrcStorageElements.size() > 0);
 
-    auto curRealtime = std::chrono::high_resolution_clock::now();
+    CScopedTimeDiff durationUpdate(nullptr, &mUpdateDurationSummed);
 
     RNGEngineType& rngEngine = mSim->mRNGEngine;
     std::uniform_int_distribution<std::size_t> dstStorageElementRndChooser(0, mDstStorageElements.size()-1);
@@ -507,8 +522,6 @@ void CUniformTransferGen::OnUpdate(const TickType now)
 
     COutput::GetRef().QueueInserts(std::move(replicaInsertQueries));
 
-    //std::cout<<"["<<now<<"]\nnumActive: "<<numActive<<"\nnumToCreate: "<<numToCreate<<"\ntotalCreated: "<<numToCreatePerRSE<<std::endl;
-    mUpdateDurationSummed += std::chrono::high_resolution_clock::now() - curRealtime;
     mNextCallTick = now + mTickFreq;
 }
 
@@ -530,7 +543,7 @@ CExponentialTransferGen::CExponentialTransferGen(IBaseSim* sim,
 
 void CExponentialTransferGen::OnUpdate(const TickType now)
 {
-    auto curRealtime = std::chrono::high_resolution_clock::now();
+    CScopedTimeDiff durationUpdate(nullptr, &mUpdateDurationSummed);
 
     const std::size_t numSrcStorageElements = mSrcStorageElements.size();
     const std::size_t numDstStorageElements = mDstStorageElements.size();
@@ -584,9 +597,7 @@ void CExponentialTransferGen::OnUpdate(const TickType now)
     }
 
     COutput::GetRef().QueueInserts(std::move(replicaInsertQueries));
-    //std::cout<<"["<<now<<"]: numActive: "<<numActive<<"; numToCreate: "<<numToCreate<<std::endl;
 
-    mUpdateDurationSummed += std::chrono::high_resolution_clock::now() - curRealtime;
     mNextCallTick = now + mTickFreq;
 }
 
@@ -608,7 +619,7 @@ CSrcPrioTransferGen::CSrcPrioTransferGen(IBaseSim* sim,
 
 void CSrcPrioTransferGen::OnUpdate(const TickType now)
 {
-    auto curRealtime = std::chrono::high_resolution_clock::now();
+    CScopedTimeDiff durationUpdate(nullptr, &mUpdateDurationSummed);
 
     const std::vector<std::shared_ptr<SFile>>& allFiles = mSim->mRucio->mFiles;
     const std::size_t numDstStorageElements = mDstStorageElements.size();
@@ -699,9 +710,7 @@ void CSrcPrioTransferGen::OnUpdate(const TickType now)
     }
 
     COutput::GetRef().QueueInserts(std::move(replicaInsertQueries));
-    //std::cout<<"["<<now<<"]: numActive: "<<numActive<<"; numToCreate: "<<numToCreate<<std::endl;
 
-    mUpdateDurationSummed += std::chrono::high_resolution_clock::now() - curRealtime;
     mNextCallTick = now + mTickFreq;
 }
 
@@ -721,7 +730,7 @@ CJobSlotTransferGen::CJobSlotTransferGen(IBaseSim* sim,
 
 void CJobSlotTransferGen::OnUpdate(const TickType now)
 {
-    auto curRealtime = std::chrono::high_resolution_clock::now();
+    CScopedTimeDiff durationUpdate(nullptr, &mUpdateDurationSummed);
 
     const std::vector<std::shared_ptr<SFile>>& allFiles = mSim->mRucio->mFiles;
     assert(allFiles.size() > 0);
@@ -835,9 +844,7 @@ void CJobSlotTransferGen::OnUpdate(const TickType now)
     }
 
     COutput::GetRef().QueueInserts(std::move(replicaInsertQueries));
-    //std::cout<<"["<<now<<"]: numActive: "<<numActive<<"; numToCreate: "<<numToCreate<<std::endl;
 
-    mUpdateDurationSummed += std::chrono::high_resolution_clock::now() - curRealtime;
     mNextCallTick = now + mTickFreq;
 }
 
@@ -937,7 +944,7 @@ void CCachedSrcTransferGen::ExpireReplica(CStorageElement* storageElement, const
     {
         //to increase performance we just randomly pick 100 replicas
         //and expire the oldest one of these
-        const std::size_t numSamples = static_cast<std::size_t>(replicas.size() * 0.05f);
+        const std::size_t numSamples = static_cast<std::size_t>(replicas.size() * 0.05);
         std::uniform_int_distribution<std::size_t> replicaRndSelector(0, replicas.size() - 1);
         for(std::size_t i=0; i<numSamples; ++i)
         {
@@ -978,7 +985,7 @@ void CCachedSrcTransferGen::ExpireReplica(CStorageElement* storageElement, const
 
 void CCachedSrcTransferGen::OnUpdate(const TickType now)
 {
-    auto curRealtime = std::chrono::high_resolution_clock::now();
+    CScopedTimeDiff durationUpdate(nullptr, &mUpdateDurationSummed);
 
     RNGEngineType& rngEngine = mSim->mRNGEngine;
 
@@ -1101,7 +1108,6 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
         }
     }
 
-    mUpdateDurationSummed += std::chrono::high_resolution_clock::now() - curRealtime;
     mNextCallTick = now + mTickFreq;
 }
 

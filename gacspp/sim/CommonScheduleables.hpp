@@ -19,6 +19,18 @@ struct SFile;
 struct SReplica;
 class IPreparedInsert;
 
+class CScopedTimeDiff
+{
+private:
+    std::chrono::high_resolution_clock::time_point mStartTime;
+    std::chrono::duration<double>* mSet;
+    std::chrono::duration<double>* mAdd;
+
+public:
+    CScopedTimeDiff(std::chrono::duration<double>* set=nullptr, std::chrono::duration<double>* add=nullptr);
+    ~CScopedTimeDiff();
+};
+
 class IValueGenerator
 {
 public:
@@ -154,7 +166,7 @@ private:
     std::shared_ptr<IPreparedInsert> mOutputTransferInsertQuery;
 
     TickType mLastUpdated = 0;
-    std::uint32_t mTickFreq;
+    TickType mTickFreq;
 
     struct STransfer
     {
@@ -182,7 +194,7 @@ public:
     TickType mSummedTransferDuration = 0;
 
 public:
-    CFixedTimeTransferManager(const std::uint32_t tickFreq, const TickType startTick=0);
+    CFixedTimeTransferManager(const TickType tickFreq, const TickType startTick=0);
 
     void OnUpdate(const TickType now) final;
 

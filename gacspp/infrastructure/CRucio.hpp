@@ -67,5 +67,7 @@ public:
     auto CreateGridSite(std::string&& name, std::string&& locationName, const std::uint8_t multiLocationIdx) -> CGridSite*;
     auto RunReaper(const TickType now) -> std::size_t;
 
+    auto GetStorageElementByName(const std::string& name) -> CStorageElement*;
+
     bool LoadConfig(const json& config) final;
 };

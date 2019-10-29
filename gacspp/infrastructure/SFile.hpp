@@ -22,6 +22,10 @@ struct SFile
     auto RemoveExpiredReplicas(const TickType now) -> std::size_t;
     auto ExtractExpiredReplicas(const TickType now, std::vector<std::shared_ptr<SReplica>>& expiredReplicas) -> std::size_t;
 
+    void ExtendExpirationTime(const TickType newExpiresAt);
+
+    auto GetReplicaByStorageElement(const CStorageElement* storageElement) -> std::shared_ptr<SReplica>;
+
     inline auto GetId() const -> IdType
     {return mId;}
     inline auto GetCreatedAt() const -> TickType
@@ -50,6 +54,8 @@ struct SReplica
 
     auto Increase(const SpaceType amount, const TickType now) -> SpaceType;
     void OnRemoveByFile(const TickType now);
+
+    void ExtendExpirationTime(const TickType newExpiresAt);
 
     inline bool IsComplete() const
     {return mCurSize == mFile->GetSize();}

@@ -277,6 +277,15 @@ auto CRucio::RunReaper(const TickType now) -> std::size_t
     return mReaper->RunReaper(now);
 }
 
+auto CRucio::GetStorageElementByName(const std::string& name) -> CStorageElement*
+{
+    for (const std::unique_ptr<CGridSite>& gridSite : mGridSites)
+        for (const std::unique_ptr<CStorageElement>& storageElement : gridSite->mStorageElements)
+            if (storageElement->GetName() == name)
+                return storageElement.get();
+    return nullptr;
+}
+
 bool CRucio::LoadConfig(const json& config)
 {
     if (!config.contains("rucio"))
