@@ -39,8 +39,8 @@ private:
     struct SJob
     {
         TickType mStageInDuration;
-        TickType mJobDuration;
         TickType mStageOutDuration;
+        TickType mJobEndTime;
         std::vector<std::pair<std::string, SpaceType>> mInputFiles;
         std::vector<std::pair<std::string, SpaceType>> mOutputFiles;
     };
@@ -94,20 +94,34 @@ private:
         mDataFile >> mCurJobBatch->first;
         mDataFile.ignore(1);
 
+        TickType stageInDuration, jobDuration, stageOutDuration;
         while(mDataFile.peek() == mTypeJobDelim)
         {
-            SJob& newJob = mCurJobBatch->second.emplace_front();
-
             mDataFile.ignore(2); // "j,"
 
-            mDataFile >> newJob.mStageInDuration;
+            mDataFile >> stageInDuration;
             mDataFile.ignore(1);
 
-            mDataFile >> newJob.mJobDuration;
+            mDataFile >> jobDuration;
             mDataFile.ignore(1);
 
-            mDataFile >> newJob.mStageOutDuration;
+            const TickType jobEndTime = mCurJobBatch->first + stageInDuration + jobDuration;
+
+            mDataFile >> stageOutDuration;
             mDataFile.ignore(1);
+
+            auto prev = mCurJobBatch->second.before_begin();
+            auto cur = mCurJobBatch->second.begin();
+            while((cur != mCurJobBatch->second.end()) && (cur->mJobEndTime < jobEndTime))
+            {
+                prev = cur;
+                ++cur;
+            }
+
+            cur = mCurJobBatch->second.emplace_after(prev);
+            cur->mStageInDuration = stageInDuration;
+            cur->mStageOutDuration = stageOutDuration;
+            cur->mJobEndTime = jobEndTime;
 
             std::ifstream::char_type type = mDataFile.peek();
             while(type == mTypeInputDelim || type == mTypeOutputDelim)
@@ -122,9 +136,9 @@ private:
                 mDataFile.ignore(1); // ',' or '\n'
 
                 if(type == mTypeInputDelim)
-                    newJob.mInputFiles.push_back(std::move(file));
+                    cur->mInputFiles.push_back(std::move(file));
                 else
-                    newJob.mOutputFiles.push_back(std::move(file));
+                    cur->mOutputFiles.push_back(std::move(file));
 
                 type = mDataFile.peek();
             }
@@ -137,6 +151,9 @@ private:
     std::shared_ptr<IPreparedInsert> mReplicaInsertQuery;
 
 public:
+    std::chrono::duration<double> mUpdateCleanDurationSummed = std::chrono::duration<double>::zero();
+    std::chrono::duration<double> mUpdateInDurationSummed = std::chrono::duration<double>::zero();
+    std::chrono::duration<double> mUpdateOutDurationSummed = std::chrono::duration<double>::zero();
     CStorageElement* mDiskStorageElement = nullptr;
     CStorageElement* mComputingStorageElement = nullptr;
 
@@ -236,7 +253,7 @@ public:
                 break;
             ++revIt;
         }
-        
+
         while (revIt != mTmpReplicas.rend())
         {
             if ((*revIt)->mExpiresAt > replica->mExpiresAt)
@@ -254,48 +271,42 @@ public:
     {
         for (auto jobBatchIt = mJobBatchList.begin(); jobBatchIt != mJobBatchList.end(); ++jobBatchIt)
         {
+            auto& jobBatch = jobBatchIt->second;
+            while (!jobBatch.empty())
             {
-                const TickType start = jobBatchIt->first;
-                auto prevIt = jobBatchIt->second.before_begin();
-                auto jobIt = jobBatchIt->second.begin();
-                while (jobIt != jobBatchIt->second.end())
+                SJob& job = jobBatch.front();
+                if (now < job.mJobEndTime)
                 {
-                    const TickType jobEndTime = start + jobIt->mStageInDuration + jobIt->mJobDuration;
-                    const TickType stageOutEndTime = jobEndTime + jobIt->mStageOutDuration;
-                    if (now >= jobEndTime)
-                    {
-                        for (const std::pair<std::string, SpaceType>& outFile : jobIt->mOutputFiles)
-                        {
-                            std::shared_ptr<SFile> file;
-                            const std::size_t idx = std::clamp<std::size_t>(outFile.first.length(), LFN_MAP_IDX_OFFSET, NUM_LFN_MAPS);
-                            auto insertResult = mLFNToFile[idx].emplace(outFile.first, file);
-
-                            if (insertResult.second)
-                            {
-                                insertResult.first->second = file = mSim->mRucio->CreateFile(outFile.second, now, SECONDS_PER_MONTH * 13);
-                                std::shared_ptr<SReplica> srcReplica = mComputingStorageElement->CreateReplica(file, now);
-
-                                assert(srcReplica);
-
-                                srcReplica->Increase(outFile.second, now);
-                                srcReplica->mExpiresAt = stageOutEndTime + 60;
-
-                                InsertTmpReplica(srcReplica);
-
-                                std::shared_ptr<SReplica> r = mDiskStorageElement->CreateReplica(file, now);
-                                mTransferMgr->CreateTransfer(srcReplica, r, now, jobIt->mStageOutDuration);
-                            }
-                        }
-                        jobIt = jobBatchIt->second.erase_after(prevIt);
-                        continue;
-                    }
-                    else
-                        mNextCallTick = std::min(mNextCallTick, jobEndTime);
-                    ++prevIt;
-                    ++jobIt;
+                    mNextCallTick = std::min(mNextCallTick, job.mJobEndTime);
+                    break;
                 }
+
+                for (const std::pair<std::string, SpaceType>& outFile : job.mOutputFiles)
+                {
+                    std::shared_ptr<SFile> file;
+                    const std::size_t idx = std::clamp<std::size_t>(outFile.first.length(), LFN_MAP_IDX_OFFSET, NUM_LFN_MAPS);
+                    auto insertResult = mLFNToFile[idx].emplace(outFile.first, file);
+
+                    if (insertResult.second)
+                    {
+                        insertResult.first->second = file = mSim->mRucio->CreateFile(outFile.second, now, SECONDS_PER_MONTH * 13);
+                        std::shared_ptr<SReplica> srcReplica = mComputingStorageElement->CreateReplica(file, now);
+
+                        assert(srcReplica);
+
+                        srcReplica->Increase(outFile.second, now);
+                        srcReplica->mExpiresAt = job.mJobEndTime + job.mStageOutDuration + 60;
+
+                        InsertTmpReplica(srcReplica);
+
+                        std::shared_ptr<SReplica> r = mDiskStorageElement->CreateReplica(file, now);
+                        mTransferMgr->CreateTransfer(srcReplica, r, now, job.mStageOutDuration);
+                    }
+                }
+                jobBatch.pop_front();
             }
-            if (jobBatchIt->second.empty())
+
+            if (jobBatch.empty())
             {
                 jobBatchIt = mJobBatchList.erase(jobBatchIt);
                 --jobBatchIt;
@@ -339,11 +350,11 @@ public:
                 {
                     dstReplica = file->GetReplicaByStorageElement(mComputingStorageElement);
                     assert(dstReplica);
-                    UpdateTmpReplicaExpiresAt(dstReplica, now + job.mStageInDuration + job.mJobDuration);
+                    UpdateTmpReplicaExpiresAt(dstReplica, job.mJobEndTime + 60);
                 }
                 else
                 {
-                    dstReplica->mExpiresAt = now + job.mStageInDuration + job.mJobDuration + 60;
+                    dstReplica->mExpiresAt = job.mJobEndTime + 60;
                     InsertTmpReplica(dstReplica);
                 }
 
@@ -380,11 +391,21 @@ public:
             mNextCallTick = std::numeric_limits<TickType>::max();
 
         assert(mDiskStorageElement && mComputingStorageElement);
-        CleanupTmpReplicas(now);
 
-        StageOut(now);
+        {
+            CScopedTimeDiff subDurationUpdate(nullptr, &mUpdateCleanDurationSummed);
+            CleanupTmpReplicas(now);
+        }
+        
+        {
+            CScopedTimeDiff subDurationUpdate(nullptr, &mUpdateOutDurationSummed);
+            StageOut(now);
+        }
 
-        StageIn(now);
+        {
+            CScopedTimeDiff subDurationUpdate(nullptr, &mUpdateInDurationSummed);
+            StageIn(now);
+        }
     }
 
     void Shutdown(const TickType now)
@@ -461,9 +482,9 @@ bool CDeterministicSim01::SetupDefaults(const json& profileJson)
     //std::shared_ptr<CReaperCaller> reaper;
     try
     {
-        const json& reaperCfg = profileJson.at("reaper");
-        const TickType tickFreq = reaperCfg.at("tickFreq").get<TickType>();
-        const TickType startTick = reaperCfg.at("startTick").get<TickType>();
+        //const json& reaperCfg = profileJson.at("reaper");
+        //const TickType tickFreq = reaperCfg.at("tickFreq").get<TickType>();
+        //const TickType startTick = reaperCfg.at("startTick").get<TickType>();
         //reaper = std::make_shared<CReaperCaller>(mRucio.get(), tickFreq, startTick);
     }
     catch (const json::out_of_range& error)
@@ -477,6 +498,9 @@ bool CDeterministicSim01::SetupDefaults(const json& profileJson)
     //heartbeat->mProccessDurations["DataGen"] = &(dataGen->mUpdateDurationSummed);
     heartbeat->mProccessDurations["TransferUpdate"] = &(manager->mUpdateDurationSummed);
     heartbeat->mProccessDurations["TransferGen"] = &(transferGen->mUpdateDurationSummed);
+    heartbeat->mProccessDurations["TransferGenClean"] = &(transferGen->mUpdateCleanDurationSummed);
+    heartbeat->mProccessDurations["TransferGenIn"] = &(transferGen->mUpdateInDurationSummed);
+    heartbeat->mProccessDurations["TransferGenOut"] = &(transferGen->mUpdateOutDurationSummed);
     //heartbeat->mProccessDurations["Reaper"] = &(reaper->mUpdateDurationSummed);
 
     mSchedule.push(manager);
