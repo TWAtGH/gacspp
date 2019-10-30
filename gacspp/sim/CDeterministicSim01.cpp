@@ -16,7 +16,6 @@
 #include "output/COutput.hpp"
 
 #include "third_party/json.hpp"
-#include "third_party/parallel_hashmap/phmap.h"
 
 #define LFN_MAP_IDX_OFFSET (20)
 #define NUM_LFN_MAPS (80)
@@ -160,8 +159,8 @@ public:
         {
             if ((*tmpReplicaIt)->mExpiresAt <= replica->mExpiresAt)
             {
-                mTmpReplicas.insert(tmpReplicaIt, replica);
-                break;
+                mTmpReplicas.insert(tmpReplicaIt, std::move(replica));
+                return;
             }
             ++tmpReplicaIt;
         }
@@ -183,6 +182,9 @@ public:
             replica->GetFile()->ExtractExpiredReplicas(now, expiredReplicas);
             mTmpReplicas.pop_back();
         }
+
+        if (expiredReplicas.empty())
+            return;
 
         auto& replicaListeners = mSim->mRucio->mReplicaActionListeners;
         if (!replicaListeners.empty())
@@ -218,70 +220,80 @@ public:
         replica->ExtendExpirationTime(newExpiresAt);
 
         auto revIt = mTmpReplicas.rbegin();
-
-        while ((revIt != mTmpReplicas.rend()) && ((*revIt)->mExpiresAt < oldExpiresAt))
-            ++revIt;
-
-        while ((revIt != mTmpReplicas.rend()) && ((*revIt)->mExpiresAt == oldExpiresAt) && ((*revIt) != replica))
-            ++revIt;
-
-        if ((*revIt) == replica)
+        auto curReplicaPos = mTmpReplicas.end();
+        while (revIt != mTmpReplicas.rend())
         {
-            auto it = revIt.base();
-            --it;
-            --revIt;
-            mTmpReplicas.erase(it);
+            if ((*revIt)->mExpiresAt == oldExpiresAt)
+            {
+                if ((*revIt) == replica)
+                {
+                    ++revIt;
+                    curReplicaPos = revIt.base();
+                    break;
+                }
+            }
+            else if ((*revIt)->mExpiresAt > oldExpiresAt)
+                break;
+            ++revIt;
         }
         
-        while ((revIt != mTmpReplicas.rend()) && ((*revIt)->mExpiresAt < replica->mExpiresAt))
+        while (revIt != mTmpReplicas.rend())
+        {
+            if ((*revIt)->mExpiresAt > replica->mExpiresAt)
+                break;
             ++revIt;
-        if (revIt != mTmpReplicas.rend())
-            mTmpReplicas.emplace(revIt.base(), std::move(replica));
-        else
-            mTmpReplicas.emplace_front(std::move(replica));
+        }
+
+        mTmpReplicas.emplace(revIt.base(), std::move(replica));
+
+        if (curReplicaPos != mTmpReplicas.end())
+            mTmpReplicas.erase(curReplicaPos);
     }
 
     void StageOut(const TickType now)
     {
         for (auto jobBatchIt = mJobBatchList.begin(); jobBatchIt != mJobBatchList.end(); ++jobBatchIt)
         {
-            const TickType start = jobBatchIt->first;
-            auto prevIt = jobBatchIt->second.before_begin();
-            auto jobIt = jobBatchIt->second.begin();
-            while (jobIt != jobBatchIt->second.end())
             {
-                const TickType jobEndTime = start + jobIt->mStageInDuration + jobIt->mJobDuration;
-                const TickType stageOutEndTime = jobEndTime + jobIt->mStageOutDuration;
-                if (now >= jobEndTime)
+                const TickType start = jobBatchIt->first;
+                auto prevIt = jobBatchIt->second.before_begin();
+                auto jobIt = jobBatchIt->second.begin();
+                while (jobIt != jobBatchIt->second.end())
                 {
-                    for (const std::pair<std::string, SpaceType>& outFile : jobIt->mOutputFiles)
+                    const TickType jobEndTime = start + jobIt->mStageInDuration + jobIt->mJobDuration;
+                    const TickType stageOutEndTime = jobEndTime + jobIt->mStageOutDuration;
+                    if (now >= jobEndTime)
                     {
-                        std::shared_ptr<SFile> file;
-                        const std::size_t idx = std::clamp<std::size_t>(outFile.first.length(), LFN_MAP_IDX_OFFSET, NUM_LFN_MAPS);
-                        auto insertResult = mLFNToFile[idx].emplace(outFile.first, file);
-
-                        if (insertResult.second)
+                        for (const std::pair<std::string, SpaceType>& outFile : jobIt->mOutputFiles)
                         {
-                            insertResult.first->second = file = mSim->mRucio->CreateFile(outFile.second, now, SECONDS_PER_MONTH * 13);
-                            std::shared_ptr<SReplica> srcReplica = mComputingStorageElement->CreateReplica(file, now);
+                            std::shared_ptr<SFile> file;
+                            const std::size_t idx = std::clamp<std::size_t>(outFile.first.length(), LFN_MAP_IDX_OFFSET, NUM_LFN_MAPS);
+                            auto insertResult = mLFNToFile[idx].emplace(outFile.first, file);
 
-                            assert(srcReplica);
+                            if (insertResult.second)
+                            {
+                                insertResult.first->second = file = mSim->mRucio->CreateFile(outFile.second, now, SECONDS_PER_MONTH * 13);
+                                std::shared_ptr<SReplica> srcReplica = mComputingStorageElement->CreateReplica(file, now);
 
-                            srcReplica->Increase(outFile.second, now);
-                            srcReplica->mExpiresAt = stageOutEndTime + 60;
+                                assert(srcReplica);
 
-                            InsertTmpReplica(srcReplica);
+                                srcReplica->Increase(outFile.second, now);
+                                srcReplica->mExpiresAt = stageOutEndTime + 60;
 
-                            std::shared_ptr<SReplica> r = mDiskStorageElement->CreateReplica(file, now);
-                            mTransferMgr->CreateTransfer(srcReplica, r, now, jobIt->mStageOutDuration);
+                                InsertTmpReplica(srcReplica);
+
+                                std::shared_ptr<SReplica> r = mDiskStorageElement->CreateReplica(file, now);
+                                mTransferMgr->CreateTransfer(srcReplica, r, now, jobIt->mStageOutDuration);
+                            }
                         }
+                        jobIt = jobBatchIt->second.erase_after(prevIt);
+                        continue;
                     }
-                    jobIt = jobBatchIt->second.erase_after(prevIt);
+                    else
+                        mNextCallTick = std::min(mNextCallTick, jobEndTime);
+                    ++prevIt;
+                    ++jobIt;
                 }
-                else
-                    mNextCallTick = std::min(mNextCallTick, jobEndTime);
-                ++prevIt;
-                ++jobIt;
             }
             if (jobBatchIt->second.empty())
             {
