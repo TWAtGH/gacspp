@@ -17,8 +17,6 @@
 
 #include "third_party/json.hpp"
 
-#define LFN_MAP_IDX_OFFSET (20)
-#define NUM_LFN_MAPS (80)
 
 class CDeterministicTransferGen : public CScheduleable, public CBaseOnDeletionInsert
 {
@@ -41,8 +39,8 @@ private:
         TickType mStageInDuration;
         TickType mStageOutDuration;
         TickType mJobEndTime;
-        std::vector<std::pair<std::string, SpaceType>> mInputFiles;
-        std::vector<std::pair<std::string, SpaceType>> mOutputFiles;
+        std::vector<std::pair<std::uint64_t, SpaceType>> mInputFiles;
+        std::vector<std::pair<std::uint64_t, SpaceType>> mOutputFiles;
     };
 
     typedef std::pair<TickType, std::forward_list<SJob>> JobBatchType;
@@ -52,7 +50,7 @@ private:
 
     std::list<std::shared_ptr<SReplica>> mTmpReplicas;
 
-    std::unordered_map<std::string, std::shared_ptr<SFile>> mLFNToFile[NUM_LFN_MAPS+1];
+    std::unordered_map<std::uint64_t, std::shared_ptr<SFile>> mFileIdToFile;
 
     bool LoadNextFile()
     {
@@ -128,9 +126,10 @@ private:
             {
                 mDataFile.ignore(2); // "i," or "o,"
 
-                std::pair<std::string, SpaceType> file;
-
-                std::getline(mDataFile, file.first, ',');
+                std::pair<std::uint64_t, SpaceType> file;
+                
+                mDataFile>>file.first;
+                mDataFile.ignore(1);
 
                 mDataFile >> file.second;
                 mDataFile.ignore(1); // ',' or '\n'
@@ -281,11 +280,10 @@ public:
                     break;
                 }
 
-                for (const std::pair<std::string, SpaceType>& outFile : job.mOutputFiles)
+                for (const std::pair<std::uint64_t, SpaceType>& outFile : job.mOutputFiles)
                 {
                     std::shared_ptr<SFile> file;
-                    const std::size_t idx = std::clamp<std::size_t>(outFile.first.length(), LFN_MAP_IDX_OFFSET, NUM_LFN_MAPS);
-                    auto insertResult = mLFNToFile[idx].emplace(outFile.first, file);
+                    auto insertResult = mFileIdToFile.emplace(outFile.first, file);
 
                     if (insertResult.second)
                     {
@@ -327,12 +325,11 @@ public:
 
         for (const SJob& job : mCurJobBatch->second)
         {
-            for (const std::pair<std::string, SpaceType>& inFile : job.mInputFiles)
+            for (const std::pair<std::uint64_t, SpaceType>& inFile : job.mInputFiles)
             {
                 std::shared_ptr<SReplica> srcReplica;
                 std::shared_ptr<SFile> file;
-                const std::size_t idx = std::clamp<std::size_t>(inFile.first.length(), LFN_MAP_IDX_OFFSET, NUM_LFN_MAPS);
-                auto insertResult = mLFNToFile[idx].emplace(inFile.first, nullptr);
+                auto insertResult = mFileIdToFile.emplace(inFile.first, nullptr);
                 if (insertResult.second == true)
                 {
                     insertResult.first->second = file = mSim->mRucio->CreateFile(inFile.second, now, SECONDS_PER_MONTH * 13);
