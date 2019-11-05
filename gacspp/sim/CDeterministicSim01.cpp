@@ -50,8 +50,6 @@ private:
 
     std::list<std::shared_ptr<SReplica>> mTmpReplicas;
 
-    std::unordered_map<std::uint64_t, std::shared_ptr<SFile>> mFileIdToFile;
-
     bool LoadNextFile()
     {
         constexpr char sym = '$';
@@ -127,7 +125,7 @@ private:
                 mDataFile.ignore(2); // "i," or "o,"
 
                 std::pair<std::uint64_t, SpaceType> file;
-                
+
                 mDataFile>>file.first;
                 mDataFile.ignore(1);
 
@@ -166,6 +164,7 @@ public:
         bool ok = ReadNextJobBatch();
         assert(ok);
         mNextCallTick = mCurJobBatch->first;
+        mSim->mRucio->mFiles.reserve(12000000);
     }
 
     void InsertTmpReplica(std::shared_ptr<SReplica> replica)
@@ -283,13 +282,12 @@ public:
                 for (const std::pair<std::uint64_t, SpaceType>& outFile : job.mOutputFiles)
                 {
                     std::shared_ptr<SFile> file;
-                    auto insertResult = mFileIdToFile.emplace(outFile.first, file);
-
-                    if (insertResult.second)
+                    if (outFile.first >= mSim->mRucio->mFiles.size())
                     {
-                        insertResult.first->second = file = mSim->mRucio->CreateFile(outFile.second, now, SECONDS_PER_MONTH * 13);
-                        std::shared_ptr<SReplica> srcReplica = mComputingStorageElement->CreateReplica(file, now);
+                        assert(mSim->mRucio->mFiles.size() == outFile.first);
+                        file = mSim->mRucio->CreateFile(outFile.second, now, SECONDS_PER_MONTH * 13);
 
+                        std::shared_ptr<SReplica> srcReplica = mComputingStorageElement->CreateReplica(file, now);
                         assert(srcReplica);
 
                         srcReplica->Increase(outFile.second, now);
@@ -329,18 +327,18 @@ public:
             {
                 std::shared_ptr<SReplica> srcReplica;
                 std::shared_ptr<SFile> file;
-                auto insertResult = mFileIdToFile.emplace(inFile.first, nullptr);
-                if (insertResult.second == true)
+                if(inFile.first >= mSim->mRucio->mFiles.size())
                 {
-                    insertResult.first->second = file = mSim->mRucio->CreateFile(inFile.second, now, SECONDS_PER_MONTH * 13);
-                    srcReplica = mDiskStorageElement->CreateReplica(file, now);
+                    assert(mSim->mRucio->mFiles.size() == inFile.first);
+                    file = mSim->mRucio->CreateFile(inFile.second, now, SECONDS_PER_MONTH * 13);
 
+                    srcReplica = mDiskStorageElement->CreateReplica(file, now);
                     assert(srcReplica);
 
                     srcReplica->Increase(inFile.second, now);
                 }
                 else
-                    file = insertResult.first->second;
+                    file = mSim->mRucio->mFiles[inFile.first];
 
                 std::shared_ptr<SReplica> dstReplica = mComputingStorageElement->CreateReplica(file, now);
                 if (!dstReplica)
@@ -393,7 +391,7 @@ public:
             CScopedTimeDiff subDurationUpdate(nullptr, &mUpdateCleanDurationSummed);
             CleanupTmpReplicas(now);
         }
-        
+
         {
             CScopedTimeDiff subDurationUpdate(nullptr, &mUpdateOutDurationSummed);
             StageOut(now);
