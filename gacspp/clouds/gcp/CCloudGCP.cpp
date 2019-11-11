@@ -55,15 +55,15 @@ namespace gcp
     }
 
 
-    void CBucket::OnOperation(const CStorageElement::OPERATION op)
+    void CBucket::OnOperation(const OPERATION op)
     {
         CStorageElement::OnOperation(op);
         switch(op)
         {
-            case CStorageElement::INSERT:
+            case INSERT:
                 mCostTracking->mNumClassA += 1;
             break;
-            case CStorageElement::GET:
+            case GET:
                 mCostTracking->mNumClassB += 1;
             break;
             default: break;
@@ -74,7 +74,7 @@ namespace gcp
     {
         if (now > mTimeLastCostUpdate)
         {
-            mCostTracking->mStorageCosts += (BYTES_TO_GiB(mUsedStorage) * GetCurStoragePrice() * (now - mTimeLastCostUpdate)) / 1000000000.0;
+            mCostTracking->mStorageCosts += (BYTES_TO_GiB(mDelegate->GetUsedStorage()) * GetCurStoragePrice() * (now - mTimeLastCostUpdate)) / 1000000000.0;
             mTimeLastCostUpdate = now;
         }
         CStorageElement::OnIncreaseReplica(amount, now);
@@ -82,10 +82,10 @@ namespace gcp
 
     void CBucket::OnRemoveReplica(const SReplica* replica, const TickType now)
     {
-        std::unique_lock<std::mutex> lock(mReplicaRemoveMutex);
+        //std::unique_lock<std::mutex> lock(mReplicaRemoveMutex);
         if (now > mTimeLastCostUpdate)
         {
-            mCostTracking->mStorageCosts += (BYTES_TO_GiB(mUsedStorage) * GetCurStoragePrice() * (now - mTimeLastCostUpdate)) / 1000000000.0;
+            mCostTracking->mStorageCosts += (BYTES_TO_GiB(mDelegate->GetUsedStorage()) * GetCurStoragePrice() * (now - mTimeLastCostUpdate)) / 1000000000.0;
             mTimeLastCostUpdate = now;
         }
         CStorageElement::OnRemoveReplica(replica, now, false);
@@ -95,7 +95,7 @@ namespace gcp
     {
         if (now > mTimeLastCostUpdate)
         {
-            mCostTracking->mStorageCosts += (BYTES_TO_GiB(mUsedStorage) * GetCurStoragePrice() * (now - mTimeLastCostUpdate)) / 1000000000.0;
+            mCostTracking->mStorageCosts += (BYTES_TO_GiB(mDelegate->GetUsedStorage()) * GetCurStoragePrice() * (now - mTimeLastCostUpdate)) / 1000000000.0;
             mTimeLastCostUpdate = now;
         }
 
@@ -129,7 +129,7 @@ namespace gcp
         assert(!storagePrice.empty());
 
         std::size_t rateIdx = 0, i = 1;
-        while( (i < storagePrice.size()) && (mUsedStorage > storagePrice[i].first) )
+        while( (i < storagePrice.size()) && (mDelegate->GetUsedStorage() > storagePrice[i].first) )
         {
             ++i;
             ++rateIdx;
@@ -139,11 +139,10 @@ namespace gcp
 
 
 
-    auto CRegion::CreateStorageElement(std::string&& name, const TickType accessLatency) -> CBucket*
+    auto CRegion::CreateStorageElement(std::string&& name, bool forbidDuplicatedReplicas) -> CBucket*
     {
-        CBucket* newBucket = new CBucket(std::move(name), accessLatency, this);
-        mStorageElements.emplace_back(newBucket);
-        return newBucket;
+        mStorageElements.emplace_back(std::make_unique<CBucket>(std::move(name), this, forbidDuplicatedReplicas));
+        return mStorageElements.back().get();
     }
 
     double CRegion::CalculateStorageCosts(const TickType now)
@@ -326,20 +325,29 @@ namespace gcp
                             assert(regionJsonValue.is_array());
                             for (const json& bucketJson : regionJsonValue)
                             {
+                                std::string name, storageSKUId, classAOpSKUId, classsBOpSKUId;
                                 try
                                 {
-                                    CBucket* bucket = region->CreateStorageElement( bucketJson.at("name").get<std::string>(),
-                                                                                    bucketJson.at("accessLatency").get<TickType>());
-
-                                    bucket->mPriceData->mStoragePrice = GetTieredRateFromSKUId(bucketJson.at("storageSKUId").get<std::string>());
-                                    bucket->mPriceData->mClassAOpPrice = GetTieredRateFromSKUId(bucketJson.at("classAOpSKUId").get<std::string>());
-                                    bucket->mPriceData->mClassBOpPrice = GetTieredRateFromSKUId(bucketJson.at("classBOpSKUId").get<std::string>());
+                                    bucketJson.at("name").get_to(name);
+                                    bucketJson.at("storageSKUId").get_to(storageSKUId);
+                                    bucketJson.at("classAOpSKUId").get_to(classAOpSKUId);
+                                    bucketJson.at("classBOpSKUId").get_to(classsBOpSKUId);
                                 }
                                 catch (const json::out_of_range& error)
                                 {
-                                    std::cout << "Failed to add bucket: " << error.what() << std::endl;
+                                    std::cout << "Failed getting settings for bucket: " << error.what() << std::endl;
                                     continue;
                                 }
+
+                                CBucket* bucket;
+                                if(bucketJson.contains("forbidDuplicatedReplicas"))
+                                    bucket = region->CreateStorageElement(std::move(name), bucketJson.at("forbidDuplicatedReplicas").get<bool>());
+                                else
+                                    bucket = region->CreateStorageElement(std::move(name));
+
+                                bucket->mPriceData->mStoragePrice = GetTieredRateFromSKUId(std::move(storageSKUId));
+                                bucket->mPriceData->mClassAOpPrice = GetTieredRateFromSKUId(std::move(classAOpSKUId));
+                                bucket->mPriceData->mClassBOpPrice = GetTieredRateFromSKUId(std::move(classsBOpSKUId));
                             }
                         }
                         else if ((regionJsonKey == "name") || (regionJsonKey == "location") || (regionJsonKey == "multiLocationIdx"))

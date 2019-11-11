@@ -116,8 +116,7 @@ bool CDefaultBaseSim::AddGridToOutput()
 
             row = std::to_string(storageElement->GetId()) + ",";
             row += std::to_string(gridSite->GetId()) + ",";
-            row += "'" + storageElement->GetName() + "',";
-            row += std::to_string(storageElement->GetAccessLatency());
+            row += "'" + storageElement->GetName() + "'";
 
             success = success && output.InsertRow("StorageElements", row);
         }
@@ -157,8 +156,7 @@ bool CDefaultBaseSim::AddCloudsToOutput()
 
                 row = std::to_string(bucket->GetId()) + ",";
                 row += std::to_string(cloudSite->GetId()) + ",";
-                row += "'" + bucket->GetName() + "',";
-                row += std::to_string(bucket->GetAccessLatency());
+                row += "'" + bucket->GetName() + "'";
 
                 success = success && output.InsertRow("StorageElements", row);
             }

@@ -55,6 +55,12 @@ public:
 class IDatabase
 {
 public:
+    IDatabase() = default;
+    IDatabase(const IDatabase&) = delete;
+    IDatabase& operator=(const IDatabase&) = delete;
+    IDatabase(const IDatabase&&) = delete;
+    IDatabase& operator=(const IDatabase&&) = delete;
+
     virtual ~IDatabase() = default;
 
     virtual bool Open(const std::string& params) = 0;

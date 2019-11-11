@@ -2,11 +2,11 @@
 "init":[
     "DROP TABLE IF EXISTS Sites, StorageElements, NetworkLinks, Files, Replicas, Transfers, Bills CASCADE;",
     "CREATE TABLE Sites (id BIGINT, name VARCHAR, locationName VARCHAR, cloudName VARCHAR);",
-    "CREATE TABLE StorageElements (id BIGINT, siteId BIGINT, name VARCHAR, accessLatency BIGINT);",
+    "CREATE TABLE StorageElements (id BIGINT, siteId BIGINT, name VARCHAR);",
     "CREATE TABLE NetworkLinks (id BIGINT, srcSiteId BIGINT, dstSiteId BIGINT);",
     "CREATE TABLE Files (id BIGINT, createdAt BIGINT, expiredAt BIGINT, filesize BIGINT);",
     "CREATE TABLE Replicas (id BIGINT, fileId BIGINT, storageElementId BIGINT, createdAt BIGINT, expiredAt BIGINT);",
-    "CREATE TABLE Transfers (id BIGINT, srcReplicaId BIGINT, dstReplicaId BIGINT, queuedAt BIGINT, startedAt BIGINT, finishedAt BIGINT);",
+    "CREATE TABLE Transfers (id BIGINT, srcStorageElementId BIGINT, dstStorageElementId BIGINT, fileId BIGINT, srcReplicaId BIGINT, dstReplicaId BIGINT, queuedAt BIGINT, startedAt BIGINT, finishedAt BIGINT, traffic BIGINT);",
     "CREATE TABLE Bills (cloudName VARCHAR, month INTEGER, bill VARCHAR);"
 ],
 
@@ -16,6 +16,6 @@
     "ALTER TABLE NetworkLinks ADD PRIMARY KEY(id), ADD FOREIGN KEY(srcSiteId) REFERENCES Sites(id), ADD FOREIGN KEY(dstSiteId) REFERENCES Sites(id);",
     "ALTER TABLE Files ADD PRIMARY KEY(id);",
     "ALTER TABLE Replicas ADD PRIMARY KEY(id), ADD FOREIGN KEY(fileId) REFERENCES Files(id), ADD FOREIGN KEY(storageElementId) REFERENCES StorageElements(id);",
-    "ALTER TABLE Transfers ADD PRIMARY KEY(id), ADD FOREIGN KEY(srcReplicaId) REFERENCES Replicas(id), ADD FOREIGN KEY(dstReplicaId) REFERENCES Replicas(id);"
+    "ALTER TABLE Transfers ADD PRIMARY KEY(id), ADD FOREIGN KEY(srcStorageElementId) REFERENCES StorageElements(id), ADD FOREIGN KEY(dstStorageElementId) REFERENCES StorageElements(id), ADD FOREIGN KEY(fileId) REFERENCES Filess(id), ADD FOREIGN KEY(srcReplicaId) REFERENCES Replicas(id), ADD FOREIGN KEY(dstReplicaId) REFERENCES Replicas(id);"
 ]
 }

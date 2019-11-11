@@ -7,57 +7,47 @@
 #include "output/COutput.hpp"
 
 
-CStorageElement::CStorageElement(std::string&& name, const TickType accessLatency, ISite* const site)
-    : mId(GetNewId()),
-      mName(std::move(name)),
-      mAccessLatency(accessLatency),
-      mSite(site)
+IStorageElementDelegate::IStorageElementDelegate(CStorageElement* storageElement)
+    : mStorageElement(storageElement)
 {}
 
-CStorageElement::~CStorageElement() = default;
+IStorageElementDelegate::~IStorageElementDelegate() = default;
 
-void CStorageElement::OnOperation(const OPERATION op)
+
+
+void CBaseStorageElementDelegate::OnOperation(const CStorageElement::OPERATION op)
 {
     (void)op;
 }
 
-auto CStorageElement::CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica>
+auto CBaseStorageElementDelegate::CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica>
 {
-    const auto result = mFileIds.insert(file->GetId());
-
-    if (!result.second)
-        return nullptr;
-
-    auto newReplica = std::make_shared<SReplica>(file, this, now, mReplicas.size());
+    auto& replicas = GetStorageElement()->mReplicas;
+    auto newReplica = std::make_shared<SReplica>(file, mStorageElement, now, replicas.size());
     file->mReplicas.emplace_back(newReplica);
-    mReplicas.emplace_back(newReplica);
+    replicas.emplace_back(newReplica);
 
-    OnOperation(INSERT);
+    OnOperation(CStorageElement::INSERT);
 
     return newReplica;
 }
 
-void CStorageElement::OnIncreaseReplica(const SpaceType amount, const TickType now)
+void CBaseStorageElementDelegate::OnIncreaseReplica(const SpaceType amount, const TickType now)
 {
     (void)now;
     mUsedStorage += amount;
 }
 
-void CStorageElement::OnRemoveReplica(const SReplica* const replica, const TickType now, bool needLock)
+void CBaseStorageElementDelegate::OnRemoveReplica(const SReplica* replica, const TickType now, bool needLock)
 {
     (void)now;
+    auto& replicas = GetStorageElement()->mReplicas;
     const SpaceType curSize = replica->GetCurSize();
-
-    std::unique_lock<std::mutex> lock(mReplicaRemoveMutex, std::defer_lock);
-    if(needLock)
-        lock.lock();
-
     const std::size_t idxToDelete = replica->mIndexAtStorageElement;
-    auto& lastReplica = mReplicas.back();
-    auto ret = mFileIds.erase(replica->GetFile()->GetId());
-    assert(ret == 1);
-    assert(idxToDelete < mReplicas.size());
+    std::shared_ptr<SReplica>& lastReplica = replicas.back();
+
     assert(curSize <= mUsedStorage);
+    assert(idxToDelete < replicas.size());
 
     mUsedStorage -= curSize;
 
@@ -65,8 +55,64 @@ void CStorageElement::OnRemoveReplica(const SReplica* const replica, const TickT
     if(idxToDelete != idxLastReplica)
     {
         idxLastReplica = idxToDelete;
-        mReplicas[idxToDelete] = lastReplica;
+        replicas[idxToDelete] = lastReplica;
     }
-    mReplicas.pop_back();
-    OnOperation(DELETE);
+    replicas.pop_back();
+    OnOperation(CStorageElement::DELETE);
+}
+
+
+
+auto CUniqueReplicaStorageElementDelegate::CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica>
+{
+    const auto result = mFileIds.insert(file->GetId());
+
+    if (!result.second)
+        return nullptr;
+
+    return CBaseStorageElementDelegate::CreateReplica(file, now);
+}
+
+
+void CUniqueReplicaStorageElementDelegate::OnRemoveReplica(const SReplica* const replica, const TickType now, bool needLock)
+{
+    std::unique_lock<std::mutex> lock(mReplicaRemoveMutex, std::defer_lock);
+    if(needLock)
+        lock.lock();
+
+    auto ret = mFileIds.erase(replica->GetFile()->GetId());
+    assert(ret == 1);
+
+    CBaseStorageElementDelegate::OnRemoveReplica(replica, now, needLock);
+}
+
+
+
+CStorageElement::CStorageElement(std::string&& name, ISite* site, bool forbidDuplicatedReplicas)
+    : mId(GetNewId()),
+      mName(std::move(name)),
+      mSite(site)
+{
+    if(forbidDuplicatedReplicas)
+        mDelegate.reset(new CUniqueReplicaStorageElementDelegate(this));
+    else
+        mDelegate.reset(new CBaseStorageElementDelegate(this));
+}
+
+void CStorageElement::OnOperation(const OPERATION op)
+{
+    mDelegate->OnOperation(op);
+}
+
+auto CStorageElement::CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica>
+{
+    return mDelegate->CreateReplica(file, now);
+}
+void CStorageElement::OnIncreaseReplica(const SpaceType amount, const TickType now)
+{
+    mDelegate->OnIncreaseReplica(amount, now);
+}
+void CStorageElement::OnRemoveReplica(const SReplica* replica, const TickType now, const bool needLock)
+{
+    mDelegate->OnRemoveReplica(replica, now, needLock);
 }

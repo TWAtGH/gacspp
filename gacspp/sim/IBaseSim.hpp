@@ -22,6 +22,11 @@ class IBaseSim
 {
 public:
     IBaseSim();
+    IBaseSim(const IBaseSim&) = delete;
+    IBaseSim& operator=(const IBaseSim&) = delete;
+    IBaseSim(const IBaseSim&&) = delete;
+    IBaseSim& operator=(const IBaseSim&&) = delete;
+
     virtual ~IBaseSim();
 
     //std::random_device rngDevice;

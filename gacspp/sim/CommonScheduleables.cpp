@@ -239,8 +239,7 @@ CTransferManager::CTransferManager(const std::uint32_t tickFreq, const TickType 
 {
     mActiveTransfers.reserve(1024*1024);
     mQueuedTransfers.reserve(1024 * 1024);
-    //mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("INSERT INTO Transfers VALUES(?, ?, ?, ?, ?);", '?');
-    mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Transfers(id, srcReplicaId, dstReplicaId, queuedAt, startedAt, finishedAt) FROM STDIN with(FORMAT csv);", 6, '?');
+    mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Transfers(id, srcStorageElementId, dstStorageElementId, fileId, srcReplicaId, dstReplicaId, queuedAt, startedAt, finishedAt) FROM STDIN with(FORMAT csv);", 6, '?');
 }
 
 void CTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcReplica, std::shared_ptr<SReplica> dstReplica, const TickType now)
@@ -252,8 +251,7 @@ void CTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcReplica, std:
 
     networkLink->mNumActiveTransfers += 1;
     srcStorageElement->OnOperation(CStorageElement::GET);
-    const TickType startAt = now + (srcStorageElement->GetAccessLatency() / 1000);
-    mQueuedTransfers.emplace_back(srcReplica, dstReplica, networkLink, now, startAt);
+    mQueuedTransfers.emplace_back(srcReplica, dstReplica, networkLink, now, now);
 }
 
 void CTransferManager::OnUpdate(const TickType now)
@@ -304,11 +302,15 @@ void CTransferManager::OnUpdate(const TickType now)
         if(dstReplica->IsComplete())
         {
             transferInsertQueries->AddValue(GetNewId());
+            transferInsertQueries->AddValue(srcReplica->GetStorageElement()->GetId());
+            transferInsertQueries->AddValue(dstReplica->GetStorageElement()->GetId());
+            transferInsertQueries->AddValue(srcReplica->GetFile()->GetId());
             transferInsertQueries->AddValue(srcReplica->GetId());
             transferInsertQueries->AddValue(dstReplica->GetId());
             transferInsertQueries->AddValue(transfer.mQueuedAt);
             transferInsertQueries->AddValue(transfer.mStartAt);
             transferInsertQueries->AddValue(now);
+            transferInsertQueries->AddValue(dstReplica->GetCurSize());
 
             ++mNumCompletedTransfers;
             mSummedTransferDuration += now - transfer.mStartAt;
@@ -349,11 +351,10 @@ CFixedTimeTransferManager::CFixedTimeTransferManager(const TickType tickFreq, co
 {
     mActiveTransfers.reserve(1024 * 1024);
     mQueuedTransfers.reserve(1024 * 1024);
-    //mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("INSERT INTO Transfers VALUES(?, ?, ?, ?, ?);", '?');
-    mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Transfers(id, srcReplicaId, dstReplicaId, queuedAt, startedAt, finishedAt) FROM STDIN with(FORMAT csv);", 6, '?');
+    mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Transfers(id, srcStorageElementId, dstStorageElementId, srcReplicaId, dstReplicaId, queuedAt, startedAt, finishedAt) FROM STDIN with(FORMAT csv);", 6, '?');
 }
 
-void CFixedTimeTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcReplica, std::shared_ptr<SReplica> dstReplica, const TickType now, const TickType duration)
+void CFixedTimeTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcReplica, std::shared_ptr<SReplica> dstReplica, const TickType now, const TickType startDelay, const TickType duration)
 {
 
     assert(mQueuedTransfers.size() < mQueuedTransfers.capacity());
@@ -365,8 +366,7 @@ void CFixedTimeTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcRepl
 
     networkLink->mNumActiveTransfers += 1;
     srcStorageElement->OnOperation(CStorageElement::GET);
-    const TickType startAt = now + (srcReplica->GetStorageElement()->GetAccessLatency() / 1000);
-    mQueuedTransfers.emplace_back(srcReplica, dstReplica, networkLink, now, startAt, std::max(SpaceType(1), increasePerTick ));
+    mQueuedTransfers.emplace_back(srcReplica, dstReplica, networkLink, now, now+startDelay, std::max(SpaceType(1), increasePerTick ));
 }
 
 void CFixedTimeTransferManager::OnUpdate(const TickType now)
@@ -403,11 +403,15 @@ void CFixedTimeTransferManager::OnUpdate(const TickType now)
         if(dstReplica->IsComplete())
         {
             transferInsertQueries->AddValue(GetNewId());
+            transferInsertQueries->AddValue(srcReplica->GetStorageElement()->GetId());
+            transferInsertQueries->AddValue(dstReplica->GetStorageElement()->GetId());
+            transferInsertQueries->AddValue(srcReplica->GetFile()->GetId());
             transferInsertQueries->AddValue(srcReplica->GetId());
             transferInsertQueries->AddValue(dstReplica->GetId());
             transferInsertQueries->AddValue(transfer.mQueuedAt);
             transferInsertQueries->AddValue(transfer.mStartAt);
             transferInsertQueries->AddValue(now);
+            transferInsertQueries->AddValue(dstReplica->GetCurSize());
 
             ++mNumCompletedTransfers;
             mSummedTransferDuration += now - transfer.mStartAt;
@@ -831,7 +835,7 @@ void CJobSlotTransferGen::OnUpdate(const TickType now)
                 replicaInsertQueries->AddValue(now);
                 replicaInsertQueries->AddValue(newReplica->mExpiresAt);
 
-                mTransferMgr->CreateTransfer(bestSrcReplica, newReplica, now, 60);
+                mTransferMgr->CreateTransfer(bestSrcReplica, newReplica, now, 0, 60); //TODO: fix delay
                 newJobs.second += 1;
             }
             else
@@ -1080,7 +1084,7 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
                         assert(newCacheReplica);
                         newCacheReplica->mExpiresAt = now + mCacheElements[0].mDefaultReplicaLifetime;
 
-                        mTransferMgr->CreateTransfer(bestSrcReplica, newCacheReplica, now, 60);
+                        mTransferMgr->CreateTransfer(bestSrcReplica, newCacheReplica, now, 0, 60); //TODO: fix delay
                     }
                 }
                 else if(!bestSrcReplica->IsComplete())
@@ -1098,7 +1102,7 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
                 assert(newReplica);
                 newReplica->mExpiresAt = now + mDefaultReplicaLifetime;
 
-                mTransferMgr->CreateTransfer(bestSrcReplica, newReplica, now, 60);
+                mTransferMgr->CreateTransfer(bestSrcReplica, newReplica, now, 0, 60); //TODO: fix delay
 
                 std::swap(fileVec[fileIdx], fileVec.back());
                 fileVec.pop_back();

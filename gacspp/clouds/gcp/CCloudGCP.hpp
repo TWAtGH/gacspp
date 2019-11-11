@@ -27,17 +27,6 @@ namespace gcp
     class CRegion;
     class CBucket : public CStorageElement
     {
-    private:
-        TickType mTimeLastCostUpdate = 0;
-        struct SCostTracking
-        {
-            double mStorageCosts = 0;
-            std::size_t mNumClassA = 0;
-            std::size_t mNumClassB = 0;
-        };
-
-        std::unique_ptr<SCostTracking> mCostTracking = std::make_unique<SCostTracking>();
-
     public:
         struct SPriceData
         {
@@ -46,13 +35,9 @@ namespace gcp
             TieredPriceType mClassBOpPrice;
         };
 
-        std::unique_ptr<SPriceData> mPriceData = std::make_unique<SPriceData>();
-
         using CStorageElement::CStorageElement;
 
-        CBucket(CBucket&&) = default;
-
-        virtual void OnOperation(const CStorageElement::OPERATION op) final;
+        virtual void OnOperation(const OPERATION op) final;
 
         virtual void OnIncreaseReplica(const SpaceType amount, const TickType now) final;
         virtual void OnRemoveReplica(const SReplica* replica, const TickType now) final;
@@ -66,6 +51,20 @@ namespace gcp
         {return mCostTracking->mNumClassA;}
         inline auto GetNumClassB() const -> std::size_t
         {return mCostTracking->mNumClassB;}
+
+
+        std::unique_ptr<SPriceData> mPriceData = std::make_unique<SPriceData>();
+
+    private:
+        TickType mTimeLastCostUpdate = 0;
+        struct SCostTracking
+        {
+            double mStorageCosts = 0;
+            std::size_t mNumClassA = 0;
+            std::size_t mNumClassB = 0;
+        };
+
+        std::unique_ptr<SCostTracking> mCostTracking = std::make_unique<SCostTracking>();
     };
 
     class CRegion : public ISite
@@ -73,7 +72,7 @@ namespace gcp
     public:
         using ISite::ISite;
 
-        auto CreateStorageElement(std::string&& name, const TickType accessLatency) -> CBucket* final;
+        auto CreateStorageElement(std::string&& name, bool forbidDuplicatedReplicas=true) -> CBucket* final;
         auto CalculateStorageCosts(const TickType now) -> double;
         auto CalculateOperationCosts(std::size_t& numClassA, std::size_t& numClassB) -> double;
         auto CalculateNetworkCosts(double& sumUsedTraffic, std::uint64_t& sumDoneTransfers) -> double;
@@ -112,7 +111,7 @@ namespace gcp
 
     public:
         CCloudFactory();
-        ~CCloudFactory();
+        virtual ~CCloudFactory();
 
         auto CreateCloud(std::string&& cloudName) const->std::unique_ptr<IBaseCloud> final;
     };

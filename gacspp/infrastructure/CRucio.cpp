@@ -224,11 +224,12 @@ auto CReaper::RunReaper(const TickType now) -> std::size_t
 
 
 
-auto CGridSite::CreateStorageElement(std::string&& name, const TickType accessLatency) -> CStorageElement*
+CGridSite::~CGridSite() = default;
+
+auto CGridSite::CreateStorageElement(std::string&& name, bool forbidDuplicatedReplicas) -> CStorageElement*
 {
-    CStorageElement* newStorageElement = new CStorageElement(std::move(name), accessLatency, this);
-    mStorageElements.emplace_back(newStorageElement);
-    return newStorageElement;
+    mStorageElements.emplace_back(std::make_unique<CStorageElement>(std::move(name), this, forbidDuplicatedReplicas));
+    return mStorageElements.back().get();
 }
 
 
@@ -312,16 +313,21 @@ bool CRucio::LoadConfig(const json& config)
                         assert(siteJsonValue.is_array());
                         for (const json& storageElementJson : siteJsonValue)
                         {
+                            std::string name;
                             try
                             {
-                                site->CreateStorageElement(storageElementJson.at("name").get<std::string>(),
-                                                           storageElementJson.at("accessLatency").get<TickType>());
+                                storageElementJson.at("name").get_to(name);
                             }
                             catch (const json::out_of_range& error)
                             {
-                                std::cout << "Failed to add storage element: " << error.what() << std::endl;
+                                std::cout << "Failed getting settings for storage element: " << error.what() << std::endl;
                                 continue;
                             }
+
+                            if(storageElementJson.contains("forbidDuplicatedReplicas"))
+                                site->CreateStorageElement(std::move(name), storageElementJson.at("forbidDuplicatedReplicas").get<bool>());
+                            else
+                                site->CreateStorageElement(std::move(name));
                         }
                     }
                     else if ((siteJsonKey == "name") || (siteJsonKey == "location") || (siteJsonKey == "multiLocationIdx"))

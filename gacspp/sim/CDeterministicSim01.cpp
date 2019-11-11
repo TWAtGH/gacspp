@@ -296,7 +296,7 @@ public:
                         InsertTmpReplica(srcReplica);
 
                         std::shared_ptr<SReplica> r = mDiskStorageElement->CreateReplica(file, now);
-                        mTransferMgr->CreateTransfer(srcReplica, r, now, job.mStageOutDuration);
+                        mTransferMgr->CreateTransfer(srcReplica, r, now, 0, job.mStageOutDuration);
                     }
                 }
                 jobBatch.pop_front();
@@ -358,7 +358,7 @@ public:
 
                 assert(srcReplica);
 
-                mTransferMgr->CreateTransfer(srcReplica, dstReplica, now, job.mStageInDuration);
+                mTransferMgr->CreateTransfer(srcReplica, dstReplica, now, 0, job.mStageInDuration);
             }
         }
 

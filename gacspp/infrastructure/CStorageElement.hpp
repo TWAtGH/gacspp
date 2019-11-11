@@ -14,6 +14,7 @@ struct SFile;
 struct SReplica;
 
 class IPreparedInsert;
+class IStorageElementDelegate;
 
 
 class CStorageElement
@@ -28,46 +29,94 @@ public:
         CUSTOM
     };
 
-    CStorageElement(std::string&& name, const TickType accessLatency, ISite* const site);
-    CStorageElement(CStorageElement&&) = default;
-    CStorageElement& operator=(CStorageElement&&) = default;
+    CStorageElement(std::string&& name, ISite* site, bool forbidDuplicatedReplicas=true);
 
-    CStorageElement(CStorageElement const&) = delete;
-    CStorageElement& operator=(CStorageElement const&) = delete;
+    void OnOperation(const OPERATION op);
 
-    virtual ~CStorageElement();
-
-
-    virtual void OnOperation(const OPERATION op);
-
-    virtual auto CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica>;
-    virtual void OnIncreaseReplica(const SpaceType amount, const TickType now);
-    virtual void OnRemoveReplica(const SReplica* replica, const TickType now, bool needLock=true);
+    auto CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica>;
+    void OnIncreaseReplica(const SpaceType amount, const TickType now);
+    void OnRemoveReplica(const SReplica* replica, const TickType now, const bool needLock=true);
 
     inline auto GetId() const -> IdType
     {return mId;}
     inline auto GetName() const -> const std::string&
     {return mName;}
-    inline auto GetAccessLatency() const -> TickType
-    {return mAccessLatency;}
     inline auto GetSite() const -> const ISite*
     {return mSite;}
     inline auto GetSite() -> ISite*
     {return mSite;}
 
+    std::vector<std::shared_ptr<SReplica>> mReplicas;
+
 private:
     IdType mId;
     std::string mName;
-    TickType mAccessLatency;
+
+protected:
+    ISite* mSite;
+    std::unique_ptr<IStorageElementDelegate> mDelegate;
+};
+
+
+
+class IStorageElementDelegate
+{
+public:
+    IStorageElementDelegate(CStorageElement* storageElement);
+
+    IStorageElementDelegate(IStorageElementDelegate&&) = delete;
+    IStorageElementDelegate& operator=(IStorageElementDelegate&&) = delete;
+    IStorageElementDelegate(const IStorageElementDelegate&) = delete;
+    IStorageElementDelegate& operator=(const IStorageElementDelegate&) = delete;
+
+    virtual ~IStorageElementDelegate();
+
+
+    virtual void OnOperation(const CStorageElement::OPERATION op) = 0;
+
+    virtual auto CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica> = 0;
+    virtual void OnIncreaseReplica(const SpaceType amount, const TickType now) = 0;
+    virtual void OnRemoveReplica(const SReplica* replica, const TickType now, bool needLock=true) = 0;
+
+    inline auto GetStorageElement() -> CStorageElement*
+    {return mStorageElement;}
+    inline auto GetUsedStorage() -> SpaceType
+    {return mUsedStorage;}
+
+protected:
+    CStorageElement *mStorageElement;
+    SpaceType mUsedStorage = 0;
+};
+
+
+
+class CBaseStorageElementDelegate : public IStorageElementDelegate
+{
+public:
+    using IStorageElementDelegate::IStorageElementDelegate;
+
+
+    virtual void OnOperation(const CStorageElement::OPERATION op);
+
+    virtual auto CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica>;
+    virtual void OnIncreaseReplica(const SpaceType amount, const TickType now);
+    virtual void OnRemoveReplica(const SReplica* replica, const TickType now, bool needLock=true);
+};
+
+
+
+class CUniqueReplicaStorageElementDelegate : public CBaseStorageElementDelegate
+{
+public:
+    using CBaseStorageElementDelegate::CBaseStorageElementDelegate;
+
+
+    virtual auto CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica>;
+    virtual void OnRemoveReplica(const SReplica* replica, const TickType now, bool needLock=true);
+
+private:
     phmap::parallel_flat_hash_set<IdType> mFileIds;
 
 protected:
     std::mutex mReplicaRemoveMutex;
-
-    ISite* mSite;
-    SpaceType mUsedStorage = 0;
-
-public:
-    std::vector<std::shared_ptr<SReplica>> mReplicas;
-
 };

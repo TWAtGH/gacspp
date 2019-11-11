@@ -26,6 +26,11 @@ public:
     std::vector<std::unique_ptr<ISite>> mRegions;
 
     IBaseCloud(std::string&& name);
+    IBaseCloud(const IBaseCloud&) = delete;
+    IBaseCloud& operator=(const IBaseCloud&) = delete;
+    IBaseCloud(const IBaseCloud&&) = delete;
+    IBaseCloud& operator=(const IBaseCloud&&) = delete;
+
     virtual ~IBaseCloud();
 
     virtual auto CreateRegion(std::string&& name,

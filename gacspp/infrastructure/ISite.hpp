@@ -9,6 +9,7 @@
 
 class CNetworkLink;
 class CStorageElement;
+class IStorageElementDelegate;
 
 
 
@@ -16,13 +17,14 @@ class ISite
 {
 public:
     ISite(std::string&& name, std::string&& locationName, const std::uint8_t multiLocationIdx);
+
+    ISite(ISite&&) = delete;
+    ISite& operator=(ISite&&) = delete;
+    ISite(const ISite&) = delete;
+    ISite& operator=(const ISite&) = delete;
+
     virtual ~ISite();
 
-    ISite(ISite&&) = default;
-    ISite& operator=(ISite&&) = default;
-
-    ISite(ISite const&) = delete;
-    ISite& operator=(ISite const&) = delete;
 
     inline bool operator==(const ISite& b) const
     {return mId == b.mId;}
@@ -30,7 +32,7 @@ public:
     {return mId != b.mId;}
 
     virtual auto CreateNetworkLink(ISite* const dstSite, const std::uint32_t bandwidth) -> CNetworkLink*;
-    virtual auto CreateStorageElement(std::string&& name, const TickType accessLatency) -> CStorageElement* = 0;
+    virtual auto CreateStorageElement(std::string&& name, bool forbidDuplicatedReplicas=true) -> CStorageElement* = 0;
 
     auto GetNetworkLink(const ISite* const dstSite) -> CNetworkLink*;
     auto GetNetworkLink(const ISite* const dstSite) const -> const CNetworkLink*;
