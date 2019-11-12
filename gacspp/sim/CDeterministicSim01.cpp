@@ -50,6 +50,8 @@ private:
 
     std::list<std::shared_ptr<SReplica>> mTmpReplicas;
 
+    std::vector<std::size_t> mFileIndices;
+
     bool LoadNextFile()
     {
         constexpr char sym = '$';
@@ -84,10 +86,10 @@ private:
             if(!LoadNextFile())
                 return false;
 
-        mJobBatchList.emplace_front();
+        JobBatchType& newJobBatch = mJobBatchList.emplace_front();
         mCurJobBatch = mJobBatchList.begin();
 
-        mDataFile >> mCurJobBatch->first;
+        mDataFile >> newJobBatch.first;
         mDataFile.ignore(1);
 
         TickType stageInDuration, jobDuration, stageOutDuration;
@@ -101,20 +103,20 @@ private:
             mDataFile >> jobDuration;
             mDataFile.ignore(1);
 
-            const TickType jobEndTime = mCurJobBatch->first + stageInDuration + jobDuration;
+            const TickType jobEndTime = newJobBatch.first + stageInDuration + jobDuration;
 
             mDataFile >> stageOutDuration;
             mDataFile.ignore(1);
 
-            auto prev = mCurJobBatch->second.before_begin();
-            auto cur = mCurJobBatch->second.begin();
-            while((cur != mCurJobBatch->second.end()) && (cur->mJobEndTime < jobEndTime))
+            auto prev = newJobBatch.second.before_begin();
+            auto cur = newJobBatch.second.begin();
+            while((cur != newJobBatch.second.end()) && (cur->mJobEndTime < jobEndTime))
             {
                 prev = cur;
                 ++cur;
             }
 
-            cur = mCurJobBatch->second.emplace_after(prev);
+            cur = newJobBatch.second.emplace_after(prev);
             cur->mStageInDuration = stageInDuration;
             cur->mStageOutDuration = stageOutDuration;
             cur->mJobEndTime = jobEndTime;
@@ -165,6 +167,7 @@ public:
         assert(ok);
         mNextCallTick = mCurJobBatch->first;
         mSim->mRucio->mFiles.reserve(12000000);
+        mFileIndices.resize(12000000, 12000000);
     }
 
     void InsertTmpReplica(std::shared_ptr<SReplica> replica)
@@ -282,9 +285,9 @@ public:
                 for (const std::pair<std::uint64_t, SpaceType>& outFile : job.mOutputFiles)
                 {
                     std::shared_ptr<SFile> file;
-                    if (outFile.first >= mSim->mRucio->mFiles.size())
+                    if(mFileIndices[outFile.first] == mFileIndices.size())
                     {
-                        assert(mSim->mRucio->mFiles.size() == outFile.first);
+                        mFileIndices[outFile.first] = mSim->mRucio->mFiles.size();
                         file = mSim->mRucio->CreateFile(outFile.second, now, SECONDS_PER_MONTH * 13);
 
                         std::shared_ptr<SReplica> srcReplica = mComputingStorageElement->CreateReplica(file, now);
@@ -327,9 +330,9 @@ public:
             {
                 std::shared_ptr<SReplica> srcReplica;
                 std::shared_ptr<SFile> file;
-                if(inFile.first >= mSim->mRucio->mFiles.size())
+                if(mFileIndices[inFile.first] == mFileIndices.size())
                 {
-                    assert(mSim->mRucio->mFiles.size() == inFile.first);
+                    mFileIndices[inFile.first] = mSim->mRucio->mFiles.size();
                     file = mSim->mRucio->CreateFile(inFile.second, now, SECONDS_PER_MONTH * 13);
 
                     srcReplica = mDiskStorageElement->CreateReplica(file, now);
@@ -338,7 +341,7 @@ public:
                     srcReplica->Increase(inFile.second, now);
                 }
                 else
-                    file = mSim->mRucio->mFiles[inFile.first];
+                    file = mSim->mRucio->mFiles[mFileIndices[inFile.first]];
 
                 std::shared_ptr<SReplica> dstReplica = mComputingStorageElement->CreateReplica(file, now);
                 if (!dstReplica)

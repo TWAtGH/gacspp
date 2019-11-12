@@ -239,7 +239,7 @@ CTransferManager::CTransferManager(const std::uint32_t tickFreq, const TickType 
 {
     mActiveTransfers.reserve(1024*1024);
     mQueuedTransfers.reserve(1024 * 1024);
-    mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Transfers(id, srcStorageElementId, dstStorageElementId, fileId, srcReplicaId, dstReplicaId, queuedAt, startedAt, finishedAt) FROM STDIN with(FORMAT csv);", 6, '?');
+    mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Transfers(id, srcStorageElementId, dstStorageElementId, fileId, srcReplicaId, dstReplicaId, queuedAt, startedAt, finishedAt, traffic) FROM STDIN with(FORMAT csv);", 10, '?');
 }
 
 void CTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcReplica, std::shared_ptr<SReplica> dstReplica, const TickType now)
@@ -351,7 +351,7 @@ CFixedTimeTransferManager::CFixedTimeTransferManager(const TickType tickFreq, co
 {
     mActiveTransfers.reserve(1024 * 1024);
     mQueuedTransfers.reserve(1024 * 1024);
-    mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Transfers(id, srcStorageElementId, dstStorageElementId, srcReplicaId, dstReplicaId, queuedAt, startedAt, finishedAt) FROM STDIN with(FORMAT csv);", 6, '?');
+    mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Transfers(id, srcStorageElementId, dstStorageElementId, fileId, srcReplicaId, dstReplicaId, queuedAt, startedAt, finishedAt, traffic) FROM STDIN with(FORMAT csv);", 10, '?');
 }
 
 void CFixedTimeTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcReplica, std::shared_ptr<SReplica> dstReplica, const TickType now, const TickType startDelay, const TickType duration)

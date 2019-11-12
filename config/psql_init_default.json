@@ -16,6 +16,6 @@
     "ALTER TABLE NetworkLinks ADD PRIMARY KEY(id), ADD FOREIGN KEY(srcSiteId) REFERENCES Sites(id), ADD FOREIGN KEY(dstSiteId) REFERENCES Sites(id);",
     "ALTER TABLE Files ADD PRIMARY KEY(id);",
     "ALTER TABLE Replicas ADD PRIMARY KEY(id), ADD FOREIGN KEY(fileId) REFERENCES Files(id), ADD FOREIGN KEY(storageElementId) REFERENCES StorageElements(id);",
-    "ALTER TABLE Transfers ADD PRIMARY KEY(id), ADD FOREIGN KEY(srcStorageElementId) REFERENCES StorageElements(id), ADD FOREIGN KEY(dstStorageElementId) REFERENCES StorageElements(id), ADD FOREIGN KEY(fileId) REFERENCES Filess(id), ADD FOREIGN KEY(srcReplicaId) REFERENCES Replicas(id), ADD FOREIGN KEY(dstReplicaId) REFERENCES Replicas(id);"
+    "ALTER TABLE Transfers ADD PRIMARY KEY(id), ADD FOREIGN KEY(srcStorageElementId) REFERENCES StorageElements(id), ADD FOREIGN KEY(dstStorageElementId) REFERENCES StorageElements(id), ADD FOREIGN KEY(fileId) REFERENCES Files(id), ADD FOREIGN KEY(srcReplicaId) REFERENCES Replicas(id), ADD FOREIGN KEY(dstReplicaId) REFERENCES Replicas(id);"
 ]
 }
