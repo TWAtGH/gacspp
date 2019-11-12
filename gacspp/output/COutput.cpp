@@ -6,6 +6,7 @@
 #include <sstream>
 
 #include "COutput.hpp"
+#include "CDatabaseDummy.hpp"
 #include "CDatabasePSQL.hpp"
 
 #include "common/constants.h"
@@ -25,7 +26,10 @@ COutput::~COutput()
 bool COutput::Initialise(const std::string& params, const std::size_t insertQueryBufferLen)
 {
     assert(mDB == nullptr);
-    mDB = std::make_shared<psql::CDatabase>();
+    if(params == ":dummydb:")
+        mDB = std::make_shared<dummydb::CDatabase>();
+    else
+        mDB = std::make_shared<psql::CDatabase>();
 
     if(mDB->Open(params))
     {
@@ -129,7 +133,10 @@ void COutput::QueueInserts(std::unique_ptr<IInsertValuesContainer>&& queriesCont
 {
     assert(queriesContainer != nullptr);
     if(queriesContainer->IsEmpty())
+    {
+        queriesContainer.reset(nullptr);
         return;
+    }
 
     const std::size_t bufLen = mInsertQueriesBuffer.size();
 

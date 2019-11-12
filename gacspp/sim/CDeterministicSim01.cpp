@@ -284,23 +284,21 @@ public:
 
                 for (const std::pair<std::uint64_t, SpaceType>& outFile : job.mOutputFiles)
                 {
-                    std::shared_ptr<SFile> file;
-                    if(mFileIndices[outFile.first] == mFileIndices.size())
-                    {
-                        mFileIndices[outFile.first] = mSim->mRucio->mFiles.size();
-                        file = mSim->mRucio->CreateFile(outFile.second, now, SECONDS_PER_MONTH * 13);
+                    assert(mFileIndices[outFile.first] == mFileIndices.size());
 
-                        std::shared_ptr<SReplica> srcReplica = mComputingStorageElement->CreateReplica(file, now);
-                        assert(srcReplica);
+                    mFileIndices[outFile.first] = mSim->mRucio->mFiles.size();
+                    std::shared_ptr<SFile> file = mSim->mRucio->CreateFile(outFile.second, now, SECONDS_PER_MONTH * 13);
+                    std::shared_ptr<SReplica> srcReplica = mComputingStorageElement->CreateReplica(file, now);
 
-                        srcReplica->Increase(outFile.second, now);
-                        srcReplica->mExpiresAt = job.mJobEndTime + job.mStageOutDuration + 60;
+                    assert(srcReplica);
 
-                        InsertTmpReplica(srcReplica);
+                    srcReplica->Increase(outFile.second, now);
+                    srcReplica->mExpiresAt = job.mJobEndTime + job.mStageOutDuration + 60;
 
-                        std::shared_ptr<SReplica> r = mDiskStorageElement->CreateReplica(file, now);
-                        mTransferMgr->CreateTransfer(srcReplica, r, now, 0, job.mStageOutDuration);
-                    }
+                    InsertTmpReplica(srcReplica);
+
+                    std::shared_ptr<SReplica> r = mDiskStorageElement->CreateReplica(file, now);
+                    mTransferMgr->CreateTransfer(srcReplica, r, now, 0, job.mStageOutDuration);
                 }
                 jobBatch.pop_front();
             }
@@ -341,25 +339,17 @@ public:
                     srcReplica->Increase(inFile.second, now);
                 }
                 else
+                {
                     file = mSim->mRucio->mFiles[mFileIndices[inFile.first]];
+                    srcReplica = file->GetReplicaByStorageElement(mDiskStorageElement);
+                    assert(srcReplica);
+                }
 
                 std::shared_ptr<SReplica> dstReplica = mComputingStorageElement->CreateReplica(file, now);
-                if (!dstReplica)
-                {
-                    dstReplica = file->GetReplicaByStorageElement(mComputingStorageElement);
-                    assert(dstReplica);
-                    UpdateTmpReplicaExpiresAt(dstReplica, job.mJobEndTime + 60);
-                }
-                else
-                {
-                    dstReplica->mExpiresAt = job.mJobEndTime + 60;
-                    InsertTmpReplica(dstReplica);
-                }
+                assert(dstReplica);
 
-                if (!srcReplica)
-                    srcReplica = file->GetReplicaByStorageElement(mDiskStorageElement);
-
-                assert(srcReplica);
+                dstReplica->mExpiresAt = job.mJobEndTime + 60;
+                InsertTmpReplica(dstReplica);
 
                 mTransferMgr->CreateTransfer(srcReplica, dstReplica, now, 0, job.mStageInDuration);
             }
