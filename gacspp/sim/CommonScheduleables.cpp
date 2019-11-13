@@ -356,22 +356,32 @@ CFixedTimeTransferManager::CFixedTimeTransferManager(const TickType tickFreq, co
 
 void CFixedTimeTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcReplica, std::shared_ptr<SReplica> dstReplica, const TickType now, const TickType startDelay, const TickType duration)
 {
-
     assert(mQueuedTransfers.size() < mQueuedTransfers.capacity());
 
     CStorageElement* const srcStorageElement = srcReplica->GetStorageElement();
     CNetworkLink* const networkLink = srcStorageElement->GetSite()->GetNetworkLink(dstReplica->GetStorageElement()->GetSite());
 
-    SpaceType increasePerTick = static_cast<SpaceType>(static_cast<double>(srcReplica->GetFile()->GetSize()) / duration);
+    SpaceType increasePerTick = static_cast<SpaceType>(static_cast<double>(srcReplica->GetFile()->GetSize()) / std::max<TickType>(1, duration));
 
     networkLink->mNumActiveTransfers += 1;
     srcStorageElement->OnOperation(CStorageElement::GET);
-    mQueuedTransfers.emplace_back(srcReplica, dstReplica, networkLink, now, now+startDelay, std::max(SpaceType(1), increasePerTick ));
+    mQueuedTransfers.emplace_back(srcReplica, dstReplica, networkLink, now, now+startDelay, increasePerTick+1);
 }
 
 void CFixedTimeTransferManager::OnUpdate(const TickType now)
 {
     CScopedTimeDiff durationUpdate(nullptr, &mUpdateDurationSummed);
+
+    for (std::size_t i = 0; i < mQueuedTransfers.size(); ++i)
+    {
+        if (mQueuedTransfers[i].mStartAt <= now)
+        {
+            assert(mActiveTransfers.size() < mActiveTransfers.capacity());
+            mActiveTransfers.emplace_back(std::move(mQueuedTransfers[i]));
+            mQueuedTransfers[i] = std::move(mQueuedTransfers.back());
+            mQueuedTransfers.pop_back();
+        }
+    }
 
     const std::uint32_t timeDiff = static_cast<std::uint32_t>(now - mLastUpdated);
     mLastUpdated = now;
@@ -391,6 +401,7 @@ void CFixedTimeTransferManager::OnUpdate(const TickType now)
         {
             networkLink->mFailedTransfers += 1;
             networkLink->mNumActiveTransfers -= 1;
+            mNumFailedTransfers += 1;
             transfer = std::move(mActiveTransfers.back());
             mActiveTransfers.pop_back();
             continue; // handle same idx again
@@ -426,17 +437,6 @@ void CFixedTimeTransferManager::OnUpdate(const TickType now)
     }
 
     COutput::GetRef().QueueInserts(std::move(transferInsertQueries));
-
-    for (std::size_t i = 0; i < mQueuedTransfers.size(); ++i)
-    {
-        if (mQueuedTransfers[i].mStartAt <= now)
-        {
-            assert(mActiveTransfers.size() < mActiveTransfers.capacity());
-            mActiveTransfers.emplace_back(std::move(mQueuedTransfers[i]));
-            mQueuedTransfers[i] = std::move(mQueuedTransfers.back());
-            mQueuedTransfers.pop_back();
-        }
-    }
 
     mNextCallTick = now + mTickFreq;
 }
@@ -1163,14 +1163,19 @@ void CHeartbeat::OnUpdate(const TickType now)
     statusOutput << "Runtime: " << mUpdateDurationSummed.count() << "s; ";
     statusOutput << "numFiles: " << static_cast<std::size_t>(mSim->mRucio->mFiles.size() / 1000.0) << "k; ";
 
-    statusOutput << "activeTransfers: " << mG2CTransferMgr->GetNumActiveTransfers();
+    statusOutput << "active: " << mG2CTransferMgr->GetNumActiveTransfers();
     if(mC2CTransferMgr)
         statusOutput << " + " << mC2CTransferMgr->GetNumActiveTransfers();
     statusOutput << "; ";
 
-    statusOutput << "CompletedTransfers: " << mG2CTransferMgr->mNumCompletedTransfers;
+    statusOutput << "done: " << mG2CTransferMgr->mNumCompletedTransfers;
     if(mC2CTransferMgr)
         statusOutput << " + " << mC2CTransferMgr->mNumCompletedTransfers;
+    statusOutput << "; ";
+
+    statusOutput << "failed: " << mG2CTransferMgr->mNumFailedTransfers;
+    if (mC2CTransferMgr)
+        statusOutput << " + " << mC2CTransferMgr->mNumFailedTransfers;
     statusOutput << "; ";
 
     double avgTransferDuration = 0;
@@ -1188,10 +1193,12 @@ void CHeartbeat::OnUpdate(const TickType now)
 
     mG2CTransferMgr->mNumCompletedTransfers = 0;
     mG2CTransferMgr->mSummedTransferDuration = 0;
+    mG2CTransferMgr->mNumFailedTransfers = 0;
     if(mC2CTransferMgr)
     {
         mC2CTransferMgr->mNumCompletedTransfers = 0;
         mC2CTransferMgr->mSummedTransferDuration = 0;
+        mC2CTransferMgr->mNumFailedTransfers = 0;
     }
 
     std::size_t maxW = 0;

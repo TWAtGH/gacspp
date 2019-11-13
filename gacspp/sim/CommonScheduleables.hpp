@@ -146,6 +146,7 @@ private:
 
 public:
     std::uint32_t mNumCompletedTransfers = 0;
+    std::uint32_t mNumFailedTransfers = 0;
     TickType mSummedTransferDuration = 0;
 
 public:
@@ -191,6 +192,7 @@ private:
 
 public:
     std::uint32_t mNumCompletedTransfers = 0;
+    std::uint32_t mNumFailedTransfers = 0;
     TickType mSummedTransferDuration = 0;
 
 public:

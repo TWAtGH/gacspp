@@ -31,11 +31,11 @@ public:
 
     CStorageElement(std::string&& name, ISite* site, bool forbidDuplicatedReplicas=true);
 
-    void OnOperation(const OPERATION op);
+    virtual void OnOperation(const OPERATION op);
 
-    auto CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica>;
-    void OnIncreaseReplica(const SpaceType amount, const TickType now);
-    void OnRemoveReplica(const SReplica* replica, const TickType now, const bool needLock=true);
+    virtual auto CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica>;
+    virtual void OnIncreaseReplica(const SpaceType amount, const TickType now);
+    virtual void OnRemoveReplica(const SReplica* replica, const TickType now, const bool needLock=true);
 
     inline auto GetId() const -> IdType
     {return mId;}

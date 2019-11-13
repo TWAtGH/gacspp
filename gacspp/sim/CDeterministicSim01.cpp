@@ -99,6 +99,7 @@ private:
 
             mDataFile >> stageInDuration;
             mDataFile.ignore(1);
+            stageInDuration = std::max<TickType>(1, stageInDuration);
 
             mDataFile >> jobDuration;
             mDataFile.ignore(1);
@@ -107,6 +108,7 @@ private:
 
             mDataFile >> stageOutDuration;
             mDataFile.ignore(1);
+            stageOutDuration = std::max<TickType>(1, stageOutDuration);
 
             auto prev = newJobBatch.second.before_begin();
             auto cur = newJobBatch.second.begin();
@@ -293,7 +295,7 @@ public:
                     assert(srcReplica);
 
                     srcReplica->Increase(outFile.second, now);
-                    srcReplica->mExpiresAt = job.mJobEndTime + job.mStageOutDuration + 60;
+                    srcReplica->mExpiresAt = job.mJobEndTime + job.mStageOutDuration + 120;
 
                     InsertTmpReplica(srcReplica);
 
