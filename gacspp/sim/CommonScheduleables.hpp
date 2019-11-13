@@ -201,6 +201,8 @@ public:
     void OnUpdate(const TickType now) final;
 
     void CreateTransfer(std::shared_ptr<SReplica> srcReplica, std::shared_ptr<SReplica> dstReplica, const TickType now, const TickType startDelay, const TickType duration);
+    void Shutdown(const TickType now) final;
+
 
     inline auto GetNumQueuedTransfers() const -> std::size_t
     {return mQueuedTransfers.size();}

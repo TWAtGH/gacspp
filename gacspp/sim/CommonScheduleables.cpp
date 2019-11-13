@@ -441,6 +441,42 @@ void CFixedTimeTransferManager::OnUpdate(const TickType now)
     mNextCallTick = now + mTickFreq;
 }
 
+void CFixedTimeTransferManager::Shutdown(const TickType now)
+{
+    std::size_t numWithDst=0, numWithoutDst=0;
+    SpaceType sumCurSizes=0, sumFileSizes=0;
+    for(const STransfer& transfer : mQueuedTransfers)
+    {
+        std::shared_ptr<SReplica> dstReplica = transfer.mDstReplica.lock();
+        if(dstReplica)
+        {
+            numWithDst += 1;
+            sumCurSizes += dstReplica->GetCurSize();
+            sumFileSizes += dstReplica->GetFile()->GetSize();
+        }
+        else
+            numWithoutDst += 1;
+    }
+    std::cout<<"Queued: numWithDst="<<numWithDst<<"; numWithoutDst="<<numWithoutDst;
+    std::cout<<"; sumCurSizes="<<sumCurSizes<<"; sumFileSizes="<<sumFileSizes<<std::endl;
+
+    numWithDst = numWithoutDst = sumCurSizes = sumFileSizes = 0;
+    for(const STransfer& transfer : mActiveTransfers)
+    {
+        std::shared_ptr<SReplica> dstReplica = transfer.mDstReplica.lock();
+        if(dstReplica)
+        {
+            numWithDst += 1;
+            sumCurSizes += dstReplica->GetCurSize();
+            sumFileSizes += dstReplica->GetFile()->GetSize();
+        }
+        else
+            numWithoutDst += 1;
+    }
+    std::cout<<"Active: numWithDst="<<numWithDst<<"; numWithoutDst="<<numWithoutDst;
+    std::cout<<"; sumCurSizes="<<sumCurSizes<<"; sumFileSizes="<<sumFileSizes<<std::endl;
+}
+
 
 
 CWavedTransferNumGen::CWavedTransferNumGen(const double softmaxScale, const double softmaxOffset, const std::uint32_t samplingFreq, const double baseFreq)
