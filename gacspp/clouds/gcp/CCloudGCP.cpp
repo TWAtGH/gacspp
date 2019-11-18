@@ -80,7 +80,7 @@ namespace gcp
         CStorageElement::OnIncreaseReplica(amount, now);
     }
 
-    void CBucket::OnRemoveReplica(const SReplica* replica, const TickType now)
+    void CBucket::OnRemoveReplica(const SReplica* replica, const TickType now, bool needLock)
     {
         //std::unique_lock<std::mutex> lock(mReplicaRemoveMutex);
         if (now > mTimeLastCostUpdate)
@@ -88,7 +88,7 @@ namespace gcp
             mCostTracking->mStorageCosts += (BYTES_TO_GiB(mDelegate->GetUsedStorage()) * GetCurStoragePrice() * (now - mTimeLastCostUpdate)) / 1000000000.0;
             mTimeLastCostUpdate = now;
         }
-        CStorageElement::OnRemoveReplica(replica, now, false);
+        CStorageElement::OnRemoveReplica(replica, now, needLock);
     }
 
     auto CBucket::CalculateStorageCosts(const TickType now) -> double

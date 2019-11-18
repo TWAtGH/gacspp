@@ -5,6 +5,7 @@
 #include "infrastructure/ISite.hpp"
 #include "infrastructure/CStorageElement.hpp"
 
+
 namespace gcp
 {
     typedef std::vector<std::pair<std::uint32_t, long double>> TieredPriceType;
@@ -40,7 +41,7 @@ namespace gcp
         virtual void OnOperation(const OPERATION op) final;
 
         virtual void OnIncreaseReplica(const SpaceType amount, const TickType now) final;
-        virtual void OnRemoveReplica(const SReplica* replica, const TickType now) final;
+        virtual void OnRemoveReplica(const SReplica* replica, const TickType now, bool needLock=true) final;
 
         auto CalculateStorageCosts(const TickType now) -> double;
         auto CalculateOperationCosts() -> double;
