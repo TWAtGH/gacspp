@@ -199,7 +199,19 @@ public:
                 mNextCallTick = std::min(mNextCallTick, replica->mExpiresAt);
                 break;
             }
-            replica->GetFile()->ExtractExpiredReplicas(now, expiredReplicas);
+
+            std::vector<std::shared_ptr<SReplica>>& fileReplicas = replica->GetFile()->mReplicas;
+            replica->OnRemoveByFile(now);
+            expiredReplicas.emplace_back(replica);
+            for(std::size_t i=0; i<fileReplicas.size(); ++i)
+            {
+                if(fileReplicas[i] == replica)
+                {
+                    fileReplicas[i] = std::move(fileReplicas.back());
+                    fileReplicas.pop_back();
+                    break;
+                }
+            }
             mTmpReplicas.pop_back();
         }
 
@@ -400,6 +412,19 @@ public:
 
     void Shutdown(const TickType now)
     {
+        std::size_t numQueuedStageOut = 0;
+        while(!mJobBatchList.empty())
+        {
+            auto& jobBatch = mJobBatchList.front().second;
+            while (!jobBatch.empty())
+            {
+                numQueuedStageOut += jobBatch.front().mOutputFiles.size();
+                jobBatch.pop_front();
+            }
+            mJobBatchList.pop_front();
+        }
+        std::cout<<"numQueuedStageOut="<<numQueuedStageOut<<std::endl;
+
         std::vector<std::weak_ptr<SFile>> files;
         files.reserve(mSim->mRucio->mFiles.size());
         std::vector<std::weak_ptr<SReplica>> replicas;
