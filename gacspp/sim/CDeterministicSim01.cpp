@@ -381,7 +381,7 @@ public:
 
     void OnUpdate(const TickType now)
     {
-        CScopedTimeDiff durationUpdate(nullptr, &mUpdateDurationSummed);
+        CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
 
         if (mTmpReplicas.empty() && mJobBatchList.empty() && (mCurJobBatch == mJobBatchList.end()))
         {
@@ -395,17 +395,17 @@ public:
         assert(mDiskStorageElement && mComputingStorageElement);
 
         {
-            CScopedTimeDiff subDurationUpdate(nullptr, &mUpdateCleanDurationSummed);
+            CScopedTimeDiff subDurationUpdate(mUpdateCleanDurationSummed, true);
             CleanupTmpReplicas(now);
         }
 
         {
-            CScopedTimeDiff subDurationUpdate(nullptr, &mUpdateOutDurationSummed);
+            CScopedTimeDiff subDurationUpdate(mUpdateOutDurationSummed, true);
             StageOut(now);
         }
 
         {
-            CScopedTimeDiff subDurationUpdate(nullptr, &mUpdateInDurationSummed);
+            CScopedTimeDiff subDurationUpdate(mUpdateInDurationSummed, true);
             StageIn(now);
         }
     }

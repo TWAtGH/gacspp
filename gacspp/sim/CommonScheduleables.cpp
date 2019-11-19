@@ -19,17 +19,17 @@
 
 
 
-CScopedTimeDiff::CScopedTimeDiff(std::chrono::duration<double>* set, std::chrono::duration<double>* add)
-    :mStartTime(std::chrono::high_resolution_clock::now()), mSet(set), mAdd(add)
+CScopedTimeDiff::CScopedTimeDiff(std::chrono::duration<double>& outVal, bool willAdd)
+    :mStartTime(std::chrono::high_resolution_clock::now()), mOutVal(outVal), mWillAdd(willAdd)
 {}
 
 CScopedTimeDiff::~CScopedTimeDiff()
 {
-    auto duration = std::chrono::high_resolution_clock::now() - mStartTime;
-    if (mSet)
-        (*mSet) = duration;
-    if (mAdd)
-        (*mAdd) += duration;
+    const auto duration = std::chrono::high_resolution_clock::now() - mStartTime;
+    if (mWillAdd)
+        mOutVal += duration;
+    else
+        mOutVal = duration;
 }
 
 
@@ -139,7 +139,7 @@ auto CDataGenerator::CreateFilesAndReplicas(const std::uint32_t numFiles, const 
 
 void CDataGenerator::OnUpdate(const TickType now)
 {
-    CScopedTimeDiff durationUpdate(nullptr, &mUpdateDurationSummed);
+    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
 
     const std::uint32_t totalFilesToGen = GetRandomNumFilesToGenerate();
 
@@ -166,7 +166,7 @@ CReaperCaller::CReaperCaller(CRucio *rucio, const std::uint32_t tickFreq, const 
 
 void CReaperCaller::OnUpdate(const TickType now)
 {
-    CScopedTimeDiff durationUpdate(nullptr, &mUpdateDurationSummed);
+    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
 
     mRucio->RunReaper(now);
 
@@ -256,7 +256,7 @@ void CTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcReplica, std:
 
 void CTransferManager::OnUpdate(const TickType now)
 {
-    CScopedTimeDiff durationUpdate(nullptr, &mUpdateDurationSummed);
+    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
 
     const std::uint32_t timeDiff = static_cast<std::uint32_t>(now - mLastUpdated);
     mLastUpdated = now;
@@ -370,7 +370,7 @@ void CFixedTimeTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcRepl
 
 void CFixedTimeTransferManager::OnUpdate(const TickType now)
 {
-    CScopedTimeDiff durationUpdate(nullptr, &mUpdateDurationSummed);
+    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
 
     std::size_t i = 0;
     while(i < mQueuedTransfers.size())
@@ -517,7 +517,7 @@ void CUniformTransferGen::OnUpdate(const TickType now)
 {
     assert(mSrcStorageElements.size() > 0);
 
-    CScopedTimeDiff durationUpdate(nullptr, &mUpdateDurationSummed);
+    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
 
     RNGEngineType& rngEngine = mSim->mRNGEngine;
     std::uniform_int_distribution<std::size_t> dstStorageElementRndChooser(0, mDstStorageElements.size()-1);
@@ -586,7 +586,7 @@ CExponentialTransferGen::CExponentialTransferGen(IBaseSim* sim,
 
 void CExponentialTransferGen::OnUpdate(const TickType now)
 {
-    CScopedTimeDiff durationUpdate(nullptr, &mUpdateDurationSummed);
+    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
 
     const std::size_t numSrcStorageElements = mSrcStorageElements.size();
     const std::size_t numDstStorageElements = mDstStorageElements.size();
@@ -662,7 +662,7 @@ CSrcPrioTransferGen::CSrcPrioTransferGen(IBaseSim* sim,
 
 void CSrcPrioTransferGen::OnUpdate(const TickType now)
 {
-    CScopedTimeDiff durationUpdate(nullptr, &mUpdateDurationSummed);
+    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
 
     const std::vector<std::shared_ptr<SFile>>& allFiles = mSim->mRucio->mFiles;
     const std::size_t numDstStorageElements = mDstStorageElements.size();
@@ -773,7 +773,7 @@ CJobSlotTransferGen::CJobSlotTransferGen(IBaseSim* sim,
 
 void CJobSlotTransferGen::OnUpdate(const TickType now)
 {
-    CScopedTimeDiff durationUpdate(nullptr, &mUpdateDurationSummed);
+    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
 
     const std::vector<std::shared_ptr<SFile>>& allFiles = mSim->mRucio->mFiles;
     assert(allFiles.size() > 0);
@@ -1028,7 +1028,7 @@ void CCachedSrcTransferGen::ExpireReplica(CStorageElement* storageElement, const
 
 void CCachedSrcTransferGen::OnUpdate(const TickType now)
 {
-    CScopedTimeDiff durationUpdate(nullptr, &mUpdateDurationSummed);
+    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
 
     RNGEngineType& rngEngine = mSim->mRNGEngine;
 

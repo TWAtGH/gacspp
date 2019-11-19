@@ -23,11 +23,11 @@ class CScopedTimeDiff
 {
 private:
     std::chrono::high_resolution_clock::time_point mStartTime;
-    std::chrono::duration<double>* mSet;
-    std::chrono::duration<double>* mAdd;
+    std::chrono::duration<double>& mOutVal;
+    bool mWillAdd;
 
 public:
-    CScopedTimeDiff(std::chrono::duration<double>* set=nullptr, std::chrono::duration<double>* add=nullptr);
+    CScopedTimeDiff(std::chrono::duration<double>& outVal, bool willAdd=false);
     ~CScopedTimeDiff();
 };
 
