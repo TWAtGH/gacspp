@@ -23,7 +23,7 @@ class CDeterministicTransferGen : public CScheduleable, public CBaseOnDeletionIn
 private:
     IBaseSim* mSim;
 
-    std::shared_ptr<CFixedTimeTransferManager> mTransferMgr;
+    std::shared_ptr<CTransferBatchManager> mTransferMgr;
 
     std::string mFilePathTmpl;
     std::uint32_t mCurFileIdx;
@@ -41,6 +41,8 @@ private:
         TickType mJobEndTime;
         std::vector<std::pair<std::uint64_t, SpaceType>> mInputFiles;
         std::vector<std::pair<std::uint64_t, SpaceType>> mOutputFiles;
+
+        std::unique_ptr<CTransferBatchManager::STransferBatch> mTransferBatch;
     };
 
     typedef std::pair<TickType, std::forward_list<SJob>> JobBatchType;
@@ -155,11 +157,12 @@ public:
     std::chrono::duration<double> mUpdateCleanDurationSummed = std::chrono::duration<double>::zero();
     std::chrono::duration<double> mUpdateInDurationSummed = std::chrono::duration<double>::zero();
     std::chrono::duration<double> mUpdateOutDurationSummed = std::chrono::duration<double>::zero();
-    CStorageElement* mDiskStorageElement = nullptr;
+
+    std::vector<std::pair<CStorageElement*, CStorageElement*>> mTapeStorageElements;
     CStorageElement* mComputingStorageElement = nullptr;
 
     CDeterministicTransferGen(IBaseSim* sim,
-                              std::shared_ptr<CFixedTimeTransferManager> transferMgr,
+                              std::shared_ptr<CTransferBatchManager> transferMgr,
                               const std::string& filePathTmpl,
                               const std::uint32_t startFileIdx=0)
         : mSim(sim), mTransferMgr(transferMgr),
@@ -336,37 +339,63 @@ public:
             return;
         }
 
-        for (const SJob& job : mCurJobBatch->second)
+        for (SJob& job : mCurJobBatch->second)
         {
+            job.mTransferBatch = std::make_unique<CTransferBatchManager::STransferBatch>();
+            std::pair<CStorageElement*, CStorageElement*> tapeDiskStorageElement{nullptr, nullptr};
             for (const std::pair<std::uint64_t, SpaceType>& inFile : job.mInputFiles)
             {
-                std::shared_ptr<SReplica> srcReplica;
                 std::shared_ptr<SFile> file;
                 if(mFileIndices[inFile.first] == mFileIndices.size())
                 {
                     mFileIndices[inFile.first] = mSim->mRucio->mFiles.size();
                     file = mSim->mRucio->CreateFile(inFile.second, now, SECONDS_PER_MONTH * 13);
-
-                    srcReplica = mDiskStorageElement->CreateReplica(file, now);
-                    assert(srcReplica);
-
-                    srcReplica->Increase(inFile.second, now);
                 }
-                else
+                else if(!tapeDiskStorageElement.first)
                 {
                     file = mSim->mRucio->mFiles[mFileIndices[inFile.first]];
-                    srcReplica = file->GetReplicaByStorageElement(mDiskStorageElement);
+
+                    for(const std::pair<CStorageElement*, CStorageElement*>& tapeDisk : mTapeStorageElements)
+                    {
+                        if(file->GetReplicaByStorageElement(tapeDisk.first))
+                        {
+                            tapeDiskStorageElement = tapeDisk;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if(!tapeDiskStorageElement.first)
+            {
+                //select tapeDiskStorageElement
+            }
+
+            job.mTransferBatch->mStartAt = now + 2700;
+            job.mTransferBatch->mRoute.push_back(tapeDiskStorageElement.first->GetNetworkLink(tapeDiskStorageElement.second));
+            job.mTransferBatch->mRoute.push_back(tapeDiskStorageElement.second->GetNetworkLink(mComputingStorageElement));
+
+            for (const std::pair<std::uint64_t, SpaceType>& inFile : job.mInputFiles)
+            {
+                std::shared_ptr<SFile> file = mSim->mRucio->mFiles[mFileIndices[inFile.first]];
+                std::shared_ptr<SReplica> srcReplica = file->GetReplicaByStorageElement(tapeDiskStorageElement.first);
+
+                if(!srcReplica)
+                {
+                    srcReplica = tapeDiskStorageElement.first->CreateReplica(file, now);
                     assert(srcReplica);
+                    srcReplica->Increase(inFile.second, now);
                 }
 
-                std::shared_ptr<SReplica> dstReplica = mComputingStorageElement->CreateReplica(file, now);
+                std::shared_ptr<SReplica> dstReplica = tapeDiskStorageElement.second->CreateReplica(file, now);
                 assert(dstReplica);
 
-                dstReplica->mExpiresAt = job.mJobEndTime + 60;
-                InsertTmpReplica(dstReplica);
-
-                mTransferMgr->CreateTransfer(srcReplica, dstReplica, now, 0, job.mStageInDuration);
+                //dstReplica->mExpiresAt = job.mJobEndTime + 60;
+                //InsertTmpReplica(dstReplica);
+                job.mTransferBatch->mTransfers.emplace_back(std::make_unique<CTransferBatchManager::STransfer>(srcReplica, dstReplica, now, now+2700));
             }
+
+            mTransferMgr->QueueTransferBatch(std::move(job.mTransferBatch));
         }
 
         if (!mDataFile.is_open())
@@ -386,13 +415,11 @@ public:
         if (mTmpReplicas.empty() && mJobBatchList.empty() && (mCurJobBatch == mJobBatchList.end()))
         {
             mNextCallTick = now + 20;
-            if ((mTransferMgr->GetNumQueuedTransfers() + mTransferMgr->GetNumActiveTransfers()) == 0)
-                mSim->Stop();
+            //if ((mTransferMgr->GetNumQueuedTransfers() + mTransferMgr->GetNumActiveTransfers()) == 0)
+                //mSim->Stop();
         }
         else
             mNextCallTick = std::numeric_limits<TickType>::max();
-
-        assert(mDiskStorageElement && mComputingStorageElement);
 
         {
             CScopedTimeDiff subDurationUpdate(mUpdateCleanDurationSummed, true);
@@ -447,7 +474,7 @@ bool CDeterministicSim01::SetupDefaults(const json& profileJson)
         return false;
 
     std::shared_ptr<CDeterministicTransferGen> transferGen;
-    std::shared_ptr<CFixedTimeTransferManager> manager;
+    std::shared_ptr<CTransferBatchManager> manager;
     try
     {
         const json& transferGenCfg = profileJson.at("deterministicTransferGen");
@@ -456,9 +483,9 @@ bool CDeterministicSim01::SetupDefaults(const json& profileJson)
         const std::string managerType = transferGenCfg.at("managerType").get<std::string>();
         const TickType managerTickFreq = transferGenCfg.at("managerTickFreq").get<TickType>();
         const TickType managerStartTick = transferGenCfg.at("managerStartTick").get<TickType>();
-        if(managerType == "fixedTime")
+        if(managerType == "batched")
         {
-            manager = std::make_shared<CFixedTimeTransferManager>(managerTickFreq, managerStartTick);
+            manager = std::make_shared<CTransferBatchManager>(managerTickFreq, managerStartTick);
             transferGen = std::make_shared<CDeterministicTransferGen>(this, manager, fileDataFilePathTmpl, fileDataFileFirstIdx);
 
             for(const json& storageElementName : transferGenCfg.at("diskStorageElements"))

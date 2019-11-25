@@ -118,7 +118,69 @@ public:
 };
 
 
-class CTransferManager : public CScheduleable
+
+class CBaseTransferManager : public CScheduleable
+{
+public:
+    using CScheduleable::CScheduleable;
+
+    std::uint32_t mNumCompletedTransfers = 0;
+    std::uint32_t mNumFailedTransfers = 0;
+    TickType mSummedTransferDuration = 0;
+};
+
+
+
+class CTransferBatchManager : public CBaseTransferManager
+{
+public:
+    struct STransfer
+    {
+        std::shared_ptr<SReplica> mSrcReplica;
+        std::shared_ptr<SReplica> mDstReplica;
+
+        TickType mQueuedAt;
+        TickType mStartAt;
+
+        std::size_t mCurRouteIdx = 0;
+
+        STransfer(std::shared_ptr<SReplica> srcReplica, std::shared_ptr<SReplica> dstReplica, TickType queuedAt, TickType startedAt, std::size_t routeIdx = 0);
+    };
+
+    struct STransferBatch
+    {
+        std::vector<CNetworkLink*> mRoute;
+
+        TickType mStartAt;
+
+        std::vector<std::unique_ptr<STransfer>> mTransfers;
+        std::uint32_t mNumDoneTransfers = 0;
+    };
+
+public:
+    CTransferBatchManager(const std::uint32_t tickFreq, const TickType startTick=0);
+
+    void OnUpdate(const TickType now) final;
+
+    void QueueTransferBatch(std::unique_ptr<STransferBatch>&& transferBatch)
+    {
+        if(!transferBatch->mTransfers.empty())
+            mQueuedTransferBatches.emplace_back(std::move(transferBatch));
+    }
+
+private:
+    std::shared_ptr<IPreparedInsert> mOutputTransferInsertQuery;
+
+    TickType mLastUpdated = 0;
+    std::uint32_t mTickFreq;
+
+    std::vector<std::unique_ptr<STransferBatch>> mActiveTransferBatches;
+    std::vector<std::unique_ptr<STransferBatch>> mQueuedTransferBatches;
+
+};
+
+
+class CTransferManager : public CBaseTransferManager
 {
 private:
     std::shared_ptr<IPreparedInsert> mOutputTransferInsertQuery;
@@ -137,17 +199,12 @@ private:
         STransfer(  std::shared_ptr<SReplica> srcReplica,
                     std::shared_ptr<SReplica> dstReplica,
                     CNetworkLink* const networkLink,
-                    const TickType queudAt,
+                    const TickType queuedAt,
                     const TickType startAt);
     };
 
     std::vector<STransfer> mActiveTransfers;
     std::vector<STransfer> mQueuedTransfers;
-
-public:
-    std::uint32_t mNumCompletedTransfers = 0;
-    std::uint32_t mNumFailedTransfers = 0;
-    TickType mSummedTransferDuration = 0;
 
 public:
     CTransferManager(const std::uint32_t tickFreq, const TickType startTick=0);
@@ -161,7 +218,7 @@ public:
 };
 
 
-class CFixedTimeTransferManager : public CScheduleable
+class CFixedTimeTransferManager : public CBaseTransferManager
 {
 private:
     std::shared_ptr<IPreparedInsert> mOutputTransferInsertQuery;
@@ -189,11 +246,6 @@ private:
 
     std::vector<STransfer> mActiveTransfers;
     std::vector<STransfer> mQueuedTransfers;
-
-public:
-    std::uint32_t mNumCompletedTransfers = 0;
-    std::uint32_t mNumFailedTransfers = 0;
-    TickType mSummedTransferDuration = 0;
 
 public:
     CFixedTimeTransferManager(const TickType tickFreq, const TickType startTick=0);
@@ -390,8 +442,8 @@ class CHeartbeat : public CScheduleable
 {
 private:
     IBaseSim* mSim;
-    std::shared_ptr<CFixedTimeTransferManager> mG2CTransferMgr;
-    std::shared_ptr<CTransferManager> mC2CTransferMgr;
+    std::shared_ptr<CBaseTransferManager> mG2CTransferMgr;
+    std::shared_ptr<CBaseTransferManager> mC2CTransferMgr;
     std::uint32_t mTickFreq;
 
     std::chrono::high_resolution_clock::time_point mTimeLastUpdate;
@@ -400,7 +452,7 @@ public:
     std::unordered_map<std::string, std::chrono::duration<double>*> mProccessDurations;
 
 public:
-    CHeartbeat(IBaseSim* sim, std::shared_ptr<CFixedTimeTransferManager> g2cTransferMgr, std::shared_ptr<CTransferManager> c2cTransferMgr, const std::uint32_t tickFreq, const TickType startTick=0);
+    CHeartbeat(IBaseSim* sim, std::shared_ptr<CBaseTransferManager> g2cTransferMgr, std::shared_ptr<CBaseTransferManager> c2cTransferMgr, const std::uint32_t tickFreq, const TickType startTick=0);
 
     void OnUpdate(const TickType now) final;
 };

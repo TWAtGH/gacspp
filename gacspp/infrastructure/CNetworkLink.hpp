@@ -23,8 +23,8 @@ private:
     CStorageElement* mDstStorageElement;
 
 public:
-    std::uint64_t mDoneTransfers = 0;
-    std::uint64_t mFailedTransfers = 0;
+    std::uint64_t mNumDoneTransfers = 0;
+    std::uint64_t mNumFailedTransfers = 0;
     std::uint32_t mNumActiveTransfers = 0;
 
     SpaceType mUsedTraffic = 0;

@@ -186,10 +186,10 @@ namespace gcp
 
                 regionNetworkCosts += costs;
                 sumUsedTraffic += inGiB;
-                sumDoneTransfers += networkLink->mDoneTransfers;
+                sumDoneTransfers += networkLink->mNumDoneTransfers;
                 networkLink->mUsedTraffic = 0;
-                networkLink->mDoneTransfers = 0;
-                networkLink->mFailedTransfers = 0;
+                networkLink->mNumDoneTransfers = 0;
+                networkLink->mNumFailedTransfers = 0;
             }
         }
         return regionNetworkCosts;
