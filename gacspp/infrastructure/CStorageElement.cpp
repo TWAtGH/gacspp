@@ -1,6 +1,7 @@
 #include <cassert>
 
 #include "ISite.hpp"
+#include "CNetworkLink.hpp"
 #include "CStorageElement.hpp"
 #include "SFile.hpp"
 
@@ -104,6 +105,15 @@ void CStorageElement::OnOperation(const OPERATION op)
     mDelegate->OnOperation(op);
 }
 
+auto CStorageElement::CreateNetworkLink(CStorageElement* const dstStorageElement, const SpaceType bandwidthBytesPerSecond) -> CNetworkLink*
+{
+    auto result = mDstSiteIdToNetworkLinkIdx.insert({ dstStorageElement->mId, mNetworkLinks.size() });
+    assert(result.second);
+    CNetworkLink* newNetworkLink = new CNetworkLink(bandwidthBytesPerSecond, this, dstStorageElement);
+    mNetworkLinks.emplace_back(newNetworkLink);
+    return newNetworkLink;
+}
+
 auto CStorageElement::CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica>
 {
     return mDelegate->CreateReplica(file, now);
@@ -115,4 +125,20 @@ void CStorageElement::OnIncreaseReplica(const SpaceType amount, const TickType n
 void CStorageElement::OnRemoveReplica(const SReplica* replica, const TickType now, const bool needLock)
 {
     mDelegate->OnRemoveReplica(replica, now, needLock);
+}
+
+auto CStorageElement::GetNetworkLink(const CStorageElement* const dstStorageElement) -> CNetworkLink*
+{
+    auto result = mDstSiteIdToNetworkLinkIdx.find(dstStorageElement->mId);
+    if (result == mDstSiteIdToNetworkLinkIdx.end())
+        return nullptr;
+    return mNetworkLinks[result->second].get();
+}
+
+auto CStorageElement::GetNetworkLink(const CStorageElement* const dstStorageElement) const -> const CNetworkLink*
+{
+    auto result = mDstSiteIdToNetworkLinkIdx.find(dstStorageElement->mId);
+    if (result == mDstSiteIdToNetworkLinkIdx.end())
+        return nullptr;
+    return mNetworkLinks[result->second].get();
 }

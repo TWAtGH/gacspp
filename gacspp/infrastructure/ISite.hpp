@@ -7,7 +7,6 @@
 
 #include "common/constants.h"
 
-class CNetworkLink;
 class CStorageElement;
 class IStorageElementDelegate;
 
@@ -31,11 +30,8 @@ public:
     inline bool operator!=(const ISite& b) const
     {return mId != b.mId;}
 
-    virtual auto CreateNetworkLink(ISite* const dstSite, const std::uint32_t bandwidth) -> CNetworkLink*;
     virtual auto CreateStorageElement(std::string&& name, bool forbidDuplicatedReplicas=true) -> CStorageElement* = 0;
-
-    auto GetNetworkLink(const ISite* const dstSite) -> CNetworkLink*;
-    auto GetNetworkLink(const ISite* const dstSite) const -> const CNetworkLink*;
+    virtual void GetStorageElements(std::vector<CStorageElement*>& storageElements) = 0;
 
     inline auto GetId() const -> IdType
     {return mId;}
@@ -46,16 +42,12 @@ public:
     inline auto GetMultiLocationIdx() const -> std::uint8_t
     {return mMultiLocationIdx;}
 
-    std::vector<std::unique_ptr<CNetworkLink>> mNetworkLinks;
 
 private:
     IdType mId;
     std::string mName;
     std::string mLocationName;
     std::uint8_t mMultiLocationIdx;
-
-protected:
-    std::unordered_map<IdType, std::size_t> mDstSiteIdToNetworkLinkIdx;
 
 public:
     std::unordered_map<std::string, std::string> mCustomConfig;

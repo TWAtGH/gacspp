@@ -74,9 +74,12 @@ namespace gcp
         using ISite::ISite;
 
         auto CreateStorageElement(std::string&& name, bool forbidDuplicatedReplicas=true) -> CBucket* final;
+        void GetStorageElements(std::vector<CStorageElement*>& storageElements) final;
+
         auto CalculateStorageCosts(const TickType now) -> double;
         auto CalculateOperationCosts(std::size_t& numClassA, std::size_t& numClassB) -> double;
         auto CalculateNetworkCosts(double& sumUsedTraffic, std::uint64_t& sumDoneTransfers) -> double;
+
 
         std::vector<std::unique_ptr<CBucket>> mStorageElements;
         std::unordered_map<IdType, TieredPriceType> mNetworkLinkIdToPrice;

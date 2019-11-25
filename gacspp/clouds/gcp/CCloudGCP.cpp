@@ -145,6 +145,13 @@ namespace gcp
         return mStorageElements.back().get();
     }
 
+    void CRegion::GetStorageElements(std::vector<CStorageElement*>& storageElements)
+    {
+        storageElements.reserve(mStorageElements.size());
+        for (std::unique_ptr<CBucket>& bucket : mStorageElements)
+            storageElements.push_back(bucket.get());
+    }
+
     double CRegion::CalculateStorageCosts(const TickType now)
     {
         double regionStorageCosts = 0;
@@ -168,18 +175,22 @@ namespace gcp
     double CRegion::CalculateNetworkCosts(double& sumUsedTraffic, std::uint64_t& sumDoneTransfers)
     {
         double regionNetworkCosts = 0;
-        for (const std::unique_ptr<CNetworkLink>& networkLink : mNetworkLinks)
+        
+        for(const std::unique_ptr<CBucket>& srcBucket : mStorageElements)
         {
-            const TieredPriceType& networkPrice = mNetworkLinkIdToPrice.at(networkLink->GetId());
-            const double inGiB = BYTES_TO_GiB(networkLink->mUsedTraffic);
-            double costs = CalculateCostsRecursive(inGiB, networkPrice.cbegin(), networkPrice.cend());
+            for (const std::unique_ptr<CNetworkLink>& networkLink : srcBucket->mNetworkLinks)
+            {
+                const TieredPriceType& networkPrice = mNetworkLinkIdToPrice.at(networkLink->GetId());
+                const double inGiB = BYTES_TO_GiB(networkLink->mUsedTraffic);
+                double costs = CalculateCostsRecursive(inGiB, networkPrice.cbegin(), networkPrice.cend());
 
-            regionNetworkCosts += costs;
-            sumUsedTraffic += inGiB;
-            sumDoneTransfers += networkLink->mDoneTransfers;
-            networkLink->mUsedTraffic = 0;
-            networkLink->mDoneTransfers = 0;
-            networkLink->mFailedTransfers = 0;
+                regionNetworkCosts += costs;
+                sumUsedTraffic += inGiB;
+                sumDoneTransfers += networkLink->mDoneTransfers;
+                networkLink->mUsedTraffic = 0;
+                networkLink->mDoneTransfers = 0;
+                networkLink->mFailedTransfers = 0;
+            }
         }
         return regionNetworkCosts;
     }
@@ -227,21 +238,24 @@ namespace gcp
             CRegion* srcRegion = dynamic_cast<CRegion*>(srcSite.get());
             assert(srcRegion != nullptr);
 
-            for (const std::unique_ptr<CNetworkLink>& networkLink : srcRegion->mNetworkLinks)
+            for (const std::unique_ptr<CBucket>& srcBucket : srcRegion->mStorageElements)
             {
-                const ISite* dstSite = networkLink->GetDstSite();
-                const std::string dstRegionMultiLocationIdx = std::to_string(dstSite->GetMultiLocationIdx());
-                const CRegion* dstRegion = dynamic_cast<const CRegion*>(dstSite);
-                std::string skuId;
-                if (dstRegion)
+                for (const std::unique_ptr<CNetworkLink>& networkLink : srcBucket->mNetworkLinks)
                 {
-                    const std::string srcRegionMultiLocationIdx = std::to_string(srcSite->GetMultiLocationIdx());
-                    mNetworkPrices->at("interregion").at(srcRegionMultiLocationIdx).at(dstRegionMultiLocationIdx).at("skuId").get_to(skuId);
-                }
-                else
-                    mNetworkPrices->at("download").at(dstRegionMultiLocationIdx).at("skuId").get_to(skuId);
+                    const ISite* dstSite = networkLink->GetDstStorageElement()->GetSite();
+                    const std::string dstRegionMultiLocationIdx = std::to_string(dstSite->GetMultiLocationIdx());
+                    const CRegion* dstRegion = dynamic_cast<const CRegion*>(dstSite);
+                    std::string skuId;
+                    if (dstRegion)
+                    {
+                        const std::string srcRegionMultiLocationIdx = std::to_string(srcSite->GetMultiLocationIdx());
+                        mNetworkPrices->at("interregion").at(srcRegionMultiLocationIdx).at(dstRegionMultiLocationIdx).at("skuId").get_to(skuId);
+                    }
+                    else
+                        mNetworkPrices->at("download").at(dstRegionMultiLocationIdx).at("skuId").get_to(skuId);
 
-                srcRegion->mNetworkLinkIdToPrice[networkLink->GetId()] = GetTieredRateFromSKUId(skuId);
+                    srcRegion->mNetworkLinkIdToPrice[networkLink->GetId()] = GetTieredRateFromSKUId(skuId);
+                }
             }
         }
     }

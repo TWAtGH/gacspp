@@ -5,18 +5,15 @@
 
 
 
-CNetworkLink::CNetworkLink(const std::uint32_t bandwidth, ISite* srcSite, ISite* dstSite)
+CNetworkLink::CNetworkLink(const SpaceType bandwidthBytesPerSecond, CStorageElement* const srcStorageElement, CStorageElement* const dstStorageElement)
     : mId(GetNewId()),
-      mSrcSite(srcSite),
-      mDstSite(dstSite),
-      mBandwidth(bandwidth)
-{}
+      mSrcStorageElement(srcStorageElement),
+      mDstStorageElement(dstStorageElement),
+      mBandwidthBytesPerSecond(bandwidthBytesPerSecond)
+{
+}
 
-auto CNetworkLink::GetSrcSite() const -> ISite*
-{return mSrcSite;}
-auto CNetworkLink::GetDstSite() const -> ISite*
-{return mDstSite;}
-auto CNetworkLink::GetSrcSiteId() const -> IdType
-{return mSrcSite->GetId();}
-auto CNetworkLink::GetDstSiteId() const -> IdType
-{return mDstSite->GetId();}
+auto CNetworkLink::GetSrcStorageElement() const -> CStorageElement*
+{return mSrcStorageElement;}
+auto CNetworkLink::GetDstStorageElement() const -> CStorageElement*
+{return mDstStorageElement;}

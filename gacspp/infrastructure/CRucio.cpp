@@ -5,6 +5,7 @@
 #include <thread>
 
 #include "CRucio.hpp"
+#include "CNetworkLink.hpp"
 #include "CStorageElement.hpp"
 #include "SFile.hpp"
 
@@ -230,6 +231,13 @@ auto CGridSite::CreateStorageElement(std::string&& name, bool forbidDuplicatedRe
 {
     mStorageElements.emplace_back(std::make_unique<CStorageElement>(std::move(name), this, forbidDuplicatedReplicas));
     return mStorageElements.back().get();
+}
+
+void CGridSite::GetStorageElements(std::vector<CStorageElement*>& storageElements)
+{
+    storageElements.reserve(mStorageElements.size());
+    for (std::unique_ptr<CStorageElement>& storageElement : mStorageElements)
+        storageElements.push_back(storageElement.get());
 }
 
 

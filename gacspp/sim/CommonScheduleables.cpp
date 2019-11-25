@@ -247,7 +247,7 @@ void CTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcReplica, std:
     assert(mQueuedTransfers.size() < mQueuedTransfers.capacity());
 
     CStorageElement* const srcStorageElement = srcReplica->GetStorageElement();
-    CNetworkLink* const networkLink = srcStorageElement->GetSite()->GetNetworkLink( dstReplica->GetStorageElement()->GetSite() );
+    CNetworkLink* const networkLink = srcStorageElement->GetNetworkLink( dstReplica->GetStorageElement() );
 
     networkLink->mNumActiveTransfers += 1;
     srcStorageElement->OnOperation(CStorageElement::GET);
@@ -293,7 +293,7 @@ void CTransferManager::OnUpdate(const TickType now)
             continue; // handle same idx again
         }
 
-        const double sharedBandwidth = networkLink->mBandwidth / static_cast<double>(networkLink->mNumActiveTransfers);
+        const double sharedBandwidth = networkLink->mBandwidthBytesPerSecond / static_cast<double>(networkLink->mNumActiveTransfers);
         std::uint32_t amount = static_cast<std::uint32_t>(sharedBandwidth * timeDiff);
         amount = dstReplica->Increase(amount, now);
         summedTraffic += amount;
@@ -359,7 +359,7 @@ void CFixedTimeTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcRepl
     assert(mQueuedTransfers.size() < mQueuedTransfers.capacity());
 
     CStorageElement* const srcStorageElement = srcReplica->GetStorageElement();
-    CNetworkLink* const networkLink = srcStorageElement->GetSite()->GetNetworkLink(dstReplica->GetStorageElement()->GetSite());
+    CNetworkLink* const networkLink = srcStorageElement->GetNetworkLink(dstReplica->GetStorageElement());
 
     SpaceType increasePerTick = static_cast<SpaceType>(static_cast<double>(srcReplica->GetFile()->GetSize()) / std::max<TickType>(1, duration));
 
@@ -730,7 +730,7 @@ void CSrcPrioTransferGen::OnUpdate(const TickType now)
                 double minWeight = std::numeric_limits<double>::max();
                 for (std::shared_ptr<SReplica>& replica : bestSrcReplicas)
                 {
-                    double w = replica->GetStorageElement()->GetSite()->GetNetworkLink(dstSite)->GetWeight();
+                    double w = 0; //todo
                     if (w < minWeight)
                     {
                         minWeight = w;
@@ -856,11 +856,10 @@ void CJobSlotTransferGen::OnUpdate(const TickType now)
                 std::shared_ptr<SReplica> bestSrcReplica = bestSrcReplicas[0];
                 if (minPrio > 0)
                 {
-                    const ISite* const dstSite = dstStorageElement->GetSite();
                     double minWeight = std::numeric_limits<double>::max();
                     for (std::shared_ptr<SReplica>& replica : bestSrcReplicas)
                     {
-                        double w = replica->GetStorageElement()->GetSite()->GetNetworkLink(dstSite)->GetWeight();
+                        double w = 0; //todo
                         if (w < minWeight)
                         {
                             minWeight = w;
@@ -1099,7 +1098,7 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
                         if(!srcReplica->IsComplete())
                             continue;
 
-                        const double weight = srcReplica->GetStorageElement()->GetSite()->GetNetworkLink(dstStorageElement->GetSite())->GetWeight();
+                        const double weight = 0; // todo
                         if(!bestSrcReplica || weight < minWeight)
                         {
                             bestSrcReplica = srcReplica;

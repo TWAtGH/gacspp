@@ -10,10 +10,10 @@
 #include "third_party/parallel_hashmap/phmap.h"
 
 class ISite;
+class CNetworkLink;
 struct SFile;
 struct SReplica;
 
-class IPreparedInsert;
 class IStorageElementDelegate;
 
 
@@ -33,6 +33,7 @@ public:
 
     virtual void OnOperation(const OPERATION op);
 
+    virtual auto CreateNetworkLink(CStorageElement* const dstStorageElement, const SpaceType bandwidth) -> CNetworkLink*;
     virtual auto CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica>;
     virtual void OnIncreaseReplica(const SpaceType amount, const TickType now);
     virtual void OnRemoveReplica(const SReplica* replica, const TickType now, const bool needLock=true);
@@ -46,6 +47,10 @@ public:
     inline auto GetSite() -> ISite*
     {return mSite;}
 
+    auto GetNetworkLink(const CStorageElement* const dstStorageElement) -> CNetworkLink*;
+    auto GetNetworkLink(const CStorageElement* const dstStorageElement) const -> const CNetworkLink*;
+
+    std::vector<std::unique_ptr<CNetworkLink>> mNetworkLinks;
     std::vector<std::shared_ptr<SReplica>> mReplicas;
 
 private:
@@ -55,6 +60,8 @@ private:
 protected:
     ISite* mSite;
     std::unique_ptr<IStorageElementDelegate> mDelegate;
+
+    std::unordered_map<IdType, std::size_t> mDstSiteIdToNetworkLinkIdx;
 };
 
 

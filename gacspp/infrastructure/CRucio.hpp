@@ -19,12 +19,11 @@ class CGridSite : public ISite
 public:
     using ISite::ISite;
 
-    CGridSite(std::string&& name, std::string&& locationName);
-
     virtual ~CGridSite();
 
 
     auto CreateStorageElement(std::string&& name, bool forbidDuplicatedReplicas=true) -> CStorageElement*;
+    void GetStorageElements(std::vector<CStorageElement*>& storageElements);
 
     std::vector<std::unique_ptr<CStorageElement>> mStorageElements;
 };

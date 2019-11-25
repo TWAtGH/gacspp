@@ -176,17 +176,19 @@ bool CDefaultBaseSim::SetupLinks(const json& profileJson)
 
     assert(mRucio);
 
-    std::unordered_map<std::string, ISite*> nameToSite;
+    std::unordered_map<std::string, CStorageElement*> nameToStorageElement;
     bool success = true;
 
     for(const std::unique_ptr<CGridSite>& gridSite : mRucio->mGridSites)
     {
         assert(gridSite);
-
-        if(!nameToSite.insert({gridSite->GetName(), gridSite.get()}).second)
+        for (const std::unique_ptr<CStorageElement>& storageElement : gridSite->mStorageElements)
         {
-            std::cout<<"GridSite name is not unique: "<<gridSite->GetName()<<std::endl;
-            success = false;
+            if (!nameToStorageElement.insert({ storageElement->GetName(), storageElement.get() }).second)
+            {
+                std::cout << "StorageElementName name is not unique: " << storageElement->GetName() << std::endl;
+                success = false;
+            }
         }
     }
 
@@ -197,11 +199,15 @@ bool CDefaultBaseSim::SetupLinks(const json& profileJson)
         for(const std::unique_ptr<ISite>& cloudSite : cloud->mRegions)
         {
             assert(cloudSite);
-
-            if(!nameToSite.insert({cloudSite->GetName(), cloudSite.get()}).second)
+            std::vector<CStorageElement*> storageElements;
+            cloudSite->GetStorageElements(storageElements);
+            for (CStorageElement* storageElement : storageElements)
             {
-                std::cout<<"CloudSite name is not unique: "<<cloud->GetName()<<": "<<cloudSite->GetName()<<std::endl;
-                success = false;
+                if (!nameToStorageElement.insert({ storageElement->GetName(), storageElement }).second)
+                {
+                    std::cout << "CloudBucket name is not unique: " << cloud->GetName() << ": " << storageElement->GetName() << std::endl;
+                    success = false;
+                }
             }
         }
     }
@@ -214,46 +220,54 @@ bool CDefaultBaseSim::SetupLinks(const json& profileJson)
 
     try
     {
-        for(const auto& [srcSiteName, dstNameCfgJson] : linksCfg.items())
+        for(const auto& [srcStorageElementName, dstNameCfgJson] : linksCfg.items())
         {
-            if(nameToSite.count(srcSiteName) == 0)
+            CStorageElement* srcStorageElement;
+            try
             {
-                std::cout<<"Failed to find src site for link configuration: "<<srcSiteName<<std::endl;
+                srcStorageElement = nameToStorageElement.at(srcStorageElementName);
+            }
+            catch (std::out_of_range error)
+            {
+                std::cout << "Failed to find src storage element for link configuration: " << srcStorageElementName << std::endl;
                 success = false;
                 continue;
             }
 
-            ISite* srcSite = nameToSite[srcSiteName];
-            for(const auto& [dstSiteName, dstLinkCfgJson] : dstNameCfgJson.items())
+            for(const auto& [dstStorageElementName, dstLinkCfgJson] : dstNameCfgJson.items())
             {
-                if(nameToSite.count(dstSiteName) == 0)
+                CStorageElement* dstStorageElement;
+                try
                 {
-                    std::cout<<"Failed to find dst site for link configuration: "<<dstSiteName<<std::endl;
+                    dstStorageElement = nameToStorageElement.at(dstStorageElementName);
+                }
+                catch (std::out_of_range error)
+                {
+                    std::cout << "Failed to find dst storage element for link configuration: " << dstStorageElementName << std::endl;
                     success = false;
                     continue;
                 }
 
-                ISite* dstSite = nameToSite[dstSiteName];
                 try
                 {
-                    std::uint32_t bandwidth = dstLinkCfgJson.at("bandwidth").get<std::uint32_t>();
-                    CNetworkLink* link = srcSite->CreateNetworkLink(dstSite, bandwidth);
+                    SpaceType bandwidth = dstLinkCfgJson.at("bandwidth").get<SpaceType>();
+                    CNetworkLink* link = srcStorageElement->CreateNetworkLink(dstStorageElement, bandwidth);
 
                     row = std::to_string(link->GetId()) + ",";
-                    row += std::to_string(link->GetSrcSiteId()) + ",";
-                    row += std::to_string(link->GetDstSiteId());
+                    row += std::to_string(link->GetSrcStorageElement()->GetId()) + ",";
+                    row += std::to_string(link->GetDstStorageElement()->GetId());
 
                     success = success && output.InsertRow("NetworkLinks", row);
 
                     if(dstLinkCfgJson.at("receivingLink").empty())
                         continue;
 
-                    bandwidth = dstLinkCfgJson.at("receivingLink").at("bandwidth").get<std::uint32_t>();
-                    link = dstSite->CreateNetworkLink(srcSite, bandwidth);
+                    bandwidth = dstLinkCfgJson.at("receivingLink").at("bandwidth").get<SpaceType>();
+                    link = dstStorageElement->CreateNetworkLink(srcStorageElement, bandwidth);
 
                     row = std::to_string(link->GetId()) + ",";
-                    row += std::to_string(link->GetSrcSiteId()) + ",";
-                    row += std::to_string(link->GetDstSiteId());
+                    row += std::to_string(link->GetSrcStorageElement()->GetId()) + ",";
+                    row += std::to_string(link->GetDstStorageElement()->GetId());
 
                     success = success && output.InsertRow("NetworkLinks", row);
                 }
