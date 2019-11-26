@@ -127,6 +127,8 @@ public:
     std::uint32_t mNumCompletedTransfers = 0;
     std::uint32_t mNumFailedTransfers = 0;
     TickType mSummedTransferDuration = 0;
+
+    virtual auto GetNumActiveTransfers() const -> std::size_t = 0;
 };
 
 
@@ -162,10 +164,15 @@ public:
 
     void OnUpdate(const TickType now) final;
 
-    void QueueTransferBatch(std::unique_ptr<STransferBatch>&& transferBatch)
+    void QueueTransferBatch(std::shared_ptr<STransferBatch> transferBatch)
     {
         if(!transferBatch->mTransfers.empty())
-            mQueuedTransferBatches.emplace_back(std::move(transferBatch));
+            mQueuedTransferBatches.emplace_back(transferBatch);
+    }
+
+    auto GetNumActiveTransfers() const -> std::size_t
+    {
+        return mActiveTransferBatches.size();
     }
 
 private:
@@ -174,8 +181,8 @@ private:
     TickType mLastUpdated = 0;
     std::uint32_t mTickFreq;
 
-    std::vector<std::unique_ptr<STransferBatch>> mActiveTransferBatches;
-    std::vector<std::unique_ptr<STransferBatch>> mQueuedTransferBatches;
+    std::vector<std::shared_ptr<STransferBatch>> mActiveTransferBatches;
+    std::vector<std::shared_ptr<STransferBatch>> mQueuedTransferBatches;
 
 };
 
@@ -213,8 +220,10 @@ public:
 
     void CreateTransfer(std::shared_ptr<SReplica> srcReplica, std::shared_ptr<SReplica> dstReplica, const TickType now);
 
-    inline auto GetNumActiveTransfers() const -> std::size_t
-    {return mActiveTransfers.size();}
+    auto GetNumActiveTransfers() const -> std::size_t
+    {
+        return mActiveTransfers.size();
+    }
 };
 
 
@@ -258,8 +267,10 @@ public:
 
     inline auto GetNumQueuedTransfers() const -> std::size_t
     {return mQueuedTransfers.size();}
-    inline auto GetNumActiveTransfers() const -> std::size_t
-    {return mActiveTransfers.size();}
+    auto GetNumActiveTransfers() const -> std::size_t
+    {
+        return mActiveTransfers.size();
+    }
 };
 
 

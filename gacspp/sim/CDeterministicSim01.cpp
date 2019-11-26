@@ -42,7 +42,7 @@ private:
         std::vector<std::pair<std::uint64_t, SpaceType>> mInputFiles;
         std::vector<std::pair<std::uint64_t, SpaceType>> mOutputFiles;
 
-        std::unique_ptr<CTransferBatchManager::STransferBatch> mTransferBatch;
+        std::shared_ptr<CTransferBatchManager::STransferBatch> mTransferBatch;
     };
 
     typedef std::pair<TickType, std::forward_list<SJob>> JobBatchType;
@@ -341,7 +341,7 @@ public:
 
         for (SJob& job : mCurJobBatch->second)
         {
-            job.mTransferBatch = std::make_unique<CTransferBatchManager::STransferBatch>();
+            job.mTransferBatch = std::make_shared<CTransferBatchManager::STransferBatch>();
             std::pair<CStorageElement*, CStorageElement*> tapeDiskStorageElement{nullptr, nullptr};
             for (const std::pair<std::uint64_t, SpaceType>& inFile : job.mInputFiles)
             {

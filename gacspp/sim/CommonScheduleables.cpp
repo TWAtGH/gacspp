@@ -260,7 +260,7 @@ void CTransferBatchManager::OnUpdate(const TickType now)
 
     while (batchIdx < mActiveTransferBatches.size())
     {
-        std::unique_ptr<STransferBatch>& batch = mActiveTransferBatches[batchIdx];
+        std::shared_ptr<STransferBatch>& batch = mActiveTransferBatches[batchIdx];
         std::vector<std::unique_ptr<STransfer>>& transfers = batch->mTransfers;
 
         std::size_t transferIdx = 0;
@@ -311,10 +311,13 @@ void CTransferBatchManager::OnUpdate(const TickType now)
                         break;
                     }
                     else
+                    {
                         dstReplica = replica;
-
-                    nextRouteIdx += 1;
+                        //store replica if it is used as src for next transfer
+                        nextRouteIdx += 1;
+                    }
                 }
+                //dstReplica.use_count()
 
                 if(nextRouteIdx >= batch->mRoute.size())
                     batch->mNumDoneTransfers += 1;
