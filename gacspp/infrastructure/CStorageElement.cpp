@@ -89,15 +89,15 @@ void CUniqueReplicaStorageElementDelegate::OnRemoveReplica(const SReplica* const
 
 
 
-CStorageElement::CStorageElement(std::string&& name, ISite* site, bool forbidDuplicatedReplicas)
+CStorageElement::CStorageElement(std::string&& name, ISite* site, bool allowDuplicateReplicas)
     : mId(GetNewId()),
       mName(std::move(name)),
       mSite(site)
 {
-    if(forbidDuplicatedReplicas)
-        mDelegate.reset(new CUniqueReplicaStorageElementDelegate(this));
-    else
+    if(allowDuplicateReplicas)
         mDelegate.reset(new CBaseStorageElementDelegate(this));
+    else
+        mDelegate.reset(new CUniqueReplicaStorageElementDelegate(this));
 }
 
 void CStorageElement::OnOperation(const OPERATION op)

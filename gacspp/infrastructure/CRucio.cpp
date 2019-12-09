@@ -9,7 +9,7 @@
 #include "CStorageElement.hpp"
 #include "SFile.hpp"
 
-#include "third_party/json.hpp"
+#include "third_party/nlohmann/json.hpp"
 
 #define NUM_REPEAR_THREADS 1
 
@@ -227,9 +227,9 @@ auto CReaper::RunReaper(const TickType now) -> std::size_t
 
 CGridSite::~CGridSite() = default;
 
-auto CGridSite::CreateStorageElement(std::string&& name, bool forbidDuplicatedReplicas) -> CStorageElement*
+auto CGridSite::CreateStorageElement(std::string&& name, bool allowDuplicateReplicas) -> CStorageElement*
 {
-    mStorageElements.emplace_back(std::make_unique<CStorageElement>(std::move(name), this, forbidDuplicatedReplicas));
+    mStorageElements.emplace_back(std::make_unique<CStorageElement>(std::move(name), this, allowDuplicateReplicas));
     return mStorageElements.back().get();
 }
 
@@ -332,8 +332,8 @@ bool CRucio::LoadConfig(const json& config)
                                 continue;
                             }
 
-                            if(storageElementJson.contains("forbidDuplicatedReplicas"))
-                                site->CreateStorageElement(std::move(name), storageElementJson.at("forbidDuplicatedReplicas").get<bool>());
+                            if(storageElementJson.contains("allowDuplicateReplicas"))
+                                site->CreateStorageElement(std::move(name), storageElementJson.at("allowDuplicateReplicas").get<bool>());
                             else
                                 site->CreateStorageElement(std::move(name));
                         }

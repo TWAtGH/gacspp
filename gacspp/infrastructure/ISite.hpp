@@ -30,7 +30,7 @@ public:
     inline bool operator!=(const ISite& b) const
     {return mId != b.mId;}
 
-    virtual auto CreateStorageElement(std::string&& name, bool forbidDuplicatedReplicas=true) -> CStorageElement* = 0;
+    virtual auto CreateStorageElement(std::string&& name, bool allowDuplicateReplicas = false) -> CStorageElement* = 0;
     virtual void GetStorageElements(std::vector<CStorageElement*>& storageElements) = 0;
 
     inline auto GetId() const -> IdType

@@ -2,7 +2,7 @@
 
 #include <filesystem>
 
-#include "third_party/json_fwd.hpp"
+#include "third_party/nlohmann/json_fwd.hpp"
 
 using nlohmann::json;
 

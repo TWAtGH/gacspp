@@ -15,7 +15,7 @@
 
 #include "output/COutput.hpp"
 
-#include "third_party/json.hpp"
+#include "third_party/nlohmann/json.hpp"
 
 
 class CDeterministicTransferGen : public CScheduleable, public CBaseOnDeletionInsert
@@ -314,8 +314,9 @@ public:
 
                     InsertTmpReplica(srcReplica);
 
-                    std::shared_ptr<SReplica> r = mDiskStorageElement->CreateReplica(file, now);
-                    mTransferMgr->CreateTransfer(srcReplica, r, now, 0, job.mStageOutDuration);
+                    //TODO: create transfer for stageout to a storage element
+                    //std::shared_ptr<SReplica> r = mDiskStorageElement->CreateReplica(file, now);
+                    //mTransferMgr->CreateTransfer(srcReplica, r, now, 0, job.mStageOutDuration);
                 }
                 jobBatch.pop_front();
             }
@@ -490,11 +491,11 @@ bool CDeterministicSim01::SetupDefaults(const json& profileJson)
 
             for(const json& storageElementName : transferGenCfg.at("diskStorageElements"))
             {
-                CStorageElement* storageElement = mRucio->GetStorageElementByName(storageElementName.get<std::string>());
-                if(storageElement)
-                    transferGen->mDiskStorageElement = storageElement;
-                else
-                    std::cout<<"Failed to find diskStorageElements: "<<storageElementName.get<std::string>()<<std::endl;
+                //CStorageElement* storageElement = mRucio->GetStorageElementByName(storageElementName.get<std::string>());
+                //if(storageElement)
+                    //transferGen->mDiskStorageElement = storageElement;
+                //else
+                    //std::cout<<"Failed to find diskStorageElements: "<<storageElementName.get<std::string>()<<std::endl;
             }
 
             for(const json& storageElementName : transferGenCfg.at("computingStorageElements"))

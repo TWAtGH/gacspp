@@ -10,7 +10,7 @@
 #include "infrastructure/CNetworkLink.hpp"
 #include "infrastructure/SFile.hpp"
 
-#include "third_party/json.hpp"
+#include "third_party/nlohmann/json.hpp"
 
 
 namespace gcp
@@ -139,9 +139,9 @@ namespace gcp
 
 
 
-    auto CRegion::CreateStorageElement(std::string&& name, bool forbidDuplicatedReplicas) -> CBucket*
+    auto CRegion::CreateStorageElement(std::string&& name, bool allowDuplicateReplicas) -> CBucket*
     {
-        mStorageElements.emplace_back(std::make_unique<CBucket>(std::move(name), this, forbidDuplicatedReplicas));
+        mStorageElements.emplace_back(std::make_unique<CBucket>(std::move(name), this, allowDuplicateReplicas));
         return mStorageElements.back().get();
     }
 
@@ -354,8 +354,8 @@ namespace gcp
                                 }
 
                                 CBucket* bucket;
-                                if(bucketJson.contains("forbidDuplicatedReplicas"))
-                                    bucket = region->CreateStorageElement(std::move(name), bucketJson.at("forbidDuplicatedReplicas").get<bool>());
+                                if(bucketJson.contains("allowDuplicateReplicas"))
+                                    bucket = region->CreateStorageElement(std::move(name), bucketJson.at("allowDuplicateReplicas").get<bool>());
                                 else
                                     bucket = region->CreateStorageElement(std::move(name));
 

@@ -22,7 +22,7 @@ public:
     virtual ~CGridSite();
 
 
-    auto CreateStorageElement(std::string&& name, bool forbidDuplicatedReplicas=true) -> CStorageElement*;
+    auto CreateStorageElement(std::string&& name, bool allowDuplicateReplicas = false) -> CStorageElement*;
     void GetStorageElements(std::vector<CStorageElement*>& storageElements);
 
     std::vector<std::unique_ptr<CStorageElement>> mStorageElements;

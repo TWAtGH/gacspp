@@ -3,7 +3,7 @@
 
 #include "CConfigManager.hpp"
 #include "common/constants.h"
-#include "third_party/json.hpp"
+#include "third_party/nlohmann/json.hpp"
 
 
 auto CConfigManager::GetRef() -> CConfigManager &

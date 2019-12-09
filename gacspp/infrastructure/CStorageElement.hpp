@@ -29,7 +29,7 @@ public:
         CUSTOM
     };
 
-    CStorageElement(std::string&& name, ISite* site, bool forbidDuplicatedReplicas=true);
+    CStorageElement(std::string&& name, ISite* site, bool allowDuplicateReplicas = false);
 
     virtual void OnOperation(const OPERATION op);
 

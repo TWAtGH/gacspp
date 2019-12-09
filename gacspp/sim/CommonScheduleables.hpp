@@ -66,7 +66,7 @@ private:
     std::unique_ptr<IValueGenerator> mFileSizeRNG;
     std::unique_ptr<IValueGenerator> mFileLifetimeRNG;
 
-    std::uint32_t mTickFreq;
+    TickType mTickFreq;
 
     auto GetRandomFileSize() const -> SpaceType;
     auto GetRandomNumFilesToGenerate() const -> std::uint32_t;
@@ -82,7 +82,7 @@ public:
                     std::unique_ptr<IValueGenerator>&& numFilesRNG,
                     std::unique_ptr<IValueGenerator>&& fileSizeRNG,
                     std::unique_ptr<IValueGenerator>&& fileLifetimeRNG,
-                    const std::uint32_t tickFreq,
+                    const TickType tickFreq,
                     const TickType startTick=0);
 
     auto CreateFilesAndReplicas(const std::uint32_t numFiles, const std::uint32_t numReplicasPerFile, const TickType now) -> std::uint64_t;
@@ -95,10 +95,10 @@ class CReaperCaller : public CScheduleable
 {
 private:
     CRucio *mRucio;
-    std::uint32_t mTickFreq;
+    TickType mTickFreq;
 
 public:
-    CReaperCaller(CRucio *rucio, const std::uint32_t tickFreq, const TickType startTick=600);
+    CReaperCaller(CRucio *rucio, const TickType tickFreq, const TickType startTick=600);
 
     void OnUpdate(const TickType now) final;
 };
@@ -109,10 +109,10 @@ private:
     std::shared_ptr<IPreparedInsert> mCloudBillInsertQuery;
 
     IBaseSim* mSim;
-    std::uint32_t mTickFreq;
+    TickType mTickFreq;
 
 public:
-    CBillingGenerator(IBaseSim* sim, const std::uint32_t tickFreq=SECONDS_PER_MONTH, const TickType startTick=SECONDS_PER_MONTH);
+    CBillingGenerator(IBaseSim* sim, const TickType tickFreq = SECONDS_PER_MONTH, const TickType startTick = SECONDS_PER_MONTH);
 
     void OnUpdate(const TickType now) final;
 };
@@ -160,7 +160,7 @@ public:
     };
 
 public:
-    CTransferBatchManager(const std::uint32_t tickFreq, const TickType startTick=0);
+    CTransferBatchManager(const TickType tickFreq, const TickType startTick=0);
 
     void OnUpdate(const TickType now) final;
 
@@ -179,7 +179,7 @@ private:
     std::shared_ptr<IPreparedInsert> mOutputTransferInsertQuery;
 
     TickType mLastUpdated = 0;
-    std::uint32_t mTickFreq;
+    TickType mTickFreq;
 
     std::vector<std::shared_ptr<STransferBatch>> mActiveTransferBatches;
     std::vector<std::shared_ptr<STransferBatch>> mQueuedTransferBatches;
@@ -193,7 +193,7 @@ private:
     std::shared_ptr<IPreparedInsert> mOutputTransferInsertQuery;
 
     TickType mLastUpdated = 0;
-    std::uint32_t mTickFreq;
+    TickType mTickFreq;
 
     struct STransfer
     {
@@ -214,7 +214,7 @@ private:
     std::vector<STransfer> mQueuedTransfers;
 
 public:
-    CTransferManager(const std::uint32_t tickFreq, const TickType startTick=0);
+    CTransferManager(const TickType tickFreq, const TickType startTick=0);
 
     void OnUpdate(const TickType now) final;
 
@@ -296,7 +296,7 @@ class CUniformTransferGen : public CScheduleable
 private:
     IBaseSim* mSim;
     std::shared_ptr<CTransferManager> mTransferMgr;
-    std::uint32_t mTickFreq;
+    TickType mTickFreq;
 
     std::shared_ptr<IPreparedInsert> mReplicaInsertQuery;
 
@@ -309,7 +309,7 @@ public:
     CUniformTransferGen(IBaseSim* sim,
                         std::shared_ptr<CTransferManager> transferMgr,
                         std::shared_ptr<CWavedTransferNumGen> transferNumGen,
-                        const std::uint32_t tickFreq,
+                        const TickType tickFreq,
                         const TickType startTick=0 );
 
     void OnUpdate(const TickType now) final;
@@ -321,7 +321,7 @@ class CExponentialTransferGen : public CScheduleable
 private:
     IBaseSim* mSim;
     std::shared_ptr<CTransferManager> mTransferMgr;
-    std::uint32_t mTickFreq;
+    TickType mTickFreq;
 
     std::shared_ptr<IPreparedInsert> mReplicaInsertQuery;
 
@@ -334,7 +334,7 @@ public:
     CExponentialTransferGen(IBaseSim* sim,
                             std::shared_ptr<CTransferManager> transferMgr,
                             std::shared_ptr<CWavedTransferNumGen> transferNumGen,
-                            const std::uint32_t tickFreq,
+                            const TickType tickFreq,
                             const TickType startTick=0 );
 
     void OnUpdate(const TickType now) final;
@@ -346,7 +346,7 @@ class CSrcPrioTransferGen : public CScheduleable
 private:
     IBaseSim* mSim;
     std::shared_ptr<CTransferManager> mTransferMgr;
-    std::uint32_t mTickFreq;
+    TickType mTickFreq;
 
     std::shared_ptr<IPreparedInsert> mReplicaInsertQuery;
 
@@ -359,7 +359,7 @@ public:
     CSrcPrioTransferGen(IBaseSim* sim,
                         std::shared_ptr<CTransferManager> transferMgr,
                         std::shared_ptr<CWavedTransferNumGen> transferNumGen,
-                        const std::uint32_t tickFreq,
+                        const TickType tickFreq,
                         const TickType startTick=0 );
 
     void OnUpdate(const TickType now) final;
@@ -371,7 +371,7 @@ class CJobSlotTransferGen : public CScheduleable
 private:
     IBaseSim* mSim;
     std::shared_ptr<CFixedTimeTransferManager> mTransferMgr;
-    std::uint32_t mTickFreq;
+    TickType mTickFreq;
 
     std::shared_ptr<IPreparedInsert> mReplicaInsertQuery;
 
@@ -389,7 +389,7 @@ public:
 public:
     CJobSlotTransferGen(IBaseSim* sim,
                         std::shared_ptr<CFixedTimeTransferManager> transferMgr,
-                        const std::uint32_t tickFreq,
+                        const TickType tickFreq,
                         const TickType startTick=0 );
 
     void OnUpdate(const TickType now) final;
@@ -415,7 +415,7 @@ class CCachedSrcTransferGen : public CScheduleable, public CBaseOnDeletionInsert
 private:
     IBaseSim* mSim;
     std::shared_ptr<CFixedTimeTransferManager> mTransferMgr;
-    std::uint32_t mTickFreq;
+    TickType mTickFreq;
 
     bool ExistsFileAtStorageElement(const std::shared_ptr<SFile>& file, const CStorageElement* storageElement) const;
     void ExpireReplica(CStorageElement* storageElement, const TickType now);
@@ -432,7 +432,7 @@ public:
                         std::shared_ptr<CFixedTimeTransferManager> transferMgr,
                         const std::size_t numPerDay,
                         const TickType defaultReplicaLifetime,
-                        const std::uint32_t tickFreq,
+                        const TickType tickFreq,
                         const TickType startTick=0 );
 
     std::vector<std::pair<float, std::vector<std::weak_ptr<SFile>>>> mRatiosAndFilesPerAccessCount{ {0.62f, {}}, {0.16f, {}}, {0.08f, {}}, {0.05f, {}} };
@@ -455,7 +455,7 @@ private:
     IBaseSim* mSim;
     std::shared_ptr<CBaseTransferManager> mG2CTransferMgr;
     std::shared_ptr<CBaseTransferManager> mC2CTransferMgr;
-    std::uint32_t mTickFreq;
+    TickType mTickFreq;
 
     std::chrono::high_resolution_clock::time_point mTimeLastUpdate;
 
@@ -463,7 +463,7 @@ public:
     std::unordered_map<std::string, std::chrono::duration<double>*> mProccessDurations;
 
 public:
-    CHeartbeat(IBaseSim* sim, std::shared_ptr<CBaseTransferManager> g2cTransferMgr, std::shared_ptr<CBaseTransferManager> c2cTransferMgr, const std::uint32_t tickFreq, const TickType startTick=0);
+    CHeartbeat(IBaseSim* sim, std::shared_ptr<CBaseTransferManager> g2cTransferMgr, std::shared_ptr<CBaseTransferManager> c2cTransferMgr, const TickType tickFreq, const TickType startTick = 0);
 
     void OnUpdate(const TickType now) final;
 };
