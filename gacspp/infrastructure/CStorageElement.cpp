@@ -42,6 +42,11 @@ void CBaseStorageElementDelegate::OnIncreaseReplica(const SpaceType amount, cons
 void CBaseStorageElementDelegate::OnRemoveReplica(const SReplica* replica, const TickType now, bool needLock)
 {
     (void)now;
+
+    std::unique_lock<std::mutex> lock(mReplicaRemoveMutex, std::defer_lock);
+    if (needLock)
+        lock.lock();
+
     auto& replicas = GetStorageElement()->mReplicas;
     const SpaceType curSize = replica->GetCurSize();
     const std::size_t idxToDelete = replica->mIndexAtStorageElement;
@@ -66,25 +71,11 @@ void CBaseStorageElementDelegate::OnRemoveReplica(const SReplica* replica, const
 
 auto CUniqueReplicaStorageElementDelegate::CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica>
 {
-    const auto result = mFileIds.insert(file->GetId());
-
-    if (!result.second)
-        return nullptr;
+    for (const std::shared_ptr<SReplica>& replica : file->mReplicas)
+        if (replica->GetStorageElement()->GetId() == mStorageElement->GetId())
+            return nullptr;
 
     return CBaseStorageElementDelegate::CreateReplica(file, now);
-}
-
-
-void CUniqueReplicaStorageElementDelegate::OnRemoveReplica(const SReplica* const replica, const TickType now, bool needLock)
-{
-    std::unique_lock<std::mutex> lock(mReplicaRemoveMutex, std::defer_lock);
-    if(needLock)
-        lock.lock();
-
-    auto ret = mFileIds.erase(replica->GetFile()->GetId());
-    assert(ret == 1);
-
-    CBaseStorageElementDelegate::OnRemoveReplica(replica, now, needLock);
 }
 
 

@@ -108,6 +108,9 @@ public:
     virtual auto CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica>;
     virtual void OnIncreaseReplica(const SpaceType amount, const TickType now);
     virtual void OnRemoveReplica(const SReplica* replica, const TickType now, bool needLock=true);
+
+protected:
+    std::mutex mReplicaRemoveMutex;
 };
 
 
@@ -119,11 +122,4 @@ public:
 
 
     virtual auto CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica>;
-    virtual void OnRemoveReplica(const SReplica* replica, const TickType now, bool needLock=true);
-
-private:
-    phmap::parallel_flat_hash_set<IdType> mFileIds;
-
-protected:
-    std::mutex mReplicaRemoveMutex;
 };
