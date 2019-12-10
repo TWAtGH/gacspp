@@ -72,6 +72,8 @@ private:
     auto GetRandomNumFilesToGenerate() const -> std::uint32_t;
     auto GetRandomLifeTime() const -> TickType;
 
+    void CreateFilesAndReplicas(const std::uint32_t numFiles, const std::uint32_t numReplicasPerFile, const TickType now);
+
 public:
 
     bool mSelectStorageElementsRandomly = false;
@@ -85,7 +87,7 @@ public:
                     const TickType tickFreq,
                     const TickType startTick=0);
 
-    auto CreateFilesAndReplicas(const std::uint32_t numFiles, const std::uint32_t numReplicasPerFile, const TickType now) -> std::uint64_t;
+    void CreateFilesAndReplicas(const TickType now);
 
     void OnUpdate(const TickType now) final;
 };

@@ -65,12 +65,24 @@ bool CTestSim::SetupDefaults(const json& profileJson)
     {
         for(const json& dataGenCfg : profileJson.at("dataGens"))
         {
-            const TickType tickFreq = dataGenCfg.at("tickFreq").get<TickType>();
-            const TickType startTick = dataGenCfg.at("startTick").get<TickType>();
+            TickType tickFreq = 0;
+            TickType startTick = 0;
+            if(dataGenCfg.contains("tickFreq"))
+                tickFreq = dataGenCfg["tickFreq"].get<TickType>();
+            if(dataGenCfg.contains("startTick"))
+                tickFreq = dataGenCfg["startTick"].get<TickType>();
+
 
             std::unordered_map<std::string, std::unique_ptr<IValueGenerator>> jsonPropNameToValueGen;
+
+            if(!dataGenCfg.contains("numFilesCfg"))
+                jsonPropNameToValueGen["numFilesCfg"] = std::make_unique<CFixedValueGenerator>(0);
+
             for(const std::string& propName : {"numFilesCfg", "fileSizeCfg", "lifetimeCfg"})
             {
+                if(jsonPropNameToValueGen.count(propName) > 0)
+                    continue;
+
                 const json& propJson = dataGenCfg.at(propName);
                 const std::string type = propJson.at("type").get<std::string>();
                 if(type == "normal")
@@ -107,9 +119,6 @@ bool CTestSim::SetupDefaults(const json& profileJson)
                 dataGen->mNumReplicaRatio.push_back(ratioVal.get<float>());
 
             dataGen->mSelectStorageElementsRandomly = dataGenCfg.at("selectStorageElementsRandomly").get<bool>();
-
-            if(dataGenCfg.contains("numPreSimStartFiles"))
-                dataGen->CreateFilesAndReplicas(dataGenCfg["numPreSimStartFiles"].get<std::uint32_t>(), 1, 0);
 
             mSchedule.push(dataGen);
         }

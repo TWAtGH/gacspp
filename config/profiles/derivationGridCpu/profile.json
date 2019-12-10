@@ -15,21 +15,17 @@
     },
 "dataGens": [
         {
-            "storageElements": ["BNL_DATATAPE"],
-            "numReplicaRatios": [],
+            "storageElements": ["BNL-OSG2_DATATAPE", "RAL-LCG2_DATATAPE", "IN2P3-CC_DATATAPE"],
+            "numReplicaRatios": [0.6, 0.25, 0.15],
             "selectStorageElementsRandomly": false,
-            "startTick": 0,
-            "tickFreq": 43200,
-            "numPreSimStartFiles": 200000,
             "numFilesCfg": {
-                "type": "normal",
-                "mean": 520,
-                "stddev": 1
+                "type": "fixed",
+                "value": 5000000
             },
-            "fileSizeCfg":{
+            "fileSizeCfg": {
                 "type": "normal",
-                "mean": 0.5,
-                "stddev": 0.25
+                "mean": 3.1,
+                "stddev": 0.5
             },
             "lifetimeCfg": {
                 "type": "fixed",

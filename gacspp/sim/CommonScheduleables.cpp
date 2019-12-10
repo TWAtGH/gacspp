@@ -72,8 +72,8 @@ CDataGenerator::CDataGenerator( IBaseSim* sim,
 auto CDataGenerator::GetRandomFileSize() const -> SpaceType
 {
     assert(mFileSizeRNG);
-    constexpr double min = MiB_TO_BYTES(64);
-    constexpr double max = static_cast<double>(std::numeric_limits<std::uint32_t>::max());
+    constexpr double min = 512000; //0.5 KiB
+    constexpr double max = static_cast<double>(std::numeric_limits<SpaceType>::max());
     const double val = min + GiB_TO_BYTES(std::abs(mFileSizeRNG->GetValue(mSim->mRNGEngine)));
     return static_cast<SpaceType>(std::min(val, max));
 }
@@ -91,25 +91,22 @@ auto CDataGenerator::GetRandomLifeTime() const -> TickType
     return static_cast<TickType>( std::max(float(SECONDS_PER_DAY), val) );
 }
 
-auto CDataGenerator::CreateFilesAndReplicas(const std::uint32_t numFiles, const std::uint32_t numReplicasPerFile, const TickType now) -> std::uint64_t
+void  CDataGenerator::CreateFilesAndReplicas(const std::uint32_t numFiles, const std::uint32_t numReplicasPerFile, const TickType now)
 {
     if(numFiles == 0 || numReplicasPerFile == 0)
-        return 0;
+        return;
 
     const std::uint32_t numStorageElements = static_cast<std::uint32_t>( mStorageElements.size() );
 
     assert(numReplicasPerFile <= numStorageElements);
 
     std::uniform_int_distribution<std::uint32_t> rngSampler(0, numStorageElements);
-    std::uint64_t bytesOfFilesGen = 0;
     for(std::uint32_t i = 0; i < numFiles; ++i)
     {
         const std::uint32_t fileSize = GetRandomFileSize();
         const TickType lifetime = GetRandomLifeTime();
 
         std::shared_ptr<SFile> file = mSim->mRucio->CreateFile(fileSize, now, lifetime);
-
-        bytesOfFilesGen += fileSize;
 
         auto reverseRSEIt = mStorageElements.rbegin();
         auto selectedElementIt = mStorageElements.begin();
@@ -133,14 +130,10 @@ auto CDataGenerator::CreateFilesAndReplicas(const std::uint32_t numFiles, const 
                 ++selectedElementIt;
         }
     }
-
-    return bytesOfFilesGen;
 }
 
-void CDataGenerator::OnUpdate(const TickType now)
+void CDataGenerator::CreateFilesAndReplicas(const TickType now)
 {
-    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
-
     const std::uint32_t totalFilesToGen = GetRandomNumFilesToGenerate();
 
     float numReplicaRatio = mNumReplicaRatio.empty() ? 1 : mNumReplicaRatio[0];
@@ -152,6 +145,13 @@ void CDataGenerator::OnUpdate(const TickType now)
         numFilesToGen = static_cast<std::uint32_t>(totalFilesToGen * mNumReplicaRatio[i]);
         CreateFilesAndReplicas(numFilesToGen, i+1, now);
     }
+}
+
+void CDataGenerator::OnUpdate(const TickType now)
+{
+    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
+
+    CreateFilesAndReplicas(now);
 
     mNextCallTick = now + mTickFreq;
 }
