@@ -32,8 +32,6 @@
 *.app
 
 # data
-input/
-results/
 *.png
 *.dat
 *.csv

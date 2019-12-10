@@ -848,7 +848,6 @@ void CSrcPrioTransferGen::OnUpdate(const TickType now)
             std::shared_ptr<SReplica> bestSrcReplica = bestSrcReplicas[0];
             if (minPrio > 0)
             {
-                const ISite* const dstSite = dstStorageElement->GetSite();
                 double minWeight = std::numeric_limits<double>::max();
                 for (std::shared_ptr<SReplica>& replica : bestSrcReplicas)
                 {

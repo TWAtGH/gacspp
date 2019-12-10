@@ -34,7 +34,7 @@ public:
     virtual void OnOperation(const OPERATION op);
 
     virtual auto CreateNetworkLink(CStorageElement* const dstStorageElement, const SpaceType bandwidth) -> CNetworkLink*;
-    virtual auto CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica>;
+    virtual auto CreateReplica(std::shared_ptr<SFile> file, const TickType now) -> std::shared_ptr<SReplica>;
     virtual void OnIncreaseReplica(const SpaceType amount, const TickType now);
     virtual void OnRemoveReplica(const SReplica* replica, const TickType now, const bool needLock=true);
 
@@ -81,7 +81,7 @@ public:
 
     virtual void OnOperation(const CStorageElement::OPERATION op) = 0;
 
-    virtual auto CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica> = 0;
+    virtual auto CreateReplica(std::shared_ptr<SFile> file, const TickType now) -> std::shared_ptr<SReplica> = 0;
     virtual void OnIncreaseReplica(const SpaceType amount, const TickType now) = 0;
     virtual void OnRemoveReplica(const SReplica* replica, const TickType now, bool needLock=true) = 0;
 
@@ -105,7 +105,7 @@ public:
 
     virtual void OnOperation(const CStorageElement::OPERATION op);
 
-    virtual auto CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica>;
+    virtual auto CreateReplica(std::shared_ptr<SFile> file, const TickType now) -> std::shared_ptr<SReplica>;
     virtual void OnIncreaseReplica(const SpaceType amount, const TickType now);
     virtual void OnRemoveReplica(const SReplica* replica, const TickType now, bool needLock=true);
 
@@ -121,5 +121,5 @@ public:
     using CBaseStorageElementDelegate::CBaseStorageElementDelegate;
 
 
-    virtual auto CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica>;
+    virtual auto CreateReplica(std::shared_ptr<SFile> file, const TickType now) -> std::shared_ptr<SReplica>;
 };

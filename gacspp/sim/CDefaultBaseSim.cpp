@@ -227,7 +227,7 @@ bool CDefaultBaseSim::SetupLinks(const json& profileJson)
             {
                 srcStorageElement = nameToStorageElement.at(srcStorageElementName);
             }
-            catch (std::out_of_range error)
+            catch (std::out_of_range& error)
             {
                 std::cout << "Failed to find src storage element for link configuration: " << srcStorageElementName << std::endl;
                 success = false;
@@ -241,7 +241,7 @@ bool CDefaultBaseSim::SetupLinks(const json& profileJson)
                 {
                     dstStorageElement = nameToStorageElement.at(dstStorageElementName);
                 }
-                catch (std::out_of_range error)
+                catch (std::out_of_range& error)
                 {
                     std::cout << "Failed to find dst storage element for link configuration: " << dstStorageElementName << std::endl;
                     success = false;

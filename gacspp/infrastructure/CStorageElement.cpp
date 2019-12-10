@@ -21,7 +21,7 @@ void CBaseStorageElementDelegate::OnOperation(const CStorageElement::OPERATION o
     (void)op;
 }
 
-auto CBaseStorageElementDelegate::CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica>
+auto CBaseStorageElementDelegate::CreateReplica(std::shared_ptr<SFile> file, const TickType now) -> std::shared_ptr<SReplica>
 {
     auto& replicas = GetStorageElement()->mReplicas;
     auto newReplica = std::make_shared<SReplica>(file, mStorageElement, now, replicas.size());
@@ -69,7 +69,7 @@ void CBaseStorageElementDelegate::OnRemoveReplica(const SReplica* replica, const
 
 
 
-auto CUniqueReplicaStorageElementDelegate::CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica>
+auto CUniqueReplicaStorageElementDelegate::CreateReplica(std::shared_ptr<SFile> file, const TickType now) -> std::shared_ptr<SReplica>
 {
     for (const std::shared_ptr<SReplica>& replica : file->mReplicas)
         if (replica->GetStorageElement()->GetId() == mStorageElement->GetId())
@@ -105,7 +105,7 @@ auto CStorageElement::CreateNetworkLink(CStorageElement* const dstStorageElement
     return newNetworkLink;
 }
 
-auto CStorageElement::CreateReplica(std::shared_ptr<SFile>& file, const TickType now) -> std::shared_ptr<SReplica>
+auto CStorageElement::CreateReplica(std::shared_ptr<SFile> file, const TickType now) -> std::shared_ptr<SReplica>
 {
     return mDelegate->CreateReplica(file, now);
 }
