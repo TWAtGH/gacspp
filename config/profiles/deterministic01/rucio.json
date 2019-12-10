@@ -1,0 +1,31 @@
+{
+"rucio":
+{
+    "sites":
+    [
+        {
+            "multiLocationIdx": 3,
+            "name": "BNL",
+            "location": "us",
+            "storageElements":
+            [
+                {
+                    "name": "BNL_DATATAPE",
+                    "forbidDuplicatedReplicas": false,
+                    "accessLatency": 2400000
+                },
+                {
+                    "name": "BNL_DATADISK",
+                    "forbidDuplicatedReplicas": false,
+                    "accessLatency": 500
+                },
+                {
+                    "name": "BNL_JOBS",
+                    "forbidDuplicatedReplicas": false,
+                    "accessLatency": 0
+                }
+            ]
+        }
+    ]
+}
+}

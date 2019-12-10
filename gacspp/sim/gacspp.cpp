@@ -19,33 +19,32 @@ int main(int argc, char** argv)
     //base paths
     CConfigManager& configManager = CConfigManager::GetRef();
     configManager.mConfigDirPath = std::filesystem::current_path() / "config";
-    configManager.mProfileDirPath = configManager.mConfigDirPath / "profiles";
 
 
     //try to load main config file
     json configJson;
     configManager.TryLoadCfg(configJson, "simconfig.json");
 
-
     //try to load sim profile
-    json profileJson;
-    if (argc > 1)
-        if(configManager.TryLoadProfileCfg(profileJson, argv[1]))
-            std::cout<<"Using profile: "<<argv[1]<<std::endl;
-
-    if (profileJson.empty())
+    if (argc < 2)
     {
         try
         {
-            if(configManager.TryLoadProfileCfg(profileJson, configJson.at("profile").get<std::string>()))
-                std::cout<<"Using profile: "<<configJson.at("profile").get<std::string>()<<std::endl;
+            configManager.mProfileDirPath = configManager.mConfigDirPath / "profiles" / configJson.at("profile").get<std::string>();
         }
-        catch(const json::out_of_range& error)
+        catch (const json::out_of_range& error)
         {
+            std::cout << "Failed to determine profile directory..." << std::endl;
+            return 1;
         }
     }
+    else
+        configManager.mProfileDirPath = configManager.mConfigDirPath / "profiles" / argv[1];
 
-    if (profileJson.empty())
+    std::cout << "Using profile directory: " << configManager.mProfileDirPath << std::endl;
+
+    json profileJson;
+    if (!configManager.TryLoadProfileCfg(profileJson, "profile.json"))
     {
         std::cout << "Failed to load a profile file..." << std::endl;
         return 1;
@@ -118,7 +117,7 @@ int main(int argc, char** argv)
     std::cout<<"MaxTick="<<maxTick<<std::endl;
 
     std::cout<<"Setting up sim..."<<std::endl;
-    std::unique_ptr<CDeterministicSim01> sim = std::make_unique<CDeterministicSim01>();
+    std::unique_ptr<CTestSim> sim = std::make_unique<CTestSim>();
     if(!sim->SetupDefaults(profileJson))
     {
         std::cout<<"Setting up sim failed"<<std::endl;

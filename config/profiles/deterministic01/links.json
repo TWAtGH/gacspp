@@ -1,0 +1,16 @@
+{
+    "us-central1": {
+        "BNL": {
+            "bandwidth": 1073741824,
+            "receivingLink": {
+                "bandwidth": 1073741824
+            }
+        }
+    },
+    "BNL": {
+        "BNL": {
+            "bandwidth": 1073741824,
+            "receivingLink": {}
+        }
+    }
+}

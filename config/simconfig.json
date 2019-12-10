@@ -1,5 +1,5 @@
 {
-"profile": "deterministic01.json",
+"profile": "derivationGridCpu",
 "output": {
     "insertQueryBufferLen": 8192,
     "keepInMemory": true,

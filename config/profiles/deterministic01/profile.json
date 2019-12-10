@@ -4,14 +4,14 @@
 		{
 			"id": "gcp",
 			"name": "gcp_default",
-			"config": {"_file_": "gcp_default.json"}
+			"config": {"_file_": "gcp.json"}
 		}
 	],
 "rucio": {
-	"config": {"_file_": "rucio_default.json"}
+	"config": {"_file_": "rucio.json"}
 	},
 "links": {
-	"config": {"_file_": "links_default.json"}
+	"config": {"_file_": "links.json"}
     },
 "reaper": {
         "tickFreq": 300,
@@ -19,7 +19,7 @@
     },
 "deterministicTransferGen": {
     "fileDataFileFirstIdx": 0,
-    "fileDataFilePathTmpl": "/eos/user/t/twegner/csvmerge/jobfiledump_merged_$$$$$.csv",
+    "fileDataFilePathTmpl": "C:\\Users\\wegne\\source\\repos\\gacspp\\csvmerge\\jobfiledump_merged_$$$$$.csv",
     "managerType": "fixedTime",
     "managerTickFreq": 10,
     "managerStartTick": 0,

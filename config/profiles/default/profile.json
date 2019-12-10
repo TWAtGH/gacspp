@@ -4,14 +4,14 @@
 		{
 			"id": "gcp",
 			"name": "gcp_default",
-			"config": {"_file_": "gcp_default.json"}
+			"config": {"_file_": "gcp.json"}
 		}
 	],
 "rucio": {
-	"config": {"_file_": "rucio_default.json"}
+	"config": {"_file_": "rucio.json"}
 	},
 "links": {
-	"config": {"_file_": "links_default.json"}
+	"config": {"_file_": "links.json"}
     },
 "dataGens": [
         {
