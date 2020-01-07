@@ -37,6 +37,32 @@
         "tickFreq": 300,
         "startTick": 300
     },
+"transferGens": [
+    {
+        "type": "simple",
+        "tickFreq": 120,
+        "startTick": 0,
+        "managerTickFreq": 20,
+        "managerStartTick": 100,
+        "info": [
+            {
+                "srcStorageElement": "BNL-OSG2_DATATAPE",
+                "dstStorageElement": "BNL-OSG2_DATADISK",
+                "maxNumActive": 50
+            },
+            {
+                "srcStorageElement": "RAL-LCG2_DATATAPE",
+                "dstStorageElement": "RAL-LCG2_DATADISK",
+                "maxNumActive": 50
+            },
+            {
+                "srcStorageElement": "IN2P3-CC_DATATAPE",
+                "dstStorageElement": "IN2P3-CC_DATADISK",
+                "maxNumActive": 50
+            },
+        ]
+    },
+],
 "cachedTransferGen": {
     "managerType": "fixedTime",
     "tickFreq": 120,

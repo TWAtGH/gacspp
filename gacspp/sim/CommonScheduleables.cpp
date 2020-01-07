@@ -621,6 +621,52 @@ auto CWavedTransferNumGen::GetNumToCreate(RNGEngineType& rngEngine, std::uint32_
 
 
 
+CSimpleTransferGen::CSimpleTransferGen(IBaseSim* sim,
+                                       std::shared_ptr<CTransferManager> transferMgr,
+                                       const TickType tickFreq,
+                                       const TickType startTick )
+    : CScheduleable(startTick),
+      mSim(sim),
+      mTransferMgr(transferMgr),
+      mTickFreq(tickFreq)
+{}
+
+void CSimpleTransferGen::OnUpdate(const TickType now)
+{
+    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
+
+    assert(!mTransferGenInfo.empty());
+
+    for(std::unique_ptr<STransferGenInfo>& info : mTransferGenInfo)
+    {
+        CNetworkLink* networkLink = info->mNetworkLink;
+        while(networkLink->mNumActiveTransfers < info->mMaxNumActive && !info->mFiles.empty())
+        {
+            std::shared_ptr<SFile>& file = info->mFiles.back();
+            bool loopCheck = false;
+            for(std::shared_ptr<SReplica>& replica : file->mReplicas)
+            {
+                if(replica->GetStorageElement() == networkLink->GetSrcStorageElement())
+                {
+                    std::shared_ptr<SReplica> newReplica = networkLink->GetDstStorageElement()->CreateReplica(file, now);
+
+                    assert(newReplica);
+
+                    mTransferMgr->CreateTransfer(replica, newReplica, now);
+                    info->mFiles.pop_back();
+                    loopCheck = true;
+                }
+            }
+            assert(loopCheck);
+        }
+
+    }
+
+    mNextCallTick = now + mTickFreq;
+}
+
+
+
 CUniformTransferGen::CUniformTransferGen(IBaseSim* sim,
                                          std::shared_ptr<CTransferManager> transferMgr,
                                          std::shared_ptr<CWavedTransferNumGen> transferNumGen,

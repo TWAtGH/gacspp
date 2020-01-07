@@ -293,6 +293,48 @@ public:
 };
 
 
+class CBaseOnDeletionInsert : public IFileActionListener, public IReplicaActionListener
+{
+private:
+    std::shared_ptr<IPreparedInsert> mFileInsertQuery;
+    std::shared_ptr<IPreparedInsert> mReplicaInsertQuery;
+
+public:
+    CBaseOnDeletionInsert();
+
+    void OnFileCreated(const TickType now, std::shared_ptr<SFile> file) override;
+    void OnFilesDeleted(const TickType now, const std::vector<std::weak_ptr<SFile>>& deletedFiles) override;
+    void OnReplicaCreated(const TickType now, std::shared_ptr<SReplica> replica) override;
+    void OnReplicasDeleted(const TickType now, const std::vector<std::weak_ptr<SReplica>>& deletedReplicas) override;
+};
+
+
+class CSimpleTransferGen : public CScheduleable, public CBaseOnDeletionInsert
+{
+private:
+    IBaseSim* mSim;
+    std::shared_ptr<CTransferManager> mTransferMgr;
+    TickType mTickFreq;
+
+public:
+    struct STransferGenInfo
+    {
+        std::size_t mMaxNumActive;
+        CNetworkLink* mNetworkLink;
+        std::vector<std::shared_ptr<SFile>> mFiles;
+    };
+    std::vector<std::unique_ptr<STransferGenInfo>> mTransferGenInfo;
+
+public:
+    CSimpleTransferGen(IBaseSim* sim,
+                        std::shared_ptr<CTransferManager> transferMgr,
+                        const TickType tickFreq,
+                        const TickType startTick=0 );
+
+    void OnUpdate(const TickType now) final;
+};
+
+
 class CUniformTransferGen : public CScheduleable
 {
 private:
@@ -397,20 +439,6 @@ public:
     void OnUpdate(const TickType now) final;
 };
 
-class CBaseOnDeletionInsert : public IFileActionListener, public IReplicaActionListener
-{
-private:
-    std::shared_ptr<IPreparedInsert> mFileInsertQuery;
-    std::shared_ptr<IPreparedInsert> mReplicaInsertQuery;
-
-public:
-    CBaseOnDeletionInsert();
-
-    void OnFileCreated(const TickType now, std::shared_ptr<SFile> file) override;
-    void OnFilesDeleted(const TickType now, const std::vector<std::weak_ptr<SFile>>& deletedFiles) override;
-    void OnReplicaCreated(const TickType now, std::shared_ptr<SReplica> replica) override;
-    void OnReplicasDeleted(const TickType now, const std::vector<std::weak_ptr<SReplica>>& deletedReplicas) override;
-};
 
 class CCachedSrcTransferGen : public CScheduleable, public CBaseOnDeletionInsert
 {
