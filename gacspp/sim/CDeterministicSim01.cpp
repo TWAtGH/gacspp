@@ -473,44 +473,55 @@ bool CDeterministicSim01::SetupDefaults(const json& profileJson)
 {
     if(!CDefaultBaseSim::SetupDefaults(profileJson))
         return false;
+    
+    auto heartbeat = std::make_shared<CHeartbeat>(this, static_cast<std::uint32_t>(SECONDS_PER_DAY), static_cast<TickType>(SECONDS_PER_DAY));
+
+    json transferManagerCfg, transferGenCfg;
+    try
+    {
+        transferManagerCfg = profileJson.at("transferCfg").at("manager");
+        transferGenCfg = profileJson.at("transferCfg").at("generator");
+    }
+    catch (const json::out_of_range& error)
+    {
+        std::cout << "Invalid transfer configuration: " << error.what() << std::endl;
+        return false;
+    }
+
+    auto transferManager = std::dynamic_pointer_cast<CTransferBatchManager>(CreateTransferManager(transferManagerCfg));
+    if (!transferManager)
+    {
+        std::cout << "Failed creating transfer manager" << std::endl;
+        return false;
+    }
+
+    heartbeat->mTransferManagers.push_back(transferManager);
 
     std::shared_ptr<CDeterministicTransferGen> transferGen;
-    std::shared_ptr<CTransferBatchManager> manager;
     try
     {
         const json& transferGenCfg = profileJson.at("deterministicTransferGen");
         const std::string fileDataFilePathTmpl = transferGenCfg.at("fileDataFilePathTmpl").get<std::string>();
         const std::uint32_t fileDataFileFirstIdx = transferGenCfg.at("fileDataFileFirstIdx").get<std::uint32_t>();
-        const std::string managerType = transferGenCfg.at("managerType").get<std::string>();
-        const TickType managerTickFreq = transferGenCfg.at("managerTickFreq").get<TickType>();
-        const TickType managerStartTick = transferGenCfg.at("managerStartTick").get<TickType>();
-        if(managerType == "batched")
+
+        transferGen = std::make_shared<CDeterministicTransferGen>(this, transferManager, fileDataFilePathTmpl, fileDataFileFirstIdx);
+
+        for(const json& storageElementName : transferGenCfg.at("diskStorageElements"))
         {
-            manager = std::make_shared<CTransferBatchManager>(managerTickFreq, managerStartTick);
-            transferGen = std::make_shared<CDeterministicTransferGen>(this, manager, fileDataFilePathTmpl, fileDataFileFirstIdx);
-
-            for(const json& storageElementName : transferGenCfg.at("diskStorageElements"))
-            {
-                //CStorageElement* storageElement = mRucio->GetStorageElementByName(storageElementName.get<std::string>());
-                //if(storageElement)
-                    //transferGen->mDiskStorageElement = storageElement;
-                //else
-                    //std::cout<<"Failed to find diskStorageElements: "<<storageElementName.get<std::string>()<<std::endl;
-            }
-
-            for(const json& storageElementName : transferGenCfg.at("computingStorageElements"))
-            {
-                CStorageElement* storageElement = mRucio->GetStorageElementByName(storageElementName.get<std::string>());
-                if(storageElement)
-                    transferGen->mComputingStorageElement = storageElement;
-                else
-                    std::cout<<"Failed to find computingStorageElements: "<<storageElementName.get<std::string>()<<std::endl;
-            }
+            //CStorageElement* storageElement = mRucio->GetStorageElementByName(storageElementName.get<std::string>());
+            //if(storageElement)
+                //transferGen->mDiskStorageElement = storageElement;
+            //else
+                //std::cout<<"Failed to find diskStorageElements: "<<storageElementName.get<std::string>()<<std::endl;
         }
-        else
+
+        for(const json& storageElementName : transferGenCfg.at("computingStorageElements"))
         {
-            std::cout << "Failed to load deterministic transfer gen cfg: only fixed transfer implemented" << std::endl;
-            return false;
+            CStorageElement* storageElement = mRucio->GetStorageElementByName(storageElementName.get<std::string>());
+            if(storageElement)
+                transferGen->mComputingStorageElement = storageElement;
+            else
+                std::cout<<"Failed to find computingStorageElements: "<<storageElementName.get<std::string>()<<std::endl;
         }
 
         mRucio->mFileActionListeners.emplace_back(transferGen);
@@ -535,18 +546,15 @@ bool CDeterministicSim01::SetupDefaults(const json& profileJson)
         std::cout << "Failed to load reaper cfg: " << error.what() << std::endl;
         //reaper = std::make_shared<CReaperCaller>(mRucio.get(), 600, 600);
     }
+    //heartbeat->mProccessDurations[reaper->mName] = &(reaper->mUpdateDurationSummed);
 
-
-    auto heartbeat = std::make_shared<CHeartbeat>(this, manager, nullptr, static_cast<std::uint32_t>(SECONDS_PER_DAY), static_cast<TickType>(SECONDS_PER_DAY));
-    //heartbeat->mProccessDurations["DataGen"] = &(dataGen->mUpdateDurationSummed);
-    heartbeat->mProccessDurations["TransferUpdate"] = &(manager->mUpdateDurationSummed);
-    heartbeat->mProccessDurations["TransferGen"] = &(transferGen->mUpdateDurationSummed);
+    heartbeat->mProccessDurations[transferManager->mName] = &(transferManager->mUpdateDurationSummed);
+    heartbeat->mProccessDurations[transferGen->mName] = &(transferGen->mUpdateDurationSummed);
     heartbeat->mProccessDurations["TransferGenClean"] = &(transferGen->mUpdateCleanDurationSummed);
     heartbeat->mProccessDurations["TransferGenIn"] = &(transferGen->mUpdateInDurationSummed);
     heartbeat->mProccessDurations["TransferGenOut"] = &(transferGen->mUpdateOutDurationSummed);
-    //heartbeat->mProccessDurations["Reaper"] = &(reaper->mUpdateDurationSummed);
 
-    mSchedule.push(manager);
+    mSchedule.push(transferManager);
     mSchedule.push(transferGen);
     //mSchedule.push(reaper);
     mSchedule.push(heartbeat);

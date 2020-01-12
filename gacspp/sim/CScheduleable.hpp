@@ -10,6 +10,7 @@
 class CScheduleable
 {
 public:
+    std::string mName;
     std::chrono::duration<double> mUpdateDurationSummed = std::chrono::duration<double>::zero();
     TickType mNextCallTick;
 

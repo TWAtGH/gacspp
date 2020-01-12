@@ -5,6 +5,7 @@
 #include "clouds/IBaseCloud.hpp"
 
 #include "infrastructure/CRucio.hpp"
+#include "infrastructure/CStorageElement.hpp"
 
 
 IBaseSim::IBaseSim() = default;
@@ -41,4 +42,19 @@ void IBaseSim::Run(const TickType maxTick)
 void IBaseSim::Stop()
 {
     mIsRunning = false;
+}
+
+auto IBaseSim::GetStorageElementByName(const std::string& name) const -> CStorageElement*
+{
+    CStorageElement* storageElement = mRucio->GetStorageElementByName(name);
+    if (storageElement)
+        return storageElement;
+
+    for (const std::unique_ptr<IBaseCloud>& cloud : mClouds)
+    {
+        storageElement = cloud->GetStorageElementByName(name);
+        if (storageElement)
+            return storageElement;
+    }
+    return nullptr;
 }

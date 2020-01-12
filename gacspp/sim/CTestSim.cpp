@@ -16,50 +16,54 @@ bool CTestSim::SetupDefaults(const json& profileJson)
     ////////////////////////////
     // setup scheuleables
     ////////////////////////////
-    std::unordered_map<std::string, CStorageElement*> nameToStorageElement;
-    std::shared_ptr<CCachedSrcTransferGen> transferGen;
-    std::shared_ptr<CFixedTimeTransferManager> manager;
-    try
-    {
-        const json& transferGenCfg = profileJson.at("cachedTransferGen");
-        const std::string managerType = transferGenCfg.at("managerType").get<std::string>();
-        const TickType tickFreq = transferGenCfg.at("tickFreq").get<TickType>();
-        const TickType startTick = transferGenCfg.at("startTick").get<TickType>();
-        const TickType managerTickFreq = transferGenCfg.at("managerTickFreq").get<TickType>();
-        const TickType managerStartTick = transferGenCfg.at("managerStartTick").get<TickType>();
-        const std::size_t numPerDay = transferGenCfg.at("numPerDay").get<std::size_t>();
-        const TickType defaultReplicaLifetime = transferGenCfg.at("defaultReplicaLifetime").get<TickType>();
-        if(managerType == "fixedTime")
-        {
-            manager = std::make_shared<CFixedTimeTransferManager>(managerTickFreq, managerStartTick);
-            transferGen = std::make_shared<CCachedSrcTransferGen>(this, manager, numPerDay, defaultReplicaLifetime, tickFreq, startTick);
 
-            for(const json& srcStorageElementName : transferGenCfg.at("srcStorageElements"))
-                transferGen->mSrcStorageElements.push_back( nameToStorageElement[srcStorageElementName.get<std::string>()] );
-            for(const json& cacheStorageElementJson : transferGenCfg.at("cacheStorageElements"))
-            {
-                const std::size_t cacheSize = cacheStorageElementJson.at("size").get<std::size_t>();
-                const TickType defaultReplicaLifetime = cacheStorageElementJson.at("defaultReplicaLifetime").get<TickType>();
-                CStorageElement* storageElement = nameToStorageElement[cacheStorageElementJson.at("storageElement").get<std::string>()];
-                transferGen->mCacheElements.push_back( {cacheSize, defaultReplicaLifetime, storageElement} );
-            }
-            for(const json& dstStorageElementName : transferGenCfg.at("dstStorageElements"))
-                transferGen->mDstStorageElements.push_back( nameToStorageElement[dstStorageElementName.get<std::string>()] );
-        }
-        else
-        {
-            std::cout << "Failed to load cached transfer gen cfg: only fixed transfer implemented" << std::endl;
-            return false;
-        }
-    }
-    catch(const json::out_of_range& error)
+    if(!profileJson.contains("transferCfgs"))
     {
-        std::cout << "Failed to load cached transfer gen cfg: " << error.what() << std::endl;
+        std::cout << "No transfer configuration" << std::endl;
         return false;
     }
 
-    mRucio->mFileActionListeners.emplace_back(transferGen);
-    mRucio->mReplicaActionListeners.emplace_back(transferGen);
+
+    auto heartbeat = std::make_shared<CHeartbeat>(this, static_cast<std::uint32_t>(SECONDS_PER_DAY), static_cast<TickType>(SECONDS_PER_DAY));
+
+    for (const json& transferCfg : profileJson.at("transferCfgs"))
+    {
+        json transferManagerCfg, transferGenCfg;
+        try
+        {
+            transferManagerCfg = transferCfg.at("manager");
+            transferGenCfg = transferCfg.at("generator");
+        }
+        catch (const json::out_of_range& error)
+        {
+            std::cout << "Invalid transfer configuration: " << error.what() << std::endl;
+            return false;
+        }
+
+        auto transferManager = std::dynamic_pointer_cast<CFixedTimeTransferManager>(CreateTransferManager(transferManagerCfg));
+        if (!transferManager)
+        {
+            std::cout << "Failed creating transfer manager" << std::endl;
+            return false;
+        }
+
+        auto transferGen = std::dynamic_pointer_cast<CCachedSrcTransferGen>(CreateTransferGenerator(transferGenCfg, transferManager));
+        if (!transferGen)
+        {
+            std::cout << "Failed creating transfer generator" << std::endl;
+            return false;
+        }
+
+        mRucio->mFileActionListeners.emplace_back(transferGen);
+        mRucio->mReplicaActionListeners.emplace_back(transferGen);
+
+        heartbeat->mTransferManagers.push_back(transferManager);
+        heartbeat->mProccessDurations[transferManager->mName] = &(transferManager->mUpdateDurationSummed);
+        heartbeat->mProccessDurations[transferGen->mName] = &(transferGen->mUpdateDurationSummed);
+
+        mSchedule.push(transferManager);
+        mSchedule.push(transferGen);
+    }
 
     try
     {
@@ -107,18 +111,21 @@ bool CTestSim::SetupDefaults(const json& profileJson)
             for(const json& storageElement : dataGenCfg.at("storageElements"))
             {
                 const std::string storageElementName = storageElement.get<std::string>();
-                if(nameToStorageElement.count(storageElementName) == 0)
+                CStorageElement* storageElement = GetStorageElementByName(storageElementName);
+                if(!storageElement)
                 {
                     std::cout<<"Failed to find storage element for data generator: "<<storageElementName<<std::endl;
                     continue;
                 }
-                dataGen->mStorageElements.push_back(nameToStorageElement[storageElementName]);
+                dataGen->mStorageElements.push_back(storageElement);
             }
 
             for(const json& ratioVal : dataGenCfg.at("numReplicaRatios"))
                 dataGen->mNumReplicaRatio.push_back(ratioVal.get<float>());
 
             dataGen->mSelectStorageElementsRandomly = dataGenCfg.at("selectStorageElementsRandomly").get<bool>();
+            
+            heartbeat->mProccessDurations[dataGen->mName] = &(dataGen->mUpdateDurationSummed);
 
             mSchedule.push(dataGen);
         }
@@ -136,6 +143,8 @@ bool CTestSim::SetupDefaults(const json& profileJson)
         const TickType tickFreq = reaperCfg.at("tickFreq").get<TickType>();
         const TickType startTick = reaperCfg.at("startTick").get<TickType>();
         reaper = std::make_shared<CReaperCaller>(mRucio.get(), tickFreq, startTick);
+
+        heartbeat->mProccessDurations[reaper->mName] = &(reaper->mUpdateDurationSummed);
     }
     catch(const json::out_of_range& error)
     {
@@ -143,17 +152,8 @@ bool CTestSim::SetupDefaults(const json& profileJson)
         reaper = std::make_shared<CReaperCaller>(mRucio.get(), 600, 600);
     }
 
-    auto heartbeat = std::make_shared<CHeartbeat>(this, manager, nullptr, static_cast<std::uint32_t>(SECONDS_PER_DAY), static_cast<TickType>(SECONDS_PER_DAY));
-    //heartbeat->mProccessDurations["DataGen"] = &(dataGen->mUpdateDurationSummed);
-    heartbeat->mProccessDurations["TransferUpdate"] = &(manager->mUpdateDurationSummed);
-    heartbeat->mProccessDurations["TransferGen"] = &(transferGen->mUpdateDurationSummed);
-    heartbeat->mProccessDurations["Reaper"] = &(reaper->mUpdateDurationSummed);
-
-
     mSchedule.push(std::make_shared<CBillingGenerator>(this));
     mSchedule.push(reaper);
-    mSchedule.push(manager);
-    mSchedule.push(transferGen);
     mSchedule.push(heartbeat);
 
     return true;

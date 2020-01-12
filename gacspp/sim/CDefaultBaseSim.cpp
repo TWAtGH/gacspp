@@ -10,6 +10,8 @@
 #include "infrastructure/CNetworkLink.hpp"
 #include "infrastructure/CRucio.hpp"
 
+#include "sim/CommonScheduleables.hpp"
+
 #include "output/COutput.hpp"
 
 #include "third_party/nlohmann/json.hpp"
@@ -307,4 +309,81 @@ bool CDefaultBaseSim::SetupDefaults(const json& profileJson)
         return false;
 
     return true;
+}
+
+
+auto CDefaultBaseSim::CreateTransferManager(const json& transferManagerCfg) const -> std::shared_ptr<CBaseTransferManager>
+{
+    std::shared_ptr<CBaseTransferManager> transferManager;
+    try
+    {
+        const std::string typeStr = transferManagerCfg.at("type").get<std::string>();
+        const std::string name = transferManagerCfg.at("name").get<std::string>();
+        const TickType tickFreq = transferManagerCfg.at("tickFreq").get<TickType>();
+        const TickType startTick = transferManagerCfg.at("startTick").get<TickType>();
+        if (typeStr == "bandwidth")
+            transferManager = std::make_shared<CTransferManager>(tickFreq, startTick);
+        else if(typeStr == "fixedTime")
+            transferManager = std::make_shared<CFixedTimeTransferManager>(tickFreq, startTick);
+        else if(typeStr == "batched")
+            transferManager = std::make_shared<CTransferBatchManager>(tickFreq, startTick);
+        else
+            std::cout << "Unknown transfer manager type: " << typeStr << std::endl;
+        if (transferManager)
+            transferManager->mName = name;
+    }
+    catch (const json::out_of_range& error)
+    {
+        std::cout << "Exception while loading transfer manager cfg: " << error.what() << std::endl;
+    }
+    return transferManager;
+}
+
+auto CDefaultBaseSim::CreateTransferGenerator(const json& transferGenCfg, const std::shared_ptr<CBaseTransferManager>& transferManager) -> std::shared_ptr<CScheduleable>
+{
+    std::shared_ptr<CScheduleable> transferGen;
+    try
+    {
+        const std::string typeStr = transferGenCfg.at("type").get<std::string>();
+        const std::string name = transferGenCfg.at("name").get<std::string>();
+        const TickType tickFreq = transferGenCfg.at("tickFreq").get<TickType>();
+        const TickType startTick = transferGenCfg.at("startTick").get<TickType>();
+
+        if (typeStr == "simple")
+        { }
+        else if (typeStr == "cachedSrc")
+        {
+            auto mgr = std::dynamic_pointer_cast<CFixedTimeTransferManager>(transferManager);
+            if (!mgr)
+            {
+                std::cout << "Wrong transfer manager for cached src transfer gen" << std::endl;
+                return transferGen;
+            }
+
+            const std::size_t numPerDay = transferGenCfg.at("numPerDay").get<std::size_t>();
+            const TickType defaultReplicaLifetime = transferGenCfg.at("defaultReplicaLifetime").get<TickType>();
+
+            auto transferGen = std::make_shared<CCachedSrcTransferGen>(this, mgr, numPerDay, defaultReplicaLifetime, tickFreq, startTick);
+
+            for (const json& srcStorageElementName : transferGenCfg.at("srcStorageElements"))
+                transferGen->mSrcStorageElements.push_back(GetStorageElementByName(srcStorageElementName.get<std::string>()));
+            for (const json& cacheStorageElementJson : transferGenCfg.at("cacheStorageElements"))
+            {
+                const std::size_t cacheSize = cacheStorageElementJson.at("size").get<std::size_t>();
+                const TickType defaultReplicaLifetime = cacheStorageElementJson.at("defaultReplicaLifetime").get<TickType>();
+                CStorageElement* storageElement = GetStorageElementByName(cacheStorageElementJson.at("storageElement").get<std::string>());
+                transferGen->mCacheElements.push_back({ cacheSize, defaultReplicaLifetime, storageElement });
+            }
+            for (const json& dstStorageElementName : transferGenCfg.at("dstStorageElements"))
+                transferGen->mDstStorageElements.push_back(GetStorageElementByName(dstStorageElementName.get<std::string>()));
+        }
+
+        if (transferGen)
+            transferGen->mName = name;
+    }
+    catch (const json::out_of_range& error)
+    {
+        std::cout << "Exception while loading transfer manager cfg: " << error.what() << std::endl;
+    }
+    return transferGen;
 }

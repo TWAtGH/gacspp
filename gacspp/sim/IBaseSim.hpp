@@ -16,6 +16,7 @@ using nlohmann::json;
 
 class IBaseCloud;
 class CRucio;
+class CStorageElement;
 
 
 class IBaseSim
@@ -40,6 +41,9 @@ public:
     virtual void Run(const TickType maxTick);
 
     void Stop();
+
+public:
+    auto GetStorageElementByName(const std::string& name) const -> CStorageElement*;
 
 protected:
     bool mIsRunning = false;

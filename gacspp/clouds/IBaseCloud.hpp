@@ -9,7 +9,7 @@
 #include "common/IConfigConsumer.hpp"
 
 class ISite;
-
+class CStorageElement;
 
 class ICloudBill
 {
@@ -39,6 +39,9 @@ public:
 
     virtual auto ProcessBilling(const TickType now) -> std::unique_ptr<ICloudBill> = 0;
     virtual void InitialiseNetworkLinks() = 0;
+
+public:
+    auto GetStorageElementByName(const std::string& name) -> CStorageElement*;
 
     inline auto GetName() const -> const std::string&
     {return mName;}

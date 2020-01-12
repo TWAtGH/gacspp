@@ -37,31 +37,52 @@
         "tickFreq": 300,
         "startTick": 300
     },
-"transferGens": [
+"transferCfgs": [
     {
-        "type": "simple",
-        "tickFreq": 120,
-        "startTick": 0,
-        "managerTickFreq": 20,
-        "managerStartTick": 100,
-        "info": [
-            {
-                "srcStorageElement": "BNL-OSG2_DATATAPE",
-                "dstStorageElement": "BNL-OSG2_DATADISK",
-                "maxNumActive": 50
-            },
-            {
-                "srcStorageElement": "RAL-LCG2_DATATAPE",
-                "dstStorageElement": "RAL-LCG2_DATADISK",
-                "maxNumActive": 50
-            },
-            {
-                "srcStorageElement": "IN2P3-CC_DATATAPE",
-                "dstStorageElement": "IN2P3-CC_DATADISK",
-                "maxNumActive": 50
-            },
-        ]
+        "manager": {
+            "type": "bandwidth",
+            "name": "tape2diskMgr",
+            "tickFreq": 20,
+            "startTick": 0
+        },
+        "generator": {
+            "type": "simple",
+            "name": "tape2diskGen",
+            "tickFreq": 20,
+            "startTick": 0,
+            "info": [
+                {
+                    "srcStorageElement": "BNL-OSG2_DATATAPE",
+                    "dstStorageElement": "BNL-OSG2_DATADISK",
+                    "maxNumActive": 50
+                },
+                {
+                    "srcStorageElement": "RAL-LCG2_DATATAPE",
+                    "dstStorageElement": "RAL-LCG2_DATADISK",
+                    "maxNumActive": 50
+                },
+                {
+                    "srcStorageElement": "IN2P3-CC_DATATAPE",
+                    "dstStorageElement": "IN2P3-CC_DATADISK",
+                    "maxNumActive": 50
+                }
+            ]
+        }
     },
+    {
+        "manager": {
+            "type": "bandwidth",
+            "name": "all2jobMgr",
+            "tickFreq": 20,
+            "startTick": 0
+        },
+        "generator": {
+            "type": "",
+            "name": "all2jobGen",
+            "tickFreq": 20,
+            "startTick": 0
+        }
+    }
 ],
 "cachedTransferGen": {
     "managerType": "fixedTime",

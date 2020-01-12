@@ -321,7 +321,7 @@ public:
     {
         std::size_t mMaxNumActive;
         CNetworkLink* mNetworkLink;
-        std::vector<std::shared_ptr<SFile>> mFiles;
+        std::vector<std::shared_ptr<SReplica>> mReplicas;
     };
     std::vector<std::unique_ptr<STransferGenInfo>> mTransferGenInfo;
 
@@ -483,17 +483,16 @@ class CHeartbeat : public CScheduleable
 {
 private:
     IBaseSim* mSim;
-    std::shared_ptr<CBaseTransferManager> mG2CTransferMgr;
-    std::shared_ptr<CBaseTransferManager> mC2CTransferMgr;
     TickType mTickFreq;
 
     std::chrono::high_resolution_clock::time_point mTimeLastUpdate;
 
 public:
     std::unordered_map<std::string, std::chrono::duration<double>*> mProccessDurations;
+    std::vector<std::shared_ptr<CBaseTransferManager>> mTransferManagers;
 
 public:
-    CHeartbeat(IBaseSim* sim, std::shared_ptr<CBaseTransferManager> g2cTransferMgr, std::shared_ptr<CBaseTransferManager> c2cTransferMgr, const TickType tickFreq, const TickType startTick = 0);
+    CHeartbeat(IBaseSim* sim, const TickType tickFreq, const TickType startTick = 0);
 
     void OnUpdate(const TickType now) final;
 };

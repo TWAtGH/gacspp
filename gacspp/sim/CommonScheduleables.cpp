@@ -640,26 +640,19 @@ void CSimpleTransferGen::OnUpdate(const TickType now)
     for(std::unique_ptr<STransferGenInfo>& info : mTransferGenInfo)
     {
         CNetworkLink* networkLink = info->mNetworkLink;
-        while(networkLink->mNumActiveTransfers < info->mMaxNumActive && !info->mFiles.empty())
+        CStorageElement* dstStorageElement = networkLink->GetDstStorageElement();
+        std::vector<std::shared_ptr<SReplica>>& replicas = info->mReplicas;
+        while(networkLink->mNumActiveTransfers < info->mMaxNumActive && !replicas.empty())
         {
-            std::shared_ptr<SFile>& file = info->mFiles.back();
-            bool loopCheck = false;
-            for(std::shared_ptr<SReplica>& replica : file->mReplicas)
-            {
-                if(replica->GetStorageElement() == networkLink->GetSrcStorageElement())
-                {
-                    std::shared_ptr<SReplica> newReplica = networkLink->GetDstStorageElement()->CreateReplica(file, now);
+            std::shared_ptr<SReplica>& srcReplica = replicas.back();
+            std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(srcReplica->GetFile(), now);
 
-                    assert(newReplica);
+            assert(srcReplica->GetStorageElement() == dstStorageElement);
+            assert(newReplica);
 
-                    mTransferMgr->CreateTransfer(replica, newReplica, now);
-                    info->mFiles.pop_back();
-                    loopCheck = true;
-                }
-            }
-            assert(loopCheck);
+            mTransferMgr->CreateTransfer(srcReplica, newReplica, now);
+            replicas.pop_back();
         }
-
     }
 
     mNextCallTick = now + mTickFreq;
@@ -1344,11 +1337,9 @@ void CCachedSrcTransferGen::OnFileCreated(const TickType now, std::shared_ptr<SF
 
 
 
-CHeartbeat::CHeartbeat(IBaseSim* sim, std::shared_ptr<CBaseTransferManager> g2cTransferMgr, std::shared_ptr<CBaseTransferManager> c2cTransferMgr, const TickType tickFreq, const TickType startTick)
+CHeartbeat::CHeartbeat(IBaseSim* sim, const TickType tickFreq, const TickType startTick)
     : CScheduleable(startTick),
       mSim(sim),
-      mG2CTransferMgr(g2cTransferMgr),
-      mC2CTransferMgr(c2cTransferMgr),
       mTickFreq(tickFreq)
 {
     mTimeLastUpdate = std::chrono::high_resolution_clock::now();
@@ -1366,52 +1357,38 @@ void CHeartbeat::OnUpdate(const TickType now)
 
     statusOutput << "[" << std::setw(6) << static_cast<TickType>(now / 1000.0) << "k]: ";
     statusOutput << "Runtime: " << mUpdateDurationSummed.count() << "s; ";
-    statusOutput << "numFiles: " << static_cast<std::size_t>(mSim->mRucio->mFiles.size() / 1000.0) << "k; ";
-
-    statusOutput << "active: " << mG2CTransferMgr->GetNumActiveTransfers();
-    if(mC2CTransferMgr)
-        statusOutput << " + " << mC2CTransferMgr->GetNumActiveTransfers();
-    statusOutput << "; ";
-
-    statusOutput << "done: " << mG2CTransferMgr->mNumCompletedTransfers;
-    if(mC2CTransferMgr)
-        statusOutput << " + " << mC2CTransferMgr->mNumCompletedTransfers;
-    statusOutput << "; ";
-
-    statusOutput << "failed: " << mG2CTransferMgr->mNumFailedTransfers;
-    if (mC2CTransferMgr)
-        statusOutput << " + " << mC2CTransferMgr->mNumFailedTransfers;
-    statusOutput << "; ";
-
-    double avgTransferDuration = 0;
-    if(mG2CTransferMgr->mNumCompletedTransfers > 0)
-        avgTransferDuration = (mG2CTransferMgr->mSummedTransferDuration / mG2CTransferMgr->mNumCompletedTransfers);
-    statusOutput << "AvgTransferDuration: " << avgTransferDuration;
-    if(mC2CTransferMgr)
+    statusOutput << "numFiles: " << static_cast<std::size_t>(mSim->mRucio->mFiles.size() / 1000.0) << "k" << std::endl;
+    
+    statusOutput << "Transfer stats:" << std::endl;
+    for (std::shared_ptr<CBaseTransferManager>& transferManager : mTransferManagers)
     {
-        avgTransferDuration = 0;
-        if(mC2CTransferMgr->mNumCompletedTransfers > 0)
-            avgTransferDuration = (mC2CTransferMgr->mSummedTransferDuration / mC2CTransferMgr->mNumCompletedTransfers);
-        statusOutput << " + " << avgTransferDuration;
-    }
-    statusOutput << std::endl;
+        std::uint64_t sumNumTransfers = transferManager->GetNumActiveTransfers() + transferManager->mNumCompletedTransfers + transferManager->mNumFailedTransfers;
+        statusOutput << transferManager->mName << std::endl;
 
-    mG2CTransferMgr->mNumCompletedTransfers = 0;
-    mG2CTransferMgr->mSummedTransferDuration = 0;
-    mG2CTransferMgr->mNumFailedTransfers = 0;
-    if(mC2CTransferMgr)
-    {
-        mC2CTransferMgr->mNumCompletedTransfers = 0;
-        mC2CTransferMgr->mSummedTransferDuration = 0;
-        mC2CTransferMgr->mNumFailedTransfers = 0;
+        statusOutput << "  avg duration: ";
+        if (sumNumTransfers > 0)
+            statusOutput << transferManager->mSummedTransferDuration / sumNumTransfers;
+        else
+            statusOutput << "-";
+        statusOutput << std::endl;
+
+        statusOutput << "        active: " << transferManager->GetNumActiveTransfers() << std::endl;
+        statusOutput << "          done: " << transferManager->mNumCompletedTransfers << std::endl;
+        statusOutput << "        failed: " << transferManager->mNumFailedTransfers << std::endl;
+        
+        transferManager->mSummedTransferDuration = 0;
+        transferManager->mNumCompletedTransfers = 0;
+        transferManager->mNumFailedTransfers = 0;
     }
+
 
     std::size_t maxW = 0;
     for (auto it : mProccessDurations)
         if (it.first.size() > maxW)
             maxW = it.first.size();
 
-    statusOutput << "  " << std::setw(maxW) << "Duration" << ": " << std::setw(6) << timeDiff.count() << "s\n";
+    statusOutput << "Sim stats:" << std::endl;
+    statusOutput << "  " << std::setw(maxW) << "Duration: " << std::setw(6) << timeDiff.count() << "s\n";
     for(auto it : mProccessDurations)
     {
         statusOutput << "  " << std::setw(maxW) << it.first;
