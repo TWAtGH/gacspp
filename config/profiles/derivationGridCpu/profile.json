@@ -15,12 +15,48 @@
     },
 "dataGens": [
         {
-            "storageElements": ["BNL-OSG2_DATATAPE", "RAL-LCG2_DATATAPE", "IN2P3-CC_DATATAPE"],
-            "numReplicaRatios": [0.6, 0.25, 0.15],
+            "storageElements": ["BNL-OSG2_DATATAPE"],
+            "numReplicaRatios": [],
             "selectStorageElementsRandomly": false,
             "numFilesCfg": {
                 "type": "fixed",
-                "value": 5000000
+                "value": 1500000
+            },
+            "fileSizeCfg": {
+                "type": "normal",
+                "mean": 3.1,
+                "stddev": 0.5
+            },
+            "lifetimeCfg": {
+                "type": "fixed",
+                "value": 157680000
+            }
+        },
+        {
+            "storageElements": ["RAL-LCG2_DATATAPE"],
+            "numReplicaRatios": [],
+            "selectStorageElementsRandomly": false,
+            "numFilesCfg": {
+                "type": "fixed",
+                "value": 800000
+            },
+            "fileSizeCfg": {
+                "type": "normal",
+                "mean": 3.1,
+                "stddev": 0.5
+            },
+            "lifetimeCfg": {
+                "type": "fixed",
+                "value": 157680000
+            }
+        },
+        {
+            "storageElements": ["IN2P3-CC_DATATAPE"],
+            "numReplicaRatios": [],
+            "selectStorageElementsRandomly": false,
+            "numFilesCfg": {
+                "type": "fixed",
+                "value": 500000
             },
             "fileSizeCfg": {
                 "type": "normal",
@@ -46,25 +82,25 @@
             "startTick": 0
         },
         "generator": {
-            "type": "simple",
+            "type": "cloudBuffer",
             "name": "tape2diskGen",
             "tickFreq": 20,
             "startTick": 0,
-            "info": [
+            "infos": [
                 {
                     "srcStorageElement": "BNL-OSG2_DATATAPE",
-                    "dstStorageElement": "BNL-OSG2_DATADISK",
-                    "maxNumActive": 50
+                    "primaryDstStorageElement": "BNL-OSG2_STAGEDISK",
+                    "secondaryDstStorageElement": "iowa_bucket"
                 },
                 {
                     "srcStorageElement": "RAL-LCG2_DATATAPE",
-                    "dstStorageElement": "RAL-LCG2_DATADISK",
-                    "maxNumActive": 50
+                    "primaryDstStorageElement": "RAL-LCG2_STAGEDISK",
+                    "secondaryDstStorageElement": "zurich_bucket"
                 },
                 {
                     "srcStorageElement": "IN2P3-CC_DATATAPE",
-                    "dstStorageElement": "IN2P3-CC_DATADISK",
-                    "maxNumActive": 50
+                    "primaryDstStorageElement": "IN2P3-CC_STAGEDISK",
+                    "secondaryDstStorageElement": "zurich_bucket"
                 }
             ]
         }
@@ -83,23 +119,5 @@
             "startTick": 0
         }
     }
-],
-"cachedTransferGen": {
-    "managerType": "fixedTime",
-    "tickFreq": 120,
-    "startTick": 0,
-    "managerTickFreq": 20,
-    "managerStartTick": 100,
-    "srcStorageElements": ["BNL_DATATAPE"],
-    "dstStorageElements": ["BNL_DATADISK"],
-    "defaultReplicaLifetime": 86400,
-    "cacheStorageElements": [],
-    "_cacheStorageElements": [
-            {
-                "size": 75000,
-                "defaultReplicaLifetime": 2592000,
-                "storageElement": "iowa_bucket"
-            }
-        ]
-    }
+]
 }

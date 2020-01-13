@@ -29,7 +29,7 @@ public:
         CUSTOM
     };
 
-    CStorageElement(std::string&& name, ISite* site, bool allowDuplicateReplicas = false);
+    CStorageElement(std::string&& name, ISite* site, bool allowDuplicateReplicas = false, SpaceType quota = 0);
 
     virtual void OnOperation(const OPERATION op);
 
@@ -69,7 +69,7 @@ protected:
 class IStorageElementDelegate
 {
 public:
-    IStorageElementDelegate(CStorageElement* storageElement);
+    IStorageElementDelegate(CStorageElement* storageElement, SpaceType quota = 0);
 
     IStorageElementDelegate(IStorageElementDelegate&&) = delete;
     IStorageElementDelegate& operator=(IStorageElementDelegate&&) = delete;
@@ -93,6 +93,7 @@ public:
 protected:
     CStorageElement *mStorageElement;
     SpaceType mUsedStorage = 0;
+    SpaceType mQuota;
 };
 
 

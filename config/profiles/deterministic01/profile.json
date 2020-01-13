@@ -8,22 +8,33 @@
 		}
 	],
 "rucio": {
-	"config": {"_file_": "rucio.json"}
+	   "config": {"_file_": "rucio.json"}
 	},
 "links": {
-	"config": {"_file_": "links.json"}
+	   "config": {"_file_": "links.json"}
     },
 "reaper": {
         "tickFreq": 300,
         "startTick": 300
     },
-"deterministicTransferGen": {
-    "fileDataFileFirstIdx": 0,
-    "fileDataFilePathTmpl": "C:\\Users\\wegne\\source\\repos\\gacspp\\csvmerge\\jobfiledump_merged_$$$$$.csv",
-    "managerType": "fixedTime",
-    "managerTickFreq": 10,
-    "managerStartTick": 0,
-    "diskStorageElements": ["BNL_DATADISK"],
-    "computingStorageElements": ["BNL_JOBS"]
+"transferCfgs": [
+    {
+        "generator": {
+                "type": "deterministic",
+                "name": "TransferGen",
+                "tickFreq": 0,
+                "startTick": 0,
+                "fileDataFileFirstIdx": 0,
+                "fileDataFilePathTmpl": "C:\\Users\\wegne\\source\\repos\\gacspp\\csvmerge\\jobfiledump_merged_$$$$$.csv",
+                "diskStorageElements": ["BNL_DATADISK"],
+                "computingStorageElements": ["BNL_JOBS"]
+            },
+        "manager": {
+                "type": "batched",
+                "name": "TransferManager",
+                "tickFreq": 10,
+                "startTick": 0
+            }
     }
+]
 }

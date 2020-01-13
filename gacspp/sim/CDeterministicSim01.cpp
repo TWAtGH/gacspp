@@ -473,14 +473,14 @@ bool CDeterministicSim01::SetupDefaults(const json& profileJson)
 {
     if(!CDefaultBaseSim::SetupDefaults(profileJson))
         return false;
-    
+
     auto heartbeat = std::make_shared<CHeartbeat>(this, static_cast<std::uint32_t>(SECONDS_PER_DAY), static_cast<TickType>(SECONDS_PER_DAY));
 
     json transferManagerCfg, transferGenCfg;
     try
     {
-        transferManagerCfg = profileJson.at("transferCfg").at("manager");
-        transferGenCfg = profileJson.at("transferCfg").at("generator");
+        transferManagerCfg = profileJson.at("transferCfgs")[0].at("manager");
+        transferGenCfg = profileJson.at("transferCfgs")[0].at("generator");
     }
     catch (const json::out_of_range& error)
     {
@@ -500,7 +500,6 @@ bool CDeterministicSim01::SetupDefaults(const json& profileJson)
     std::shared_ptr<CDeterministicTransferGen> transferGen;
     try
     {
-        const json& transferGenCfg = profileJson.at("deterministicTransferGen");
         const std::string fileDataFilePathTmpl = transferGenCfg.at("fileDataFilePathTmpl").get<std::string>();
         const std::uint32_t fileDataFileFirstIdx = transferGenCfg.at("fileDataFileFirstIdx").get<std::uint32_t>();
 

@@ -139,9 +139,9 @@ namespace gcp
 
 
 
-    auto CRegion::CreateStorageElement(std::string&& name, bool allowDuplicateReplicas) -> CBucket*
+    auto CRegion::CreateStorageElement(std::string&& name, bool allowDuplicateReplicas, SpaceType quota) -> CBucket*
     {
-        mStorageElements.emplace_back(std::make_unique<CBucket>(std::move(name), this, allowDuplicateReplicas));
+        mStorageElements.emplace_back(std::make_unique<CBucket>(std::move(name), this, allowDuplicateReplicas, quota));
         return mStorageElements.back().get();
     }
 
@@ -175,7 +175,7 @@ namespace gcp
     double CRegion::CalculateNetworkCosts(double& sumUsedTraffic, std::uint64_t& sumDoneTransfers)
     {
         double regionNetworkCosts = 0;
-        
+
         for(const std::unique_ptr<CBucket>& srcBucket : mStorageElements)
         {
             for (const std::unique_ptr<CNetworkLink>& networkLink : srcBucket->mNetworkLinks)
@@ -353,11 +353,9 @@ namespace gcp
                                     continue;
                                 }
 
-                                CBucket* bucket;
-                                if(bucketJson.contains("allowDuplicateReplicas"))
-                                    bucket = region->CreateStorageElement(std::move(name), bucketJson.at("allowDuplicateReplicas").get<bool>());
-                                else
-                                    bucket = region->CreateStorageElement(std::move(name));
+                                const SpaceType quota = bucketJson.contains("quota") ? bucketJson["quota"].get<SpaceType>() : 0;
+                                const bool duplicates = bucketJson.contains("allowDuplicateReplicas") ? bucketJson["allowDuplicateReplicas"].get<bool>() : false;
+                                CBucket* bucket = region->CreateStorageElement(std::move(name), duplicates, quota);
 
                                 bucket->mPriceData->mStoragePrice = GetTieredRateFromSKUId(std::move(storageSKUId));
                                 bucket->mPriceData->mClassAOpPrice = GetTieredRateFromSKUId(std::move(classAOpSKUId));

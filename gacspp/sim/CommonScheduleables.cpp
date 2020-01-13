@@ -621,17 +621,17 @@ auto CWavedTransferNumGen::GetNumToCreate(RNGEngineType& rngEngine, std::uint32_
 
 
 
-CSimpleTransferGen::CSimpleTransferGen(IBaseSim* sim,
-                                       std::shared_ptr<CTransferManager> transferMgr,
-                                       const TickType tickFreq,
-                                       const TickType startTick )
+CCloudBufferTransferGen::CCloudBufferTransferGen(IBaseSim* sim,
+                                                 std::shared_ptr<CTransferManager> transferMgr,
+                                                 const TickType tickFreq,
+                                                 const TickType startTick )
     : CScheduleable(startTick),
       mSim(sim),
       mTransferMgr(transferMgr),
       mTickFreq(tickFreq)
 {}
 
-void CSimpleTransferGen::OnUpdate(const TickType now)
+void CCloudBufferTransferGen::OnUpdate(const TickType now)
 {
     CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
 
@@ -639,19 +639,39 @@ void CSimpleTransferGen::OnUpdate(const TickType now)
 
     for(std::unique_ptr<STransferGenInfo>& info : mTransferGenInfo)
     {
-        CNetworkLink* networkLink = info->mNetworkLink;
+        CNetworkLink* networkLink = info->mPrimaryLink;
         CStorageElement* dstStorageElement = networkLink->GetDstStorageElement();
         std::vector<std::shared_ptr<SReplica>>& replicas = info->mReplicas;
-        while(networkLink->mNumActiveTransfers < info->mMaxNumActive && !replicas.empty())
+
+        if(info->mCurReplicaIdx == 0 && replicas.empty())
+            replicas = networkLink->GetSrcStorageElement()->mReplicas;
+
+        while(info->mCurReplicaIdx < replicas.size())
         {
-            std::shared_ptr<SReplica>& srcReplica = replicas.back();
-            std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(srcReplica->GetFile(), now);
+            std::shared_ptr<SReplica>& srcReplica = replicas[info->mCurReplicaIdx];
+            std::shared_ptr<SFile> file = srcReplica->GetFile();
+            std::shared_ptr<SReplica> newReplica;
 
-            assert(srcReplica->GetStorageElement() == dstStorageElement);
-            assert(newReplica);
+            if(networkLink->mNumActiveTransfers < networkLink->mMaxNumActiveTransfers)
+            {
+                newReplica = dstStorageElement->CreateReplica(file, now);
+                if(newReplica)
+                {
+                    assert(srcReplica->GetStorageElement() == dstStorageElement);
 
-            mTransferMgr->CreateTransfer(srcReplica, newReplica, now);
-            replicas.pop_back();
+                    mTransferMgr->CreateTransfer(srcReplica, newReplica, now);
+                    info->mCurReplicaIdx += 1;
+                    continue;
+                }
+                else if(networkLink != info->mSecondaryLink)
+                {
+                    networkLink = info->mSecondaryLink;
+                    dstStorageElement = networkLink->GetDstStorageElement();
+                    continue;
+                }
+            }
+            
+            break;
         }
     }
 
@@ -1358,7 +1378,7 @@ void CHeartbeat::OnUpdate(const TickType now)
     statusOutput << "[" << std::setw(6) << static_cast<TickType>(now / 1000.0) << "k]: ";
     statusOutput << "Runtime: " << mUpdateDurationSummed.count() << "s; ";
     statusOutput << "numFiles: " << static_cast<std::size_t>(mSim->mRucio->mFiles.size() / 1000.0) << "k" << std::endl;
-    
+
     statusOutput << "Transfer stats:" << std::endl;
     for (std::shared_ptr<CBaseTransferManager>& transferManager : mTransferManagers)
     {
@@ -1375,7 +1395,7 @@ void CHeartbeat::OnUpdate(const TickType now)
         statusOutput << "        active: " << transferManager->GetNumActiveTransfers() << std::endl;
         statusOutput << "          done: " << transferManager->mNumCompletedTransfers << std::endl;
         statusOutput << "        failed: " << transferManager->mNumFailedTransfers << std::endl;
-        
+
         transferManager->mSummedTransferDuration = 0;
         transferManager->mNumCompletedTransfers = 0;
         transferManager->mNumFailedTransfers = 0;

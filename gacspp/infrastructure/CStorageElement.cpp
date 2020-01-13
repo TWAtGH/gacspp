@@ -8,8 +8,9 @@
 #include "output/COutput.hpp"
 
 
-IStorageElementDelegate::IStorageElementDelegate(CStorageElement* storageElement)
-    : mStorageElement(storageElement)
+IStorageElementDelegate::IStorageElementDelegate(CStorageElement* storageElement, SpaceType quota)
+    : mStorageElement(storageElement),
+      mQuota(quota)
 {}
 
 IStorageElementDelegate::~IStorageElementDelegate() = default;
@@ -23,6 +24,9 @@ void CBaseStorageElementDelegate::OnOperation(const CStorageElement::OPERATION o
 
 auto CBaseStorageElementDelegate::CreateReplica(std::shared_ptr<SFile> file, const TickType now) -> std::shared_ptr<SReplica>
 {
+    if(mQuota > 0 && (mUsedStorage + file->GetSize()) > mQuota)
+        return nullptr;
+
     auto& replicas = GetStorageElement()->mReplicas;
     auto newReplica = std::make_shared<SReplica>(file, mStorageElement, now, replicas.size());
     file->mReplicas.emplace_back(newReplica);
@@ -80,15 +84,15 @@ auto CUniqueReplicaStorageElementDelegate::CreateReplica(std::shared_ptr<SFile> 
 
 
 
-CStorageElement::CStorageElement(std::string&& name, ISite* site, bool allowDuplicateReplicas)
+CStorageElement::CStorageElement(std::string&& name, ISite* site, bool allowDuplicateReplicas, SpaceType quota)
     : mId(GetNewId()),
       mName(std::move(name)),
       mSite(site)
 {
     if(allowDuplicateReplicas)
-        mDelegate.reset(new CBaseStorageElementDelegate(this));
+        mDelegate.reset(new CBaseStorageElementDelegate(this, quota));
     else
-        mDelegate.reset(new CUniqueReplicaStorageElementDelegate(this));
+        mDelegate.reset(new CUniqueReplicaStorageElementDelegate(this, quota));
 }
 
 void CStorageElement::OnOperation(const OPERATION op)

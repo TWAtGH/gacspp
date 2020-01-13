@@ -27,6 +27,8 @@ public:
     std::uint64_t mNumFailedTransfers = 0;
     std::uint32_t mNumActiveTransfers = 0;
 
+    std::uint32_t mMaxNumActiveTransfers = 0;
+
     SpaceType mUsedTraffic = 0;
     SpaceType mBandwidthBytesPerSecond;
 };

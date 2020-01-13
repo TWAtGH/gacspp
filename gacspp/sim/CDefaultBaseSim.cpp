@@ -255,17 +255,29 @@ bool CDefaultBaseSim::SetupLinks(const json& profileJson)
                     SpaceType bandwidth = dstLinkCfgJson.at("bandwidth").get<SpaceType>();
                     CNetworkLink* link = srcStorageElement->CreateNetworkLink(dstStorageElement, bandwidth);
 
+                    if(dstLinkCfgJson.contains("maxActiveTransfers"))
+                        link->mMaxNumActiveTransfers = dstLinkCfgJson["maxActiveTransfers"].get<std::uint32_t>();
+                    else
+                        std::cout<<"no max active transfers: "<<srcStorageElementName<<" - "<<dstStorageElementName<<std::endl; //todo remove
+
                     row = std::to_string(link->GetId()) + ",";
                     row += std::to_string(link->GetSrcStorageElement()->GetId()) + ",";
                     row += std::to_string(link->GetDstStorageElement()->GetId());
 
                     success = success && output.InsertRow("NetworkLinks", row);
 
-                    if(dstLinkCfgJson.at("receivingLink").empty())
+                    if(!dstLinkCfgJson.contains("receivingLink"))
+                        continue;
+                    if(dstLinkCfgJson["receivingLink"].empty())
                         continue;
 
-                    bandwidth = dstLinkCfgJson.at("receivingLink").at("bandwidth").get<SpaceType>();
+                    bandwidth = dstLinkCfgJson["receivingLink"].at("bandwidth").get<SpaceType>();
                     link = dstStorageElement->CreateNetworkLink(srcStorageElement, bandwidth);
+
+                    if(dstLinkCfgJson["receivingLink"].contains("maxActiveTransfers"))
+                        link->mMaxNumActiveTransfers = dstLinkCfgJson["receivingLink"]["maxActiveTransfers"].get<std::uint32_t>();
+                    else
+                        std::cout<<"no max active transfers: "<<dstStorageElementName<<" - "<<srcStorageElementName<<std::endl; //todo remove
 
                     row = std::to_string(link->GetId()) + ",";
                     row += std::to_string(link->GetSrcStorageElement()->GetId()) + ",";
@@ -376,6 +388,56 @@ auto CDefaultBaseSim::CreateTransferGenerator(const json& transferGenCfg, const 
             }
             for (const json& dstStorageElementName : transferGenCfg.at("dstStorageElements"))
                 transferGen->mDstStorageElements.push_back(GetStorageElementByName(dstStorageElementName.get<std::string>()));
+        }
+        else if (typeStr == "cloudBuffer")
+        {
+            auto mgr = std::dynamic_pointer_cast<CTransferManager>(transferManager);
+            auto transferGen = std::make_shared<CCloudBufferTransferGen>(this, mgr, tickFreq, startTick);
+
+            for(const json& infoJson : transferGenCfg.at("infos"))
+            {
+                auto info = std::make_unique<CCloudBufferTransferGen::STransferGenInfo>();
+
+                std::string name = infoJson.at("srcStorageElement").get<std::string>();
+                CStorageElement* srcStorageElement = GetStorageElementByName(name);
+                if(!srcStorageElement)
+                {
+                    std::cout<<"Failed to find storage element by name: "<<name<<std::endl;
+                    continue;
+                }
+
+                name = infoJson.at("primaryDstStorageElement").get<std::string>();
+                CStorageElement* primaryDstStorageElement = GetStorageElementByName(name);
+                if(!primaryDstStorageElement)
+                {
+                    std::cout<<"Failed to find storage element by name: "<<name<<std::endl;
+                    continue;
+                }
+
+                name = infoJson.at("secondaryDstStorageElement").get<std::string>();
+                CStorageElement* secondaryDstStorageElement = GetStorageElementByName(name);
+                if(!secondaryDstStorageElement)
+                {
+                    std::cout<<"Failed to find storage element by name: "<<name<<std::endl;
+                    continue;
+                }
+
+                info->mPrimaryLink = srcStorageElement->GetNetworkLink(primaryDstStorageElement);
+                info->mSecondaryLink = srcStorageElement->GetNetworkLink(secondaryDstStorageElement);
+
+                if(!info->mPrimaryLink)
+                {
+                    std::cout<<"Failed to find link: "<<srcStorageElement->GetName()<<" -> "<<primaryDstStorageElement->GetName()<<std::endl;
+                    continue;
+                }
+                if(!info->mSecondaryLink)
+                {
+                    std::cout<<"Failed to find link: "<<srcStorageElement->GetName()<<" -> "<<secondaryDstStorageElement->GetName()<<std::endl;
+                    continue;
+                }
+
+                transferGen->mTransferGenInfo.push_back(std::move(info));
+            }
         }
 
         if (transferGen)

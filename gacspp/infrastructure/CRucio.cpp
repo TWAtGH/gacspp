@@ -227,9 +227,9 @@ auto CReaper::RunReaper(const TickType now) -> std::size_t
 
 CGridSite::~CGridSite() = default;
 
-auto CGridSite::CreateStorageElement(std::string&& name, bool allowDuplicateReplicas) -> CStorageElement*
+auto CGridSite::CreateStorageElement(std::string&& name, bool allowDuplicateReplicas, SpaceType quota) -> CStorageElement*
 {
-    mStorageElements.emplace_back(std::make_unique<CStorageElement>(std::move(name), this, allowDuplicateReplicas));
+    mStorageElements.emplace_back(std::make_unique<CStorageElement>(std::move(name), this, allowDuplicateReplicas, quota));
     return mStorageElements.back().get();
 }
 
@@ -332,10 +332,9 @@ bool CRucio::LoadConfig(const json& config)
                                 continue;
                             }
 
-                            if(storageElementJson.contains("allowDuplicateReplicas"))
-                                site->CreateStorageElement(std::move(name), storageElementJson.at("allowDuplicateReplicas").get<bool>());
-                            else
-                                site->CreateStorageElement(std::move(name));
+                            const SpaceType quota = storageElementJson.contains("quota") ? storageElementJson["quota"].get<SpaceType>() : 0;
+                            const bool duplicates = storageElementJson.contains("allowDuplicateReplicas") ? storageElementJson["allowDuplicateReplicas"].get<bool>() : false;
+                            site->CreateStorageElement(std::move(name), duplicates, quota);
                         }
                     }
                     else if ((siteJsonKey == "name") || (siteJsonKey == "location") || (siteJsonKey == "multiLocationIdx"))

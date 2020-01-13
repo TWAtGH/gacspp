@@ -309,7 +309,7 @@ public:
 };
 
 
-class CSimpleTransferGen : public CScheduleable, public CBaseOnDeletionInsert
+class CCloudBufferTransferGen : public CScheduleable, public CBaseOnDeletionInsert
 {
 private:
     IBaseSim* mSim;
@@ -319,14 +319,15 @@ private:
 public:
     struct STransferGenInfo
     {
-        std::size_t mMaxNumActive;
-        CNetworkLink* mNetworkLink;
+        CNetworkLink* mPrimaryLink;
+        CNetworkLink* mSecondaryLink;
         std::vector<std::shared_ptr<SReplica>> mReplicas;
+        std::size_t mCurReplicaIdx = 0;
     };
     std::vector<std::unique_ptr<STransferGenInfo>> mTransferGenInfo;
 
 public:
-    CSimpleTransferGen(IBaseSim* sim,
+    CCloudBufferTransferGen(IBaseSim* sim,
                         std::shared_ptr<CTransferManager> transferMgr,
                         const TickType tickFreq,
                         const TickType startTick=0 );

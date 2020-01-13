@@ -40,14 +40,14 @@ bool CTestSim::SetupDefaults(const json& profileJson)
             return false;
         }
 
-        auto transferManager = std::dynamic_pointer_cast<CFixedTimeTransferManager>(CreateTransferManager(transferManagerCfg));
+        auto transferManager = std::dynamic_pointer_cast<CTransferManager>(CreateTransferManager(transferManagerCfg));
         if (!transferManager)
         {
             std::cout << "Failed creating transfer manager" << std::endl;
             return false;
         }
 
-        auto transferGen = std::dynamic_pointer_cast<CCachedSrcTransferGen>(CreateTransferGenerator(transferGenCfg, transferManager));
+        auto transferGen = std::dynamic_pointer_cast<CCloudBufferTransferGen>(CreateTransferGenerator(transferGenCfg, transferManager));
         if (!transferGen)
         {
             std::cout << "Failed creating transfer generator" << std::endl;
@@ -108,13 +108,12 @@ bool CTestSim::SetupDefaults(const json& profileJson)
                                                                             std::move(jsonPropNameToValueGen["lifetimeCfg"]),
                                                                             tickFreq, startTick);
 
-            for(const json& storageElement : dataGenCfg.at("storageElements"))
+            for(const json& storageElementJson : dataGenCfg.at("storageElements"))
             {
-                const std::string storageElementName = storageElement.get<std::string>();
-                CStorageElement* storageElement = GetStorageElementByName(storageElementName);
+                CStorageElement* storageElement = GetStorageElementByName(storageElementJson.get<std::string>());
                 if(!storageElement)
                 {
-                    std::cout<<"Failed to find storage element for data generator: "<<storageElementName<<std::endl;
+                    std::cout<<"Failed to find storage element for data generator: "<<storageElementJson.get<std::string>()<<std::endl;
                     continue;
                 }
                 dataGen->mStorageElements.push_back(storageElement);
@@ -124,7 +123,7 @@ bool CTestSim::SetupDefaults(const json& profileJson)
                 dataGen->mNumReplicaRatio.push_back(ratioVal.get<float>());
 
             dataGen->mSelectStorageElementsRandomly = dataGenCfg.at("selectStorageElementsRandomly").get<bool>();
-            
+
             heartbeat->mProccessDurations[dataGen->mName] = &(dataGen->mUpdateDurationSummed);
 
             mSchedule.push(dataGen);
