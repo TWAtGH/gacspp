@@ -292,24 +292,44 @@ public:
     auto GetNumToCreate(RNGEngineType& rngEngine, std::uint32_t numActive, const TickType now) -> std::uint32_t;
 };
 
+class IInsertValuesContainer;
 
 class CBaseOnDeletionInsert : public IFileActionListener, public IReplicaActionListener
 {
-private:
+protected:
+    std::unique_ptr<IInsertValuesContainer> mFileValueContainer;
+    std::unique_ptr<IInsertValuesContainer> mReplicaValueContainer;
+
     std::shared_ptr<IPreparedInsert> mFileInsertQuery;
     std::shared_ptr<IPreparedInsert> mReplicaInsertQuery;
+
+    void AddFileDeletes(const std::vector<std::weak_ptr<SFile>>& deletedFiles);
+    void AddReplicaDelete(const std::weak_ptr<SReplica>& replica);
 
 public:
     CBaseOnDeletionInsert();
 
     void OnFileCreated(const TickType now, std::shared_ptr<SFile> file) override;
     void OnFilesDeleted(const TickType now, const std::vector<std::weak_ptr<SFile>>& deletedFiles) override;
-    void OnReplicaCreated(const TickType now, std::shared_ptr<SReplica> replica) override;
-    void OnReplicasDeleted(const TickType now, const std::vector<std::weak_ptr<SReplica>>& deletedReplicas) override;
+    void OnReplicaCreated(const TickType now, CStorageElement* storageElement, std::shared_ptr<SReplica> replica) override;
+    void OnReplicaDeleted(const TickType now, CStorageElement* storageElement, std::weak_ptr<SReplica> replica) override;
 };
 
 
-class CCloudBufferTransferGen : public CScheduleable, public CBaseOnDeletionInsert
+class CBufferedOnDeletionInsert : public CBaseOnDeletionInsert
+{
+private:
+    void FlushFileDeletes();
+    void FlushReplicaDeletes();
+
+public:
+    virtual ~CBufferedOnDeletionInsert();
+    void OnFilesDeleted(const TickType now, const std::vector<std::weak_ptr<SFile>>& deletedFiles) override;
+    void OnReplicaDeleted(const TickType now, CStorageElement* storageElement, std::weak_ptr<SReplica> replica) override;
+};
+
+
+class CCloudBufferTransferGen : public CScheduleable, public IReplicaActionListener
 {
 private:
     IBaseSim* mSim;
@@ -322,9 +342,11 @@ public:
         CNetworkLink* mPrimaryLink;
         CNetworkLink* mSecondaryLink;
         std::vector<std::shared_ptr<SReplica>> mReplicas;
-        std::size_t mCurReplicaIdx = 0;
     };
     std::vector<std::unique_ptr<STransferGenInfo>> mTransferGenInfo;
+
+    void OnReplicaCreated(const TickType now, CStorageElement* storageElement, std::shared_ptr<SReplica> replica) override;
+    void OnReplicaDeleted(const TickType now, CStorageElement* storageElement, std::weak_ptr<SReplica> replica) override;
 
 public:
     CCloudBufferTransferGen(IBaseSim* sim,

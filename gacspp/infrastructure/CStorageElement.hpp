@@ -15,6 +15,7 @@ struct SFile;
 struct SReplica;
 
 class IStorageElementDelegate;
+class IReplicaActionListener;
 
 
 class CStorageElement
@@ -52,6 +53,8 @@ public:
 
     std::vector<std::unique_ptr<CNetworkLink>> mNetworkLinks;
     std::vector<std::shared_ptr<SReplica>> mReplicas;
+
+    std::vector<std::weak_ptr<IReplicaActionListener>> mReplicaActionListeners;
 
 private:
     IdType mId;

@@ -54,8 +54,8 @@ bool CTestSim::SetupDefaults(const json& profileJson)
             return false;
         }
 
-        mRucio->mFileActionListeners.emplace_back(transferGen);
-        mRucio->mReplicaActionListeners.emplace_back(transferGen);
+        //mRucio->mFileActionListeners.emplace_back(transferGen);
+        //mRucio->mReplicaActionListeners.emplace_back(transferGen);
 
         heartbeat->mTransferManagers.push_back(transferManager);
         heartbeat->mProccessDurations[transferManager->mName] = &(transferManager->mUpdateDurationSummed);
@@ -142,6 +142,7 @@ bool CTestSim::SetupDefaults(const json& profileJson)
         const TickType tickFreq = reaperCfg.at("tickFreq").get<TickType>();
         const TickType startTick = reaperCfg.at("startTick").get<TickType>();
         reaper = std::make_shared<CReaperCaller>(mRucio.get(), tickFreq, startTick);
+        reaper->mName = reaperCfg.at("name").get<std::string>();
 
         heartbeat->mProccessDurations[reaper->mName] = &(reaper->mUpdateDurationSummed);
     }
@@ -149,10 +150,11 @@ bool CTestSim::SetupDefaults(const json& profileJson)
     {
         std::cout << "Failed to load reaper cfg: " << error.what() << std::endl;
         reaper = std::make_shared<CReaperCaller>(mRucio.get(), 600, 600);
+        reaper->mName = "DefaultReaper";
     }
 
     mSchedule.push(std::make_shared<CBillingGenerator>(this));
-    mSchedule.push(reaper);
+    //mSchedule.push(reaper);
     mSchedule.push(heartbeat);
 
     return true;

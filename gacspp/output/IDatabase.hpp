@@ -30,6 +30,8 @@ public:
     virtual bool IsMergingSupported() const = 0;
     virtual bool MergeIfPossible(std::unique_ptr<IInsertValuesContainer>& other) = 0;
 
+    virtual auto GetSize() const -> std::size_t = 0;
+
     virtual auto InsertValues() -> std::size_t = 0;
 };
 

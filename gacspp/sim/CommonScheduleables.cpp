@@ -384,6 +384,8 @@ void CTransferManager::OnUpdate(const TickType now)
 {
     CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
 
+    //std::cout<<mName<<": "<<mActiveTransfers.size()<<" / "<<mQueuedTransfers.size()<<std::endl;
+
     const std::uint32_t timeDiff = static_cast<std::uint32_t>(now - mLastUpdated);
     mLastUpdated = now;
 
@@ -621,15 +623,146 @@ auto CWavedTransferNumGen::GetNumToCreate(RNGEngineType& rngEngine, std::uint32_
 
 
 
+CBaseOnDeletionInsert::CBaseOnDeletionInsert()
+{
+    mFileInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Files(id, createdAt, expiredAt, filesize) FROM STDIN with(FORMAT csv);", 4, '?');
+    mReplicaInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Replicas(id, fileId, storageElementId, createdAt, expiredAt) FROM STDIN with(FORMAT csv);", 5, '?');
+}
+
+void CBaseOnDeletionInsert::OnFileCreated(const TickType now, std::shared_ptr<SFile> file)
+{
+    (void)now;
+    (void)file;
+}
+
+void CBaseOnDeletionInsert::OnReplicaCreated(const TickType now, CStorageElement* storageElement, std::shared_ptr<SReplica> replica)
+{
+    (void)now;
+    (void)replica;
+}
+
+void CBaseOnDeletionInsert::AddFileDeletes(const std::vector<std::weak_ptr<SFile>>& deletedFiles)
+{
+    for(const std::weak_ptr<SFile>& weakFile : deletedFiles)
+    {
+        std::shared_ptr<SFile> file = weakFile.lock();
+
+        assert(file);
+
+        mFileValueContainer->AddValue(file->GetId());
+        mFileValueContainer->AddValue(file->GetCreatedAt());
+        mFileValueContainer->AddValue(file->mExpiresAt);
+        mFileValueContainer->AddValue(file->GetSize());
+    }
+}
+
+void CBaseOnDeletionInsert::AddReplicaDelete(const std::weak_ptr<SReplica>& replica)
+{
+    std::shared_ptr<SReplica> r = replica.lock();
+
+    assert(r);
+
+    mReplicaValueContainer->AddValue(r->GetId());
+    mReplicaValueContainer->AddValue(r->GetFile()->GetId());
+    mReplicaValueContainer->AddValue(r->GetStorageElement()->GetId());
+    mReplicaValueContainer->AddValue(r->GetCreatedAt());
+    mReplicaValueContainer->AddValue(r->mExpiresAt);
+}
+
+void CBaseOnDeletionInsert::OnFilesDeleted(const TickType now, const std::vector<std::weak_ptr<SFile>>& deletedFiles)
+{
+    (void)now;
+    std::unique_ptr<IInsertValuesContainer> mFileValueContainer = mFileInsertQuery->CreateValuesContainer(deletedFiles.size() * 4);
+
+    AddFileDeletes(deletedFiles);
+
+    COutput::GetRef().QueueInserts(std::move(mFileValueContainer));
+}
+
+void CBaseOnDeletionInsert::OnReplicaDeleted(const TickType now, CStorageElement* storageElement, std::weak_ptr<SReplica> replica)
+{
+    (void)now;
+    std::unique_ptr<IInsertValuesContainer> mReplicaValueContainer = mReplicaInsertQuery->CreateValuesContainer();
+
+    AddReplicaDelete(replica);
+
+    COutput::GetRef().QueueInserts(std::move(mReplicaValueContainer));
+}
+
+
+CBufferedOnDeletionInsert::~CBufferedOnDeletionInsert()
+{
+    FlushFileDeletes();
+    FlushReplicaDeletes();
+}
+
+void CBufferedOnDeletionInsert::FlushFileDeletes()
+{
+    if(!mFileValueContainer->IsEmpty())
+        COutput::GetRef().QueueInserts(std::move(mFileValueContainer));
+}
+
+void CBufferedOnDeletionInsert::FlushReplicaDeletes()
+{
+    if(!mReplicaValueContainer->IsEmpty())
+        COutput::GetRef().QueueInserts(std::move(mReplicaValueContainer));
+}
+
+void CBufferedOnDeletionInsert::OnFilesDeleted(const TickType now, const std::vector<std::weak_ptr<SFile>>& deletedFiles)
+{
+    constexpr std::size_t valueBufSize = 5000 * 4;
+    if(!mFileValueContainer)
+        mFileValueContainer = mFileInsertQuery->CreateValuesContainer(valueBufSize);
+
+    AddFileDeletes(deletedFiles);
+
+    if(mFileValueContainer->GetSize() >= valueBufSize)
+        FlushFileDeletes();
+}
+
+void CBufferedOnDeletionInsert::OnReplicaDeleted(const TickType now, CStorageElement* storageElement, std::weak_ptr<SReplica> replica)
+{
+    constexpr std::size_t valueBufSize = 5000 * 5;
+    if(!mReplicaValueContainer)
+        mReplicaValueContainer = mReplicaInsertQuery->CreateValuesContainer(valueBufSize);
+
+    AddReplicaDelete(replica);
+
+    if(mReplicaValueContainer->GetSize() >= valueBufSize)
+        FlushReplicaDeletes();
+}
+
+
+
 CCloudBufferTransferGen::CCloudBufferTransferGen(IBaseSim* sim,
                                                  std::shared_ptr<CTransferManager> transferMgr,
                                                  const TickType tickFreq,
                                                  const TickType startTick )
     : CScheduleable(startTick),
       mSim(sim),
-      mTransferMgr(transferMgr),
+      mTransferMgr(std::move(transferMgr)),
       mTickFreq(tickFreq)
 {}
+
+void CCloudBufferTransferGen::OnReplicaCreated(const TickType now, CStorageElement* storageElement, std::shared_ptr<SReplica> replica)
+{
+    for(std::unique_ptr<STransferGenInfo>& info : mTransferGenInfo)
+    {
+        if(storageElement == info->mPrimaryLink->GetSrcStorageElement())
+        {
+            info->mReplicas.push_back(std::move(replica));
+            return;
+        }
+    }
+}
+
+void CCloudBufferTransferGen::OnReplicaDeleted(const TickType now, CStorageElement* storageElement, std::weak_ptr<SReplica> replica)
+{
+    (void)now;
+    (void)storageElement;
+    (void)replica;
+}
+
 
 void CCloudBufferTransferGen::OnUpdate(const TickType now)
 {
@@ -643,35 +776,47 @@ void CCloudBufferTransferGen::OnUpdate(const TickType now)
         CStorageElement* dstStorageElement = networkLink->GetDstStorageElement();
         std::vector<std::shared_ptr<SReplica>>& replicas = info->mReplicas;
 
-        if(info->mCurReplicaIdx == 0 && replicas.empty())
-            replicas = networkLink->GetSrcStorageElement()->mReplicas;
+        /*std::cout<<now<<" "<<mName<<": ["<<replicas.size()<<"]: ";
+        std::cout<<networkLink->GetSrcStorageElement()->GetName()<<" -> ";
+        std::cout<<dstStorageElement->GetName();
+        if(info->mSecondaryLink)
+            std::cout<<" -> "<<info->mSecondaryLink->GetDstStorageElement()->GetName();
+        std::cout<<std::endl;*/
 
-        while(info->mCurReplicaIdx < replicas.size())
+        for(std::size_t idx=0; idx<replicas.size();)
         {
-            std::shared_ptr<SReplica>& srcReplica = replicas[info->mCurReplicaIdx];
-            std::shared_ptr<SFile> file = srcReplica->GetFile();
-            std::shared_ptr<SReplica> newReplica;
-
-            if(networkLink->mNumActiveTransfers < networkLink->mMaxNumActiveTransfers)
+            std::cout<<mName<<": "<<idx<<std::endl;
+            std::shared_ptr<SReplica>& srcReplica = replicas[idx];
+            if(srcReplica->IsComplete())
             {
-                newReplica = dstStorageElement->CreateReplica(file, now);
-                if(newReplica)
+                if(networkLink->mNumActiveTransfers < networkLink->mMaxNumActiveTransfers)
                 {
-                    assert(srcReplica->GetStorageElement() == dstStorageElement);
+                    std::shared_ptr<SFile> file = srcReplica->GetFile();
+                    std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(file, now);
+                    if(!newReplica && info->mSecondaryLink)
+                    {
+                        networkLink = info->mSecondaryLink;
+                        if(networkLink->mNumActiveTransfers >= networkLink->mMaxNumActiveTransfers)
+                            break;
 
-                    mTransferMgr->CreateTransfer(srcReplica, newReplica, now);
-                    info->mCurReplicaIdx += 1;
-                    continue;
+                        dstStorageElement = networkLink->GetDstStorageElement();
+
+                        newReplica = dstStorageElement->CreateReplica(file, now);
+                    }
+
+                    if(newReplica)
+                    {
+                        mTransferMgr->CreateTransfer(srcReplica, newReplica, now);
+                        srcReplica = replicas.back();
+                        replicas.pop_back();
+                    }
+                    else
+                        break;
                 }
-                else if(networkLink != info->mSecondaryLink)
-                {
-                    networkLink = info->mSecondaryLink;
-                    dstStorageElement = networkLink->GetDstStorageElement();
-                    continue;
-                }
+                else
+                    break;
             }
-            
-            break;
+            ++idx;
         }
     }
 
@@ -1072,64 +1217,6 @@ void CJobSlotTransferGen::OnUpdate(const TickType now)
 
 
 
-CBaseOnDeletionInsert::CBaseOnDeletionInsert()
-{
-    mFileInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Files(id, createdAt, expiredAt, filesize) FROM STDIN with(FORMAT csv);", 4, '?');
-    mReplicaInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Replicas(id, fileId, storageElementId, createdAt, expiredAt) FROM STDIN with(FORMAT csv);", 5, '?');
-}
-
-void CBaseOnDeletionInsert::OnFileCreated(const TickType now, std::shared_ptr<SFile> file)
-{
-    (void)now;
-    (void)file;
-}
-
-void CBaseOnDeletionInsert::OnFilesDeleted(const TickType now, const std::vector<std::weak_ptr<SFile>>& deletedFiles)
-{
-    (void)now;
-    std::unique_ptr<IInsertValuesContainer> fileInsertQueries = mFileInsertQuery->CreateValuesContainer(deletedFiles.size() * 4);
-    for(const std::weak_ptr<SFile>& weakFile : deletedFiles)
-    {
-        std::shared_ptr<SFile> file = weakFile.lock();
-
-        assert(file);
-
-        fileInsertQueries->AddValue(file->GetId());
-        fileInsertQueries->AddValue(file->GetCreatedAt());
-        fileInsertQueries->AddValue(file->mExpiresAt);
-        fileInsertQueries->AddValue(file->GetSize());
-    }
-    COutput::GetRef().QueueInserts(std::move(fileInsertQueries));
-}
-
-void CBaseOnDeletionInsert::OnReplicaCreated(const TickType now, std::shared_ptr<SReplica> replica)
-{
-    (void)now;
-    (void)replica;
-}
-
-void CBaseOnDeletionInsert::OnReplicasDeleted(const TickType now, const std::vector<std::weak_ptr<SReplica>>& deletedReplicas)
-{
-    (void)now;
-    std::unique_ptr<IInsertValuesContainer> replicaInsertQueries = mReplicaInsertQuery->CreateValuesContainer(deletedReplicas.size() * 5);
-    for(const std::weak_ptr<SReplica>& weakReplica : deletedReplicas)
-    {
-        std::shared_ptr<SReplica> replica = weakReplica.lock();
-
-        assert(replica);
-
-        replicaInsertQueries->AddValue(replica->GetId());
-        replicaInsertQueries->AddValue(replica->GetFile()->GetId());
-        replicaInsertQueries->AddValue(replica->GetStorageElement()->GetId());
-        replicaInsertQueries->AddValue(replica->GetCreatedAt());
-        replicaInsertQueries->AddValue(replica->mExpiresAt);
-    }
-    COutput::GetRef().QueueInserts(std::move(replicaInsertQueries));
-}
-
-
-
-
 CCachedSrcTransferGen::CCachedSrcTransferGen(IBaseSim* sim,
                                              std::shared_ptr<CFixedTimeTransferManager> transferMgr,
                                              const std::size_t numPerDay,
@@ -1190,19 +1277,8 @@ void CCachedSrcTransferGen::ExpireReplica(CStorageElement* storageElement, const
             replicasIt++;
         }
     }
-    std::vector<std::shared_ptr<SReplica>> expiredReplicas;
     (*oldestReplicaIt)->mExpiresAt = now;
-    (*oldestReplicaIt)->GetFile()->ExtractExpiredReplicas(now, expiredReplicas);
-
-    std::vector<std::weak_ptr<SReplica>> expiredWeakReplicas;
-    expiredWeakReplicas.reserve(expiredReplicas.size());
-    for(std::shared_ptr<SReplica>& r : expiredReplicas)
-        expiredWeakReplicas.emplace_back(r);
-    for(std::weak_ptr<IReplicaActionListener> replicaListener : mSim->mRucio->mReplicaActionListeners)
-    {
-        if(std::shared_ptr<IReplicaActionListener> listener = replicaListener.lock())
-            listener->OnReplicasDeleted(now, expiredWeakReplicas);
-    }
+    (*oldestReplicaIt)->GetFile()->RemoveExpiredReplicas(now);
 }
 
 void CCachedSrcTransferGen::OnUpdate(const TickType now)
@@ -1335,7 +1411,7 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
 
 void CCachedSrcTransferGen::Shutdown(const TickType now)
 {
-    std::vector<std::weak_ptr<SFile>> files;
+    /*std::vector<std::weak_ptr<SFile>> files;
     files.reserve(mSim->mRucio->mFiles.size());
     std::vector<std::weak_ptr<SReplica>> replicas;
     replicas.reserve(files.size() * 4);
@@ -1346,7 +1422,7 @@ void CCachedSrcTransferGen::Shutdown(const TickType now)
             replicas.emplace_back(replica);
     }
     OnFilesDeleted(now, files);
-    OnReplicasDeleted(now, replicas);
+    OnReplicasDeleted(now, replicas);*/
 }
 
 void CCachedSrcTransferGen::OnFileCreated(const TickType now, std::shared_ptr<SFile> file)

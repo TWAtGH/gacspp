@@ -2,6 +2,7 @@
 
 #include "ISite.hpp"
 #include "CNetworkLink.hpp"
+#include "CRucio.hpp"
 #include "CStorageElement.hpp"
 #include "SFile.hpp"
 
@@ -34,6 +35,24 @@ auto CBaseStorageElementDelegate::CreateReplica(std::shared_ptr<SFile> file, con
 
     OnOperation(CStorageElement::INSERT);
 
+    //notify all listeners
+    auto& listeners = GetStorageElement()->mReplicaActionListeners;
+    for(std::size_t i=0; i<listeners.size();)
+    {
+        std::shared_ptr<IReplicaActionListener> listener = listeners[i].lock();
+        if(!listener)
+        {
+            //remove invalid listeners
+            listeners[i] = std::move(listeners.back());
+            listeners.pop_back();
+            continue;
+        }
+
+        listener->OnReplicaCreated(now, GetStorageElement(), newReplica);
+
+        ++i;
+    }
+
     return newReplica;
 }
 
@@ -58,6 +77,24 @@ void CBaseStorageElementDelegate::OnRemoveReplica(const SReplica* replica, const
 
     assert(curSize <= mUsedStorage);
     assert(idxToDelete < replicas.size());
+
+    //notify all listeners
+    auto& listeners = GetStorageElement()->mReplicaActionListeners;
+    for(std::size_t i=0; i<listeners.size();)
+    {
+        std::shared_ptr<IReplicaActionListener> listener = listeners[i].lock();
+        if(!listener)
+        {
+            //remove invalid listeners
+            listeners[i] = std::move(listeners.back());
+            listeners.pop_back();
+            continue;
+        }
+
+        listener->OnReplicaDeleted(now, GetStorageElement(), replicas[idxToDelete]);
+
+        ++i;
+    }
 
     mUsedStorage -= curSize;
 

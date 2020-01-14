@@ -70,7 +70,7 @@ void CReaper::ReaperWorker(const std::size_t threadIdx)
 
         std::vector<std::shared_ptr<SFile>>& files = mRucio->mFiles;
         std::vector<std::shared_ptr<SFile>>& removedFiles = mRemovedFilesPerThread[threadIdx];
-        std::vector<std::shared_ptr<SReplica>>& removedReplicas = mRemovedReplicasPerThread[threadIdx];
+        //std::vector<std::shared_ptr<SReplica>>& removedReplicas = mRemovedReplicasPerThread[threadIdx];
         const float numElementsPerThread = files.size() / static_cast<float>(NUM_REPEAR_THREADS);
         const auto lastIdx = static_cast<std::size_t>(numElementsPerThread * (threadIdx + 1));
         for(std::size_t i = numElementsPerThread * threadIdx; i < lastIdx; ++i)
@@ -78,9 +78,9 @@ void CReaper::ReaperWorker(const std::size_t threadIdx)
             std::shared_ptr<SFile>& curFile = files[i];
             if(curFile->mExpiresAt <= mReaperWorkerNow)
             {
-                if(!mRucio->mReplicaActionListeners.empty())
-                    for(std::shared_ptr<SReplica>& replica : curFile->mReplicas)
-                        removedReplicas.emplace_back(replica);
+                //if(!mRucio->mReplicaActionListeners.empty())
+                    //for(std::shared_ptr<SReplica>& replica : curFile->mReplicas)
+                        //removedReplicas.emplace_back(replica);
 
                 curFile->Remove(mReaperWorkerNow);
 
@@ -89,10 +89,10 @@ void CReaper::ReaperWorker(const std::size_t threadIdx)
                 else
                     removedFiles.emplace_back(std::move(curFile));
             }
-            else if(mRucio->mReplicaActionListeners.empty())
+            else// if(mRucio->mReplicaActionListeners.empty())
                 curFile->RemoveExpiredReplicas(mReaperWorkerNow);
-            else
-                curFile->ExtractExpiredReplicas(mReaperWorkerNow, removedReplicas);
+            //else
+                //curFile->ExtractExpiredReplicas(mReaperWorkerNow, removedReplicas);
         }
 
         lastNow = mReaperWorkerNow;
@@ -146,7 +146,7 @@ auto CReaper::RunReaper(const TickType now) -> std::size_t
         files.pop_back();
 
     std::vector<std::weak_ptr<IFileActionListener>>& fileListeners = mRucio->mFileActionListeners;
-    std::vector<std::weak_ptr<IReplicaActionListener>> replicaListeners = mRucio->mReplicaActionListeners;
+    //std::vector<std::weak_ptr<IReplicaActionListener>> replicaListeners = mRucio->mReplicaActionListeners;
     if(!fileListeners.empty())
     {
         //get num to reserve mem
@@ -184,7 +184,7 @@ auto CReaper::RunReaper(const TickType now) -> std::size_t
     }
 
 
-    if(!replicaListeners.empty())
+    /*if(!replicaListeners.empty())
     {
         //get num to reserve mem
         std::size_t numRemoved = 0;
@@ -218,7 +218,7 @@ auto CReaper::RunReaper(const TickType now) -> std::size_t
         //clear refs to deleted files
         for(std::vector<std::shared_ptr<SReplica>>& removedReplicasPerThread : mRemovedReplicasPerThread)
             removedReplicasPerThread.clear();
-    }
+    }*/
 
     return numFiles - files.size();
 }

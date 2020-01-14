@@ -70,6 +70,7 @@
         }
     ],
 "reaper": {
+        "name": "Reaper",
         "tickFreq": 300,
         "startTick": 300
     },
@@ -86,21 +87,19 @@
             "name": "tape2diskGen",
             "tickFreq": 20,
             "startTick": 0,
+            "readNewSrcReplicas": true,
             "infos": [
                 {
                     "srcStorageElement": "BNL-OSG2_DATATAPE",
-                    "primaryDstStorageElement": "BNL-OSG2_STAGEDISK",
-                    "secondaryDstStorageElement": "iowa_bucket"
+                    "primaryDstStorageElement": "BNL-OSG2_STAGEDISK"
                 },
                 {
                     "srcStorageElement": "RAL-LCG2_DATATAPE",
-                    "primaryDstStorageElement": "RAL-LCG2_STAGEDISK",
-                    "secondaryDstStorageElement": "zurich_bucket"
+                    "primaryDstStorageElement": "RAL-LCG2_STAGEDISK"
                 },
                 {
                     "srcStorageElement": "IN2P3-CC_DATATAPE",
-                    "primaryDstStorageElement": "IN2P3-CC_STAGEDISK",
-                    "secondaryDstStorageElement": "zurich_bucket"
+                    "primaryDstStorageElement": "IN2P3-CC_STAGEDISK"
                 }
             ]
         }
@@ -108,15 +107,33 @@
     {
         "manager": {
             "type": "bandwidth",
-            "name": "all2jobMgr",
+            "name": "stage2bufferMgr",
             "tickFreq": 20,
             "startTick": 0
         },
         "generator": {
-            "type": "",
-            "name": "all2jobGen",
+            "type": "cloudBuffer",
+            "name": "stage2bufferGen",
             "tickFreq": 20,
-            "startTick": 0
+            "startTick": 0,
+            "readNewSrcReplicas": true,
+            "infos": [
+                {
+                    "srcStorageElement": "BNL-OSG2_STAGEDISK",
+                    "primaryDstStorageElement": "BNL-OSG2_INPUTDISK",
+                    "secondaryDstStorageElement": "iowa_bucket"
+                },
+                {
+                    "srcStorageElement": "RAL-LCG2_STAGEDISK",
+                    "primaryDstStorageElement": "RAL-LCG2_INPUTDISK",
+                    "secondaryDstStorageElement": "zurich_bucket"
+                },
+                {
+                    "srcStorageElement": "IN2P3-CC_STAGEDISK",
+                    "primaryDstStorageElement": "IN2P3-CC_INPUTDISK",
+                    "secondaryDstStorageElement": "zurich_bucket"
+                }
+            ]
         }
     }
 ]

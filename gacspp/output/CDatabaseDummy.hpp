@@ -25,6 +25,9 @@ public:
     {return false;};
     virtual bool MergeIfPossible(std::unique_ptr<IInsertValuesContainer>& other);
 
+    virtual auto GetSize() const -> std::size_t
+    {return 0;};
+
     virtual auto InsertValues() -> std::size_t;
 };
 

@@ -47,6 +47,20 @@
             "bandwidth": 10737418240,
             "maxActiveTransfers": 30
         },
+        "BNL-OSG2_INPUTDISK": {
+            "bandwidth": 10737418240,
+            "maxActiveTransfers": 30
+        },
+        "BNL-OSG2_CPU": {
+            "bandwidth": 10737418240,
+            "maxActiveTransfers": 30
+        }
+    },
+    "BNL-OSG2_INPUTDISK": {
+        "iowa_gcp": {
+            "bandwidth": 10737418240,
+            "maxActiveTransfers": 30
+        },
         "BNL-OSG2_CPU": {
             "bandwidth": 10737418240,
             "maxActiveTransfers": 30
@@ -78,6 +92,20 @@
             "bandwidth": 10737418240,
             "maxActiveTransfers": 30
         },
+        "RAL-LCG2_INPUTDISK": {
+            "bandwidth": 10737418240,
+            "maxActiveTransfers": 30
+        },
+        "RAL-LCG2_CPU": {
+            "bandwidth": 10737418240,
+            "maxActiveTransfers": 30
+        }
+    },
+    "RAL-LCG2_INPUTDISK": {
+        "zurich_gcp": {
+            "bandwidth": 10737418240,
+            "maxActiveTransfers": 30
+        },
         "RAL-LCG2_CPU": {
             "bandwidth": 10737418240,
             "maxActiveTransfers": 30
@@ -105,6 +133,20 @@
             "bandwidth": 10737418240,
             "maxActiveTransfers": 30
         },
+        "zurich_gcp": {
+            "bandwidth": 10737418240,
+            "maxActiveTransfers": 30
+        },
+        "IN2P3-CC_INPUTDISK": {
+            "bandwidth": 10737418240,
+            "maxActiveTransfers": 30
+        },
+        "IN2P3-CC_CPU": {
+            "bandwidth": 10737418240,
+            "maxActiveTransfers": 30
+        }
+    },
+    "IN2P3-CC_INPUTDISK": {
         "zurich_gcp": {
             "bandwidth": 10737418240,
             "maxActiveTransfers": 30

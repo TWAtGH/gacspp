@@ -366,33 +366,45 @@ auto CDefaultBaseSim::CreateTransferGenerator(const json& transferGenCfg, const 
         else if (typeStr == "cachedSrc")
         {
             auto mgr = std::dynamic_pointer_cast<CFixedTimeTransferManager>(transferManager);
-            if (!mgr)
+            if(!mgr)
             {
-                std::cout << "Wrong transfer manager for cached src transfer gen" << std::endl;
+                std::cout<<"Wrong manager given for generator: "<<name<<std::endl;
                 return transferGen;
             }
 
             const std::size_t numPerDay = transferGenCfg.at("numPerDay").get<std::size_t>();
             const TickType defaultReplicaLifetime = transferGenCfg.at("defaultReplicaLifetime").get<TickType>();
 
-            auto transferGen = std::make_shared<CCachedSrcTransferGen>(this, mgr, numPerDay, defaultReplicaLifetime, tickFreq, startTick);
+            auto specTransferGen = std::make_shared<CCachedSrcTransferGen>(this, mgr, numPerDay, defaultReplicaLifetime, tickFreq, startTick);
 
             for (const json& srcStorageElementName : transferGenCfg.at("srcStorageElements"))
-                transferGen->mSrcStorageElements.push_back(GetStorageElementByName(srcStorageElementName.get<std::string>()));
+                specTransferGen->mSrcStorageElements.push_back(GetStorageElementByName(srcStorageElementName.get<std::string>()));
             for (const json& cacheStorageElementJson : transferGenCfg.at("cacheStorageElements"))
             {
                 const std::size_t cacheSize = cacheStorageElementJson.at("size").get<std::size_t>();
                 const TickType defaultReplicaLifetime = cacheStorageElementJson.at("defaultReplicaLifetime").get<TickType>();
                 CStorageElement* storageElement = GetStorageElementByName(cacheStorageElementJson.at("storageElement").get<std::string>());
-                transferGen->mCacheElements.push_back({ cacheSize, defaultReplicaLifetime, storageElement });
+                specTransferGen->mCacheElements.push_back({ cacheSize, defaultReplicaLifetime, storageElement });
             }
             for (const json& dstStorageElementName : transferGenCfg.at("dstStorageElements"))
-                transferGen->mDstStorageElements.push_back(GetStorageElementByName(dstStorageElementName.get<std::string>()));
+                specTransferGen->mDstStorageElements.push_back(GetStorageElementByName(dstStorageElementName.get<std::string>()));
+
+            transferGen = specTransferGen;
         }
         else if (typeStr == "cloudBuffer")
         {
             auto mgr = std::dynamic_pointer_cast<CTransferManager>(transferManager);
-            auto transferGen = std::make_shared<CCloudBufferTransferGen>(this, mgr, tickFreq, startTick);
+            if(!mgr)
+            {
+                std::cout<<"Wrong manager given for generator: "<<name<<std::endl;
+                return transferGen;
+            }
+
+            bool addNewReplicas = false;
+            if(transferGenCfg.contains("readNewSrcReplicas"))
+                addNewReplicas = transferGenCfg["readNewSrcReplicas"].get<bool>();
+
+            auto specTransferGen = std::make_shared<CCloudBufferTransferGen>(this, mgr, tickFreq, startTick);
 
             for(const json& infoJson : transferGenCfg.at("infos"))
             {
@@ -414,34 +426,53 @@ auto CDefaultBaseSim::CreateTransferGenerator(const json& transferGenCfg, const 
                     continue;
                 }
 
-                name = infoJson.at("secondaryDstStorageElement").get<std::string>();
-                CStorageElement* secondaryDstStorageElement = GetStorageElementByName(name);
-                if(!secondaryDstStorageElement)
-                {
-                    std::cout<<"Failed to find storage element by name: "<<name<<std::endl;
-                    continue;
-                }
-
                 info->mPrimaryLink = srcStorageElement->GetNetworkLink(primaryDstStorageElement);
-                info->mSecondaryLink = srcStorageElement->GetNetworkLink(secondaryDstStorageElement);
-
                 if(!info->mPrimaryLink)
                 {
                     std::cout<<"Failed to find link: "<<srcStorageElement->GetName()<<" -> "<<primaryDstStorageElement->GetName()<<std::endl;
                     continue;
                 }
-                if(!info->mSecondaryLink)
+
+                CStorageElement* secondaryDstStorageElement = nullptr;
+                if(infoJson.contains("secondaryDstStorageElement"))
                 {
-                    std::cout<<"Failed to find link: "<<srcStorageElement->GetName()<<" -> "<<secondaryDstStorageElement->GetName()<<std::endl;
-                    continue;
+                    name = infoJson.at("secondaryDstStorageElement").get<std::string>();
+                    secondaryDstStorageElement = GetStorageElementByName(name);
+                    if(secondaryDstStorageElement)
+                    {
+                        info->mSecondaryLink = srcStorageElement->GetNetworkLink(secondaryDstStorageElement);
+                        if(!info->mSecondaryLink)
+                        {
+                            std::cout<<"Failed to find link: "<<srcStorageElement->GetName()<<" -> "<<secondaryDstStorageElement->GetName()<<std::endl;
+                            continue;
+                        }
+                    }
+                    else
+                        std::cout<<"Failed to find secondary storage element by name: "<<name<<std::endl;
                 }
 
-                transferGen->mTransferGenInfo.push_back(std::move(info));
+                for(auto& info : specTransferGen->mTransferGenInfo)
+                {
+                    if(info->mPrimaryLink->GetSrcStorageElement() == srcStorageElement)
+                    {
+                        std::cout<<"Buffered transfer gen must not have same source element twice: "<<srcStorageElement->GetName()<<std::endl;
+                        return transferGen;
+                    }
+                }
+
+                specTransferGen->mTransferGenInfo.push_back(std::move(info));
+
+                if(addNewReplicas)
+                    srcStorageElement->mReplicaActionListeners.push_back(specTransferGen);
             }
+
+            transferGen = specTransferGen;
         }
 
         if (transferGen)
             transferGen->mName = name;
+        else
+            std::cout<<name<<std::endl;
     }
     catch (const json::out_of_range& error)
     {

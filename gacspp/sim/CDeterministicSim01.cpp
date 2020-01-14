@@ -221,7 +221,7 @@ public:
         if (expiredReplicas.empty())
             return;
 
-        auto& replicaListeners = mSim->mRucio->mReplicaActionListeners;
+        /*auto& replicaListeners = mSim->mRucio->mReplicaActionListeners;
         if (!replicaListeners.empty())
         {
             //put files in continous mem in form of weak_ptr
@@ -246,7 +246,7 @@ public:
 
                 ++i;
             }
-        }
+        }*/
     }
 
     void UpdateTmpReplicaExpiresAt(std::shared_ptr<SReplica> replica, const TickType newExpiresAt)
@@ -452,7 +452,7 @@ public:
             mJobBatchList.pop_front();
         }
         std::cout<<"numQueuedStageOut="<<numQueuedStageOut<<std::endl;
-
+/*
         std::vector<std::weak_ptr<SFile>> files;
         files.reserve(mSim->mRucio->mFiles.size());
         std::vector<std::weak_ptr<SReplica>> replicas;
@@ -464,7 +464,7 @@ public:
                 replicas.emplace_back(replica);
         }
         OnFilesDeleted(now, files);
-        OnReplicasDeleted(now, replicas);
+        OnReplicasDeleted(now, replicas);*/
     }
 };
 
@@ -524,7 +524,7 @@ bool CDeterministicSim01::SetupDefaults(const json& profileJson)
         }
 
         mRucio->mFileActionListeners.emplace_back(transferGen);
-        mRucio->mReplicaActionListeners.emplace_back(transferGen);
+        //mRucio->mReplicaActionListeners.emplace_back(transferGen);
     }
     catch(const json::out_of_range& error)
     {
