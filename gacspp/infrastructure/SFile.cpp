@@ -19,7 +19,21 @@ void SFile::Remove(const TickType now)
         replica->OnRemoveByFile(now);
     mReplicas.clear();
 }
-
+void SFile::RemoveReplica(const TickType now, const std::shared_ptr<SReplica>& replica)
+{
+    std::size_t idx = 0;
+    for(;idx<mReplicas.size();++idx)
+    {
+        if(mReplicas[idx] == replica)
+        {
+            replica->OnRemoveByFile(now);
+            mReplicas[idx] = std::move(mReplicas.back());
+            mReplicas.pop_back();
+            return;
+        }
+    }
+    assert(false);
+}
 auto SFile::RemoveExpiredReplicas(const TickType now) -> std::size_t
 {
     const std::size_t numReplicas = mReplicas.size();

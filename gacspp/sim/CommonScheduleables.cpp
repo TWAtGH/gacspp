@@ -351,12 +351,14 @@ CTransferManager::STransfer::STransfer( std::shared_ptr<SReplica> srcReplica,
                                         std::shared_ptr<SReplica> dstReplica,
                                         CNetworkLink* const networkLink,
                                         const TickType queuedAt,
-                                        const TickType startAt)
+                                        const TickType startAt,
+                                        bool deleteSrcReplica)
     : mSrcReplica(srcReplica),
       mDstReplica(dstReplica),
       mNetworkLink(networkLink),
       mQueuedAt(queuedAt),
-      mStartAt(startAt)
+      mStartAt(startAt),
+      mDeleteSrcReplica(deleteSrcReplica)
 {}
 
 CTransferManager::CTransferManager(const TickType tickFreq, const TickType startTick)
@@ -368,7 +370,7 @@ CTransferManager::CTransferManager(const TickType tickFreq, const TickType start
     mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Transfers(id, srcStorageElementId, dstStorageElementId, fileId, srcReplicaId, dstReplicaId, queuedAt, startedAt, finishedAt, traffic) FROM STDIN with(FORMAT csv);", 10, '?');
 }
 
-void CTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcReplica, std::shared_ptr<SReplica> dstReplica, const TickType now)
+void CTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcReplica, std::shared_ptr<SReplica> dstReplica, const TickType now, bool deleteSrcReplica)
 {
     assert(mQueuedTransfers.size() < mQueuedTransfers.capacity());
 
@@ -377,7 +379,7 @@ void CTransferManager::CreateTransfer(std::shared_ptr<SReplica> srcReplica, std:
 
     networkLink->mNumActiveTransfers += 1;
     srcStorageElement->OnOperation(CStorageElement::GET);
-    mQueuedTransfers.emplace_back(srcReplica, dstReplica, networkLink, now, now);
+    mQueuedTransfers.emplace_back(srcReplica, dstReplica, networkLink, now, now, deleteSrcReplica);
 }
 
 void CTransferManager::OnUpdate(const TickType now)
@@ -443,6 +445,9 @@ void CTransferManager::OnUpdate(const TickType now)
 
             networkLink->mNumDoneTransfers += 1;
             networkLink->mNumActiveTransfers -= 1;
+            if(transfer.mDeleteSrcReplica)
+                srcReplica->GetFile()->RemoveReplica(now, srcReplica);
+
             transfer = std::move(mActiveTransfers.back());
             mActiveTransfers.pop_back();
             continue; // handle same idx again
@@ -800,7 +805,7 @@ void CCloudBufferTransferGen::OnUpdate(const TickType now)
 
                     if(newReplica)
                     {
-                        mTransferMgr->CreateTransfer(srcReplica, newReplica, now);
+                        mTransferMgr->CreateTransfer(srcReplica, newReplica, now, mDeleteSrcReplica);
                         srcReplica = replicas.back();
                         replicas.pop_back();
                     }

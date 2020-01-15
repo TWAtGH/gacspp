@@ -19,6 +19,7 @@ struct SFile
     SFile& operator=(SFile const&) = delete;
 
     void Remove(const TickType now);
+    void RemoveReplica(const TickType now, const std::shared_ptr<SReplica>& replica);
     auto RemoveExpiredReplicas(const TickType now) -> std::size_t;
     auto ExtractExpiredReplicas(const TickType now, std::vector<std::shared_ptr<SReplica>>& expiredReplicas) -> std::size_t;
 

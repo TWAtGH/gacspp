@@ -406,6 +406,9 @@ auto CDefaultBaseSim::CreateTransferGenerator(const json& transferGenCfg, const 
 
             auto specTransferGen = std::make_shared<CCloudBufferTransferGen>(this, mgr, tickFreq, startTick);
 
+            if(transferGenCfg.contains("deleteSrcReplica"))
+                specTransferGen->mDeleteSrcReplica = transferGenCfg["deleteSrcReplica"].get<bool>();
+
             for(const json& infoJson : transferGenCfg.at("infos"))
             {
                 auto info = std::make_unique<CCloudBufferTransferGen::STransferGenInfo>();

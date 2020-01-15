@@ -1,5 +1,5 @@
 {
-"maxTick": 7776000,
+"maxTick": 12960000,
 "clouds": [
 		{
 			"id": "gcp",
@@ -120,6 +120,7 @@
             "tickFreq": 20,
             "startTick": 0,
             "readNewSrcReplicas": true,
+            "deleteSrcReplica": true,
             "infos": [
                 {
                     "srcStorageElement": "BNL-OSG2_STAGEDISK",

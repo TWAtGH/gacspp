@@ -204,12 +204,14 @@ private:
         CNetworkLink* mNetworkLink;
         TickType mQueuedAt;
         TickType mStartAt;
+        bool mDeleteSrcReplica;
 
         STransfer(  std::shared_ptr<SReplica> srcReplica,
                     std::shared_ptr<SReplica> dstReplica,
                     CNetworkLink* const networkLink,
                     const TickType queuedAt,
-                    const TickType startAt);
+                    const TickType startAt,
+                    bool deleteSrcReplica);
     };
 
     std::vector<STransfer> mActiveTransfers;
@@ -220,7 +222,7 @@ public:
 
     void OnUpdate(const TickType now) final;
 
-    void CreateTransfer(std::shared_ptr<SReplica> srcReplica, std::shared_ptr<SReplica> dstReplica, const TickType now);
+    void CreateTransfer(std::shared_ptr<SReplica> srcReplica, std::shared_ptr<SReplica> dstReplica, const TickType now, bool deleteSrcReplica = false);
 
     auto GetNumActiveTransfers() const -> std::size_t
     {
@@ -344,6 +346,8 @@ public:
         std::vector<std::shared_ptr<SReplica>> mReplicas;
     };
     std::vector<std::unique_ptr<STransferGenInfo>> mTransferGenInfo;
+
+    bool mDeleteSrcReplica = false;
 
     void OnReplicaCreated(const TickType now, CStorageElement* storageElement, std::shared_ptr<SReplica> replica) override;
     void OnReplicaDeleted(const TickType now, CStorageElement* storageElement, std::weak_ptr<SReplica> replica) override;

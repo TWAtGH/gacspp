@@ -57,22 +57,22 @@ CInsertValuesContainer::CInsertValuesContainer(const std::shared_ptr<IDatabase>&
 
 void CInsertValuesContainer::AddValue(double value)
 {
-    mValues += (std::to_string(value) + ",");
+    mValues += std::to_string(value) + std::string(",");
 }
 
 void CInsertValuesContainer::AddValue(int value)
 {
-    mValues += (std::to_string(value) + ",");
+    mValues += std::to_string(value) + std::string(",");
 }
 
 void CInsertValuesContainer::AddValue(std::uint32_t value)
 {
-    mValues += (std::to_string(value) + ",");
+    mValues += std::to_string(value) + std::string(",");
 }
 
 void CInsertValuesContainer::AddValue(std::uint64_t value)
 {
-    mValues += (std::to_string(value) + ",");
+    mValues += std::to_string(value) + std::string(",");
 }
 
 void CInsertValuesContainer::AddValue(const std::string& value)
