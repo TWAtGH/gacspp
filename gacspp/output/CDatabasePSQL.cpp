@@ -4,7 +4,6 @@
 
 #include "CDatabasePSQL.hpp"
 
-
 namespace psql
 {
 

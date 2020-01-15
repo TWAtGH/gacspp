@@ -19,7 +19,8 @@
                 },
                 {
                     "name": "BNL-OSG2_INPUTDISK",
-                    "allowDuplicateReplicas": false
+                    "allowDuplicateReplicas": false,
+                    "quota": 1.1258999e+15
                 },
                 {
                     "name": "BNL-OSG2_CPU",
@@ -47,7 +48,8 @@
                 },
                 {
                     "name": "RAL-LCG2_INPUTDISK",
-                    "allowDuplicateReplicas": false
+                    "allowDuplicateReplicas": false,
+                    "quota": 1.1258999e+15
                 },
                 {
                     "name": "RAL-LCG2_CPU",
@@ -75,7 +77,8 @@
                 },
                 {
                     "name": "IN2P3-CC_INPUTDISK",
-                    "allowDuplicateReplicas": false
+                    "allowDuplicateReplicas": false,
+                    "quota": 1.1258999e+15
                 },
                 {
                     "name": "IN2P3-CC_CPU",

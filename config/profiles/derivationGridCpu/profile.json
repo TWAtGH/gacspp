@@ -15,6 +15,7 @@
     },
 "dataGens": [
         {
+            "name": "BNLTapeDataGen",
             "storageElements": ["BNL-OSG2_DATATAPE"],
             "numReplicaRatios": [],
             "selectStorageElementsRandomly": false,
@@ -33,6 +34,7 @@
             }
         },
         {
+            "name": "RALTapeDataGen",
             "storageElements": ["RAL-LCG2_DATATAPE"],
             "numReplicaRatios": [],
             "selectStorageElementsRandomly": false,
@@ -51,6 +53,7 @@
             }
         },
         {
+            "name": "IN2P3TapeDataGen",
             "storageElements": ["IN2P3-CC_DATATAPE"],
             "numReplicaRatios": [],
             "selectStorageElementsRandomly": false,
@@ -78,13 +81,13 @@
     {
         "manager": {
             "type": "bandwidth",
-            "name": "tape2diskMgr",
+            "name": "TapeStageMgr",
             "tickFreq": 20,
             "startTick": 0
         },
         "generator": {
             "type": "cloudBuffer",
-            "name": "tape2diskGen",
+            "name": "TapeStageGen",
             "tickFreq": 20,
             "startTick": 0,
             "readNewSrcReplicas": true,
@@ -107,13 +110,13 @@
     {
         "manager": {
             "type": "bandwidth",
-            "name": "stage2bufferMgr",
+            "name": "StageBufferMgr",
             "tickFreq": 20,
             "startTick": 0
         },
         "generator": {
             "type": "cloudBuffer",
-            "name": "stage2bufferGen",
+            "name": "StageBufferGen",
             "tickFreq": 20,
             "startTick": 0,
             "readNewSrcReplicas": true,

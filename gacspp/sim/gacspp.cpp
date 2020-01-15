@@ -116,17 +116,19 @@ int main(int argc, char** argv)
     }
     std::cout<<"MaxTick="<<maxTick<<std::endl;
 
-    std::cout<<"Setting up sim..."<<std::endl;
-    std::unique_ptr<CTestSim> sim = std::make_unique<CTestSim>();
-    if(!sim->SetupDefaults(profileJson))
     {
-        std::cout<<"Setting up sim failed"<<std::endl;
-        return 1;
-    }
+        std::cout<<"Setting up sim..."<<std::endl;
+        std::unique_ptr<CTestSim> sim = std::make_unique<CTestSim>();
+        if(!sim->SetupDefaults(profileJson))
+        {
+            std::cout<<"Setting up sim failed"<<std::endl;
+            return 1;
+        }
 
-    std::cout<<"Running sim..."<<std::endl;
-    output.StartConsumer();
-    sim->Run(maxTick);
+        std::cout<<"Running sim..."<<std::endl;
+        output.StartConsumer();
+        sim->Run(maxTick);
+    }
 
     std::cout<<"Finalising database..."<<std::endl;
     output.Shutdown();

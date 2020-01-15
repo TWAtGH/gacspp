@@ -41,7 +41,6 @@ class IReplicaActionListener
 {
 public:
     virtual void OnReplicaCreated(const TickType now, CStorageElement* storageElement, std::shared_ptr<SReplica> replica) = 0;
-    //virtual void OnReplicasDeleted(const TickType now, const std::vector<std::weak_ptr<SReplica>>& deletedReplicas) = 0;
     virtual void OnReplicaDeleted(const TickType now, CStorageElement* storageElement, std::weak_ptr<SReplica> replica) = 0;
 };
 
@@ -56,7 +55,6 @@ public:
     std::vector<std::unique_ptr<CGridSite>> mGridSites;
 
     std::vector<std::weak_ptr<IFileActionListener>> mFileActionListeners;
-    //std::vector<std::weak_ptr<IReplicaActionListener>> mReplicaActionListeners;
 
     CRucio();
     ~CRucio();

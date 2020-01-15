@@ -2,6 +2,10 @@
 
 #include "CTestSim.hpp"
 
+#include "clouds/IBaseCloud.hpp"
+#include "infrastructure/CStorageElement.hpp"
+#include "output/IDatabase.hpp"
+
 #include "CommonScheduleables.hpp"
 
 #include "third_party/nlohmann/json.hpp"
@@ -54,9 +58,6 @@ bool CTestSim::SetupDefaults(const json& profileJson)
             return false;
         }
 
-        //mRucio->mFileActionListeners.emplace_back(transferGen);
-        //mRucio->mReplicaActionListeners.emplace_back(transferGen);
-
         heartbeat->mTransferManagers.push_back(transferManager);
         heartbeat->mProccessDurations[transferManager->mName] = &(transferManager->mUpdateDurationSummed);
         heartbeat->mProccessDurations[transferGen->mName] = &(transferGen->mUpdateDurationSummed);
@@ -64,6 +65,18 @@ bool CTestSim::SetupDefaults(const json& profileJson)
         mSchedule.push(transferManager);
         mSchedule.push(transferGen);
     }
+
+    std::vector<CStorageElement*> storageElements;
+    for (const std::unique_ptr<CGridSite>& site : mRucio->mGridSites)
+        site->GetStorageElements(storageElements);
+    for (const std::unique_ptr<IBaseCloud>& cloud : mClouds)
+        for (const std::unique_ptr<ISite>& region : cloud->mRegions)
+            region->GetStorageElements(storageElements);
+
+    mDeletionInserter = std::make_shared<CBufferedOnDeletionInsert>();
+    for (CStorageElement* storageElement : storageElements)
+        storageElement->mReplicaActionListeners.emplace_back(mDeletionInserter);
+    mRucio->mFileActionListeners.emplace_back(mDeletionInserter);
 
     try
     {
@@ -107,7 +120,7 @@ bool CTestSim::SetupDefaults(const json& profileJson)
                                                                             std::move(jsonPropNameToValueGen["fileSizeCfg"]),
                                                                             std::move(jsonPropNameToValueGen["lifetimeCfg"]),
                                                                             tickFreq, startTick);
-
+            dataGen->mName = dataGenCfg.at("name").get<std::string>();
             for(const json& storageElementJson : dataGenCfg.at("storageElements"))
             {
                 CStorageElement* storageElement = GetStorageElementByName(storageElementJson.get<std::string>());

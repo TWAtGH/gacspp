@@ -355,7 +355,9 @@ public:
                         const TickType startTick=0 );
 
     void OnUpdate(const TickType now) final;
+    void Shutdown(const TickType now) final;
 };
+
 
 
 class CUniformTransferGen : public CScheduleable
@@ -439,8 +441,6 @@ private:
     IBaseSim* mSim;
     std::shared_ptr<CFixedTimeTransferManager> mTransferMgr;
     TickType mTickFreq;
-
-    std::shared_ptr<IPreparedInsert> mReplicaInsertQuery;
 
 public:
 
