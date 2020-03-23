@@ -1,0 +1,144 @@
+{
+"maxTick": 12960000,
+"clouds": [
+		{
+			"id": "gcp",
+			"name": "gcp_default",
+			"config": {"_file_": "gcp.json"}
+		}
+	],
+"rucio": {
+	"config": {"_file_": "rucio.json"}
+	},
+"links": {
+	"config": {"_file_": "links.json"}
+    },
+"dataGens": [
+        {
+            "name": "BNLTapeDataGen",
+            "storageElements": ["BNL-OSG2_DATATAPE"],
+            "numReplicaRatios": [],
+            "selectStorageElementsRandomly": false,
+            "numFilesCfg": {
+                "type": "fixed",
+                "value": 1500000
+            },
+            "fileSizeCfg": {
+                "type": "normal",
+                "mean": 3.1,
+                "stddev": 0.5
+            },
+            "lifetimeCfg": {
+                "type": "fixed",
+                "value": 157680000
+            }
+        },
+        {
+            "name": "RALTapeDataGen",
+            "storageElements": ["RAL-LCG2_DATATAPE"],
+            "numReplicaRatios": [],
+            "selectStorageElementsRandomly": false,
+            "numFilesCfg": {
+                "type": "fixed",
+                "value": 800000
+            },
+            "fileSizeCfg": {
+                "type": "normal",
+                "mean": 3.1,
+                "stddev": 0.5
+            },
+            "lifetimeCfg": {
+                "type": "fixed",
+                "value": 157680000
+            }
+        },
+        {
+            "name": "IN2P3TapeDataGen",
+            "storageElements": ["IN2P3-CC_DATATAPE"],
+            "numReplicaRatios": [],
+            "selectStorageElementsRandomly": false,
+            "numFilesCfg": {
+                "type": "fixed",
+                "value": 500000
+            },
+            "fileSizeCfg": {
+                "type": "normal",
+                "mean": 3.1,
+                "stddev": 0.5
+            },
+            "lifetimeCfg": {
+                "type": "fixed",
+                "value": 157680000
+            }
+        }
+    ],
+"reaper": {
+        "name": "Reaper",
+        "tickFreq": 300,
+        "startTick": 300
+    },
+"transferCfgs": [
+    {
+        "manager": {
+            "type": "bandwidth",
+            "name": "TapeStageMgr",
+            "tickFreq": 20,
+            "startTick": 0
+        },
+        "generator": {
+            "type": "cloudBuffer",
+            "name": "TapeStageGen",
+            "tickFreq": 20,
+            "startTick": 0,
+            "readNewSrcReplicas": true,
+            "infos": [
+                {
+                    "srcStorageElement": "BNL-OSG2_DATATAPE",
+                    "primaryDstStorageElement": "BNL-OSG2_STAGEDISK"
+                },
+                {
+                    "srcStorageElement": "RAL-LCG2_DATATAPE",
+                    "primaryDstStorageElement": "RAL-LCG2_STAGEDISK"
+                },
+                {
+                    "srcStorageElement": "IN2P3-CC_DATATAPE",
+                    "primaryDstStorageElement": "IN2P3-CC_STAGEDISK"
+                }
+            ]
+        }
+    },
+    {
+        "manager": {
+            "type": "bandwidth",
+            "name": "StageBufferMgr",
+            "tickFreq": 20,
+            "startTick": 0
+        },
+        "generator": {
+            "type": "cloudBuffer",
+            "name": "StageBufferGen",
+            "tickFreq": 20,
+            "startTick": 0,
+            "readNewSrcReplicas": true,
+            "deleteSrcReplica": true,
+            "infos": [
+                {
+                    "srcStorageElement": "BNL-OSG2_STAGEDISK",
+                    "primaryDstStorageElement": "BNL-OSG2_INPUTDISK",
+                    "secondaryDstStorageElement": "iowa_bucket"
+                },
+                {
+                    "srcStorageElement": "RAL-LCG2_STAGEDISK",
+                    "primaryDstStorageElement": "RAL-LCG2_INPUTDISK",
+                    "secondaryDstStorageElement": "zurich_bucket"
+                },
+                {
+                    "srcStorageElement": "IN2P3-CC_STAGEDISK",
+                    "primaryDstStorageElement": "IN2P3-CC_INPUTDISK",
+                    "secondaryDstStorageElement": "zurich_bucket"
+                }
+            ]
+        }
+    }
+]
+}

@@ -10,7 +10,9 @@
 #include "infrastructure/CNetworkLink.hpp"
 #include "infrastructure/CRucio.hpp"
 
-#include "sim/CommonScheduleables.hpp"
+#include "sim/scheduleables/CommonScheduleables.hpp"
+#include "sim/scheduleables/TransferManager.hpp"
+#include "sim/scheduleables/TransferGenerators.hpp"
 
 #include "output/COutput.hpp"
 

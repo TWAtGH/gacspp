@@ -11,7 +11,9 @@
 #include "infrastructure/CStorageElement.hpp"
 #include "infrastructure/SFile.hpp"
 
-#include "CommonScheduleables.hpp"
+#include "scheduleables/CommonScheduleables.hpp"
+#include "scheduleables/TransferManager.hpp"
+#include "scheduleables/TransferGenerators.hpp"
 
 #include "output/COutput.hpp"
 

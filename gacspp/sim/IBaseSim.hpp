@@ -4,7 +4,7 @@
 #include <random>
 #include <vector>
 
-#include "CScheduleable.hpp"
+#include "scheduleables/CScheduleable.hpp"
 
 #include "common/constants.h"
 

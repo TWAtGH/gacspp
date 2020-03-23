@@ -1,0 +1,95 @@
+{
+"rucio":
+{
+    "sites":
+    [
+        {
+            "multiLocationIdx": 3,
+            "name": "BNL-ATLAS",
+            "location": "us",
+            "storageElements":
+            [
+                {
+                    "name": "BNL-OSG2_DATATAPE",
+                    "allowDuplicateReplicas": false
+                },
+                {
+                    "name": "BNL-OSG2_STAGEDISK",
+                    "allowDuplicateReplicas": false
+                },
+                {
+                    "name": "BNL-OSG2_INPUTDISK",
+                    "allowDuplicateReplicas": false,
+                    "quota": 1.1258999e+15
+                },
+                {
+                    "name": "BNL-OSG2_CPU",
+                    "allowDuplicateReplicas": true
+                },
+                {
+                    "name": "BNL-OSG2_DATADISK",
+                    "allowDuplicateReplicas": false
+                }
+            ]
+        },
+        {
+            "multiLocationIdx": 2,
+            "name": "RAL-LCG2",
+            "location": "eu",
+            "storageElements":
+            [
+                {
+                    "name": "RAL-LCG2_DATATAPE",
+                    "allowDuplicateReplicas": false
+                },
+                {
+                    "name": "RAL-LCG2_STAGEDISK",
+                    "allowDuplicateReplicas": false
+                },
+                {
+                    "name": "RAL-LCG2_INPUTDISK",
+                    "allowDuplicateReplicas": false,
+                    "quota": 1.1258999e+15
+                },
+                {
+                    "name": "RAL-LCG2_CPU",
+                    "allowDuplicateReplicas": true
+                },
+                {
+                    "name": "RAL-LCG2_DATADISK",
+                    "allowDuplicateReplicas": false
+                }
+            ]
+        },
+        {
+            "multiLocationIdx": 2,
+            "name": "IN2P3-CC",
+            "location": "eu",
+            "storageElements":
+            [
+                {
+                    "name": "IN2P3-CC_DATATAPE",
+                    "allowDuplicateReplicas": false
+                },
+                {
+                    "name": "IN2P3-CC_STAGEDISK",
+                    "allowDuplicateReplicas": false
+                },
+                {
+                    "name": "IN2P3-CC_INPUTDISK",
+                    "allowDuplicateReplicas": false,
+                    "quota": 1.1258999e+15
+                },
+                {
+                    "name": "IN2P3-CC_CPU",
+                    "allowDuplicateReplicas": true
+                },
+                {
+                    "name": "IN2P3-CC_DATADISK",
+                    "allowDuplicateReplicas": false
+                }
+            ]
+        }
+    ]
+}
+}

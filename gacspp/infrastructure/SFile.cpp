@@ -1,6 +1,7 @@
 #include "CStorageElement.hpp"
 #include "SFile.hpp"
 
+#include "common/utils.hpp"
 
 
 SFile::SFile(const SpaceType size, const TickType createdAt, const TickType lifetime)

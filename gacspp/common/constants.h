@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <random>
 
@@ -27,11 +28,9 @@
 
 typedef std::minstd_rand RNGEngineType;
 
+typedef std::chrono::high_resolution_clock::time_point TimePointType;
+typedef std::chrono::duration<double> DurationType;
+
 typedef std::uint64_t SpaceType;
 typedef std::uint64_t TickType;
 typedef std::uint64_t IdType;
-inline IdType GetNewId()
-{
-    static IdType id = 0;
-    return ++id;
-}

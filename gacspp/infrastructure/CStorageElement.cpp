@@ -1,10 +1,13 @@
 #include <cassert>
 
+#include "IActionListener.hpp"
 #include "ISite.hpp"
 #include "CNetworkLink.hpp"
 #include "CRucio.hpp"
 #include "CStorageElement.hpp"
 #include "SFile.hpp"
+
+#include "common/utils.hpp"
 
 #include "output/COutput.hpp"
 

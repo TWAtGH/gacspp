@@ -3,7 +3,7 @@ CC = $(CXX)
 CXXFLAGS = -O3 -march=native -std=c++17 -Wall -Wextra -pedantic -Igacspp/third_party/
 LDLIBS = -ldl -lpthread -lstdc++fs -lpq
 
-COMPONENTS = clouds clouds/gcp common infrastructure output sim
+COMPONENTS = clouds clouds/gcp common infrastructure output sim sim/scheduleables
 
 HEADERS := $(wildcard $(COMPONENTS:%=gacspp/%/*.h*))
 SOURCES := $(wildcard $(COMPONENTS:%=gacspp/%/*.cpp))

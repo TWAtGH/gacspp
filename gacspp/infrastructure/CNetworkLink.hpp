@@ -6,6 +6,7 @@
 
 class CStorageElement;
 
+
 class CNetworkLink
 {
 public:

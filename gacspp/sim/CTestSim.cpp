@@ -3,10 +3,15 @@
 #include "CTestSim.hpp"
 
 #include "clouds/IBaseCloud.hpp"
-#include "infrastructure/CStorageElement.hpp"
-#include "output/IDatabase.hpp"
 
-#include "CommonScheduleables.hpp"
+#include "infrastructure/CRucio.hpp"
+#include "infrastructure/CStorageElement.hpp"
+
+#include "scheduleables/CommonScheduleables.hpp"
+#include "scheduleables/TransferManager.hpp"
+#include "scheduleables/TransferGenerators.hpp"
+
+#include "output/IDatabase.hpp"
 
 #include "third_party/nlohmann/json.hpp"
 

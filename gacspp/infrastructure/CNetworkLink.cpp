@@ -3,6 +3,7 @@
 #include "ISite.hpp"
 #include "CNetworkLink.hpp"
 
+#include "common/utils.hpp"
 
 
 CNetworkLink::CNetworkLink(const SpaceType bandwidthBytesPerSecond, CStorageElement* const srcStorageElement, CStorageElement* const dstStorageElement)

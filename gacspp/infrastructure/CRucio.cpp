@@ -4,6 +4,7 @@
 #include <mutex>
 #include <thread>
 
+#include "IActionListener.hpp"
 #include "CRucio.hpp"
 #include "CNetworkLink.hpp"
 #include "CStorageElement.hpp"

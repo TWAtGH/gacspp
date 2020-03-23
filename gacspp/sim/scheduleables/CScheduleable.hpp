@@ -1,6 +1,5 @@
 #pragma once
 
-#include <chrono>
 #include <memory>
 #include <queue>
 #include <vector>
@@ -11,7 +10,7 @@ class CScheduleable
 {
 public:
     std::string mName;
-    std::chrono::duration<double> mUpdateDurationSummed = std::chrono::duration<double>::zero();
+    DurationType mUpdateDurationSummed = DurationType::zero();
     TickType mNextCallTick;
 
     CScheduleable(const TickType startTick=0)
