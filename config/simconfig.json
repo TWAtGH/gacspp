@@ -1,5 +1,5 @@
 {
-"profile": "dataDiskToGCS",
+"profile": "dcGCS",
 "output": {
     "insertQueryBufferLen": 8192,
     "keepInMemory": true,

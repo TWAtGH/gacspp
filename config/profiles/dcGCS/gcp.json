@@ -1,45 +1,19 @@
 {
   "gcp": {
     "skuIds": {"_file_": "skus.json"},
-	"networkPrices": {"_file_": "gcp_network_prices.json"},
+	  "networkPrices": {"_file_": "gcp_network_prices.json"},
     "regions": [
       {
-        "multiLocationIdx": 3,
-        "name": "us-central1",
-        "location": "Iowa",
-        "numJobSlots": 1000,
-        "buckets": [
-          {
-            "name": "iowa_bucket",
-    		"storageSKUId": "E5F0-6A5D-7BAD",
-    		"classAOpSKUId": "4DBF-185F-A415",
-    		"classBOpSKUId": "7870-010B-2763"
-          },
-          {
-            "name": "iowa_gcp",
-    		"storageSKUId": "E5F0-6A5D-7BAD",
-    		"classAOpSKUId": "4DBF-185F-A415",
-    		"classBOpSKUId": "7870-010B-2763"
-          }
-        ]
-      },
-      {
         "multiLocationIdx": 2,
-        "name": "europe-west6",
-        "location": "Zurich",
+        "name": "europe",
+        "location": "Europe",
         "numJobSlots": 1000,
         "buckets": [
           {
-            "name": "zurich_bucket",
-    		"storageSKUId": "91B5-8ABC-06EC",
-    		"classAOpSKUId": "4DBF-185F-A415",
-    		"classBOpSKUId": "7870-010B-2763"
-          },
-          {
-            "name": "zurich_gcp",
-    		"storageSKUId": "91B5-8ABC-06EC",
-    		"classAOpSKUId": "4DBF-185F-A415",
-    		"classBOpSKUId": "7870-010B-2763"
+            "name": "google_eu",
+    		    "storageSKUId": "EC40-8747-D6FF",
+    		    "classAOpSKUId": "9ADA-9AED-1B24",
+    		    "classBOpSKUId": "8AE7-5BBD-8F38"
           }
         ]
       }

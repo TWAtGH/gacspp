@@ -1,169 +1,44 @@
 {
-    "iowa_bucket": {
-        "iowa_gcp": {
+    "CERN-PROD_DATATAPE": {
+        "CERN-PROD_DATADISK": {
+            "accessLatency": 2400000,
             "bandwidth": 1073741824,
+            "maxActiveTransfers": 30
+        },
+        "google_eu": {
+            "bandwidth": 10737418240,
+            "maxActiveTransfers": 30
+        }
+    },
+    "CERN-PROD_DATADISK": {
+        "google_eu": {
+            "bandwidth": 10737418240,
             "maxActiveTransfers": 30,
             "receivingLink": {
                 "bandwidth": 1073741824,
                 "maxActiveTransfers": 30
             }
-        },
-        "BNL-OSG2_CPU": {
+        }
+    },
+    "UKI-NORTHGRID-MAN-HEP_DATATAPE": {
+        "UKI-NORTHGRID-MAN-HEP_DATADISK": {
+            "accessLatency": 2400000,
             "bandwidth": 1073741824,
+            "maxActiveTransfers": 30
+        },
+        "google_eu": {
+            "bandwidth": 10737418240,
             "maxActiveTransfers": 30
         }
     },
-    "zurich_bucket": {
-        "zurich_gcp": {
-            "bandwidth": 1073741824,
+    "UKI-NORTHGRID-MAN-HEP_DATADISK": {
+        "google_eu": {
+            "bandwidth": 10737418240,
             "maxActiveTransfers": 30,
             "receivingLink": {
                 "bandwidth": 1073741824,
                 "maxActiveTransfers": 30
             }
-        },
-        "RAL-LCG2_CPU": {
-            "bandwidth": 1073741824,
-            "maxActiveTransfers": 30
-        },
-        "IN2P3-CC_CPU": {
-            "bandwidth": 1073741824,
-            "maxActiveTransfers": 30
-        }
-    },
-    "BNL-OSG2_DATATAPE": {
-        "BNL-OSG2_STAGEDISK": {
-            "accessLatency": 2400000,
-            "bandwidth": 1073741824,
-            "maxActiveTransfers": 30
-        }
-    },
-    "BNL-OSG2_STAGEDISK": {
-        "iowa_bucket": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
-        },
-        "iowa_gcp": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
-        },
-        "BNL-OSG2_INPUTDISK": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
-        },
-        "BNL-OSG2_CPU": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
-        }
-    },
-    "BNL-OSG2_INPUTDISK": {
-        "iowa_gcp": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
-        },
-        "BNL-OSG2_CPU": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
-        }
-    },
-    "BNL-OSG2_CPU": {
-        "iowa_bucket": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
-        },
-        "BNL-OSG2_DATADISK": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
-        }
-    },
-    "RAL-LCG2_DATATAPE": {
-        "RAL-LCG2_STAGEDISK": {
-            "accessLatency": 2400000,
-            "bandwidth": 681574400,
-            "maxActiveTransfers": 30
-        }
-    },
-    "RAL-LCG2_STAGEDISK": {
-        "zurich_bucket": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
-        },
-        "zurich_gcp": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
-        },
-        "RAL-LCG2_INPUTDISK": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
-        },
-        "RAL-LCG2_CPU": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
-        }
-    },
-    "RAL-LCG2_INPUTDISK": {
-        "zurich_gcp": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
-        },
-        "RAL-LCG2_CPU": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
-        }
-    },
-    "RAL-LCG2_CPU": {
-        "zurich_bucket": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
-        },
-        "RAL-LCG2_DATADISK": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
-        }
-    },
-    "IN2P3-CC_DATATAPE": {
-        "IN2P3-CC_STAGEDISK": {
-            "accessLatency": 2400000,
-            "bandwidth": 471859200,
-            "maxActiveTransfers": 30
-        }
-    },
-    "IN2P3-CC_STAGEDISK": {
-        "zurich_bucket": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
-        },
-        "zurich_gcp": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
-        },
-        "IN2P3-CC_INPUTDISK": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
-        },
-        "IN2P3-CC_CPU": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
-        }
-    },
-    "IN2P3-CC_INPUTDISK": {
-        "zurich_gcp": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
-        },
-        "IN2P3-CC_CPU": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
-        }
-    },
-    "IN2P3-CC_CPU": {
-        "zurich_bucket": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
-        },
-        "IN2P3-CC_DATADISK": {
-            "bandwidth": 10737418240,
-            "maxActiveTransfers": 30
         }
     }
 }

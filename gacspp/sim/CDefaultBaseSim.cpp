@@ -414,7 +414,7 @@ auto CDefaultBaseSim::CreateTransferGenerator(const json& transferGenCfg, const 
             for(const json& infoJson : transferGenCfg.at("infos"))
             {
                 auto info = std::make_unique<CCloudBufferTransferGen::STransferGenInfo>();
-
+                info->mReusageNumGen = std::move(IValueGenerator::CreateFromJson(infoJson.at("reusageNumCfg")));
                 std::string name = infoJson.at("srcStorageElement").get<std::string>();
                 CStorageElement* srcStorageElement = GetStorageElementByName(name);
                 if(!srcStorageElement)

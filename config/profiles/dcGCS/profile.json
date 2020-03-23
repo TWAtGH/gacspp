@@ -15,18 +15,20 @@
     },
 "dataGens": [
         {
-            "name": "BNLTapeDataGen",
-            "storageElements": ["BNL-OSG2_DATATAPE"],
+            "name": "CERNTapeDataGen",
+            "storageElements": ["CERN-PROD_DATATAPE"],
             "numReplicaRatios": [],
             "selectStorageElementsRandomly": false,
             "numFilesCfg": {
                 "type": "fixed",
-                "value": 1500000
+                "value": 3000000
             },
             "fileSizeCfg": {
                 "type": "normal",
-                "mean": 3.1,
-                "stddev": 0.5
+                "mean": 2.02,
+                "stddev": 0.25,
+                "min": 0.01,
+                "max": 10
             },
             "lifetimeCfg": {
                 "type": "fixed",
@@ -34,37 +36,20 @@
             }
         },
         {
-            "name": "RALTapeDataGen",
-            "storageElements": ["RAL-LCG2_DATATAPE"],
+            "name": "UKITapeDataGen",
+            "storageElements": ["UKI-NORTHGRID-MAN-HEP_DATATAPE"],
             "numReplicaRatios": [],
             "selectStorageElementsRandomly": false,
             "numFilesCfg": {
                 "type": "fixed",
-                "value": 800000
+                "value": 2000000
             },
             "fileSizeCfg": {
                 "type": "normal",
-                "mean": 3.1,
-                "stddev": 0.5
-            },
-            "lifetimeCfg": {
-                "type": "fixed",
-                "value": 157680000
-            }
-        },
-        {
-            "name": "IN2P3TapeDataGen",
-            "storageElements": ["IN2P3-CC_DATATAPE"],
-            "numReplicaRatios": [],
-            "selectStorageElementsRandomly": false,
-            "numFilesCfg": {
-                "type": "fixed",
-                "value": 500000
-            },
-            "fileSizeCfg": {
-                "type": "normal",
-                "mean": 3.1,
-                "stddev": 0.5
+                "mean": 2.02,
+                "stddev": 0.25,
+                "min": 0.01,
+                "max": 10
             },
             "lifetimeCfg": {
                 "type": "fixed",
@@ -81,61 +66,39 @@
     {
         "manager": {
             "type": "bandwidth",
-            "name": "TapeStageMgr",
+            "name": "TransferMgr",
             "tickFreq": 20,
             "startTick": 0
         },
         "generator": {
             "type": "cloudBuffer",
-            "name": "TapeStageGen",
-            "tickFreq": 20,
-            "startTick": 0,
-            "readNewSrcReplicas": true,
-            "infos": [
-                {
-                    "srcStorageElement": "BNL-OSG2_DATATAPE",
-                    "primaryDstStorageElement": "BNL-OSG2_STAGEDISK"
-                },
-                {
-                    "srcStorageElement": "RAL-LCG2_DATATAPE",
-                    "primaryDstStorageElement": "RAL-LCG2_STAGEDISK"
-                },
-                {
-                    "srcStorageElement": "IN2P3-CC_DATATAPE",
-                    "primaryDstStorageElement": "IN2P3-CC_STAGEDISK"
-                }
-            ]
-        }
-    },
-    {
-        "manager": {
-            "type": "bandwidth",
-            "name": "StageBufferMgr",
-            "tickFreq": 20,
-            "startTick": 0
-        },
-        "generator": {
-            "type": "cloudBuffer",
-            "name": "StageBufferGen",
+            "name": "TransferGen",
             "tickFreq": 20,
             "startTick": 0,
             "readNewSrcReplicas": true,
             "deleteSrcReplica": true,
             "infos": [
                 {
-                    "srcStorageElement": "BNL-OSG2_STAGEDISK",
-                    "primaryDstStorageElement": "BNL-OSG2_INPUTDISK",
-                    "secondaryDstStorageElement": "iowa_bucket"
+                    "srcStorageElement": "CERN-PROD_DATATAPE",
+                    "primaryDstStorageElement": "CERN-PROD_DATADISK",
+                    "secondaryDstStorageElement": "google_eu",
+                    "reusageNumCfg": {
+                        "type": "exponential",
+                        "lambda": 15,
+                        "minCfg": {"type": "minClip", "limit": 1},
+                        "maxCfg": {"type": "maxModulo", "limit": 30}
+                    }
                 },
                 {
-                    "srcStorageElement": "RAL-LCG2_STAGEDISK",
-                    "primaryDstStorageElement": "RAL-LCG2_INPUTDISK",
-                    "secondaryDstStorageElement": "zurich_bucket"
-                },
-                {
-                    "srcStorageElement": "IN2P3-CC_STAGEDISK",
-                    "primaryDstStorageElement": "IN2P3-CC_INPUTDISK",
-                    "secondaryDstStorageElement": "zurich_bucket"
+                    "srcStorageElement": "UKI-NORTHGRID-MAN-HEP_DATATAPE",
+                    "primaryDstStorageElement": "UKI-NORTHGRID-MAN-HEP_DATADISK",
+                    "secondaryDstStorageElement": "google_eu",
+                    "reusageNumCfg": {
+                        "type": "exponential",
+                        "lambda": 15,
+                        "minCfg": {"type": "minClip", "limit": 1},
+                        "maxCfg": {"type": "maxModulo", "limit": 30}
+                    }
                 }
             ]
         }

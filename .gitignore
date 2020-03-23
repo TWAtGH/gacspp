@@ -51,3 +51,6 @@ config/psql_connection.json
 # swan
 .swanproject
 *.ipynb
+
+#vscode
+.vscode/

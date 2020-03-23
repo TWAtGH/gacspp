@@ -147,7 +147,19 @@ void CCloudBufferTransferGen::OnReplicaCreated(const TickType now, std::shared_p
     {
         if(replica->GetStorageElement() == info->mPrimaryLink->GetSrcStorageElement())
         {
-            info->mReplicas.push_back(std::move(replica));
+            const std::uint32_t numReusages = info->mReusageNumGen->GetValue(mSim->mRNGEngine);
+            std::forward_list<std::pair<std::uint32_t, std::shared_ptr<SReplica>>>& replicaInfo = info->mReplicaInfo;
+            auto prev = replicaInfo.before_begin();
+            auto cur = replicaInfo.begin();
+            while(cur != replicaInfo.end())
+            {
+                if(cur->first >= numReusages)
+                    break;
+
+                prev = cur;
+                cur++;
+            }
+            replicaInfo.insert_after(prev, std::make_pair(numReusages, replica));
             return;
         }
     }
@@ -159,7 +171,6 @@ void CCloudBufferTransferGen::OnReplicaDeleted(const TickType now, std::weak_ptr
     (void)replica;
 }
 
-
 void CCloudBufferTransferGen::OnUpdate(const TickType now)
 {
     CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
@@ -170,13 +181,22 @@ void CCloudBufferTransferGen::OnUpdate(const TickType now)
     {
         CNetworkLink* networkLink = info->mPrimaryLink;
         CStorageElement* dstStorageElement = networkLink->GetDstStorageElement();
-        std::vector<std::shared_ptr<SReplica>>& replicas = info->mReplicas;
-
-        for(std::size_t idx=0; idx<replicas.size();)
+        std::forward_list<std::pair<std::uint32_t, std::shared_ptr<SReplica>>>& replicaInfo = info->mReplicaInfo;
+        auto prev = replicaInfo.before_begin();
+        auto cur = replicaInfo.begin();
+        while(cur != replicaInfo.end())
         {
-            std::shared_ptr<SReplica>& srcReplica = replicas[idx];
-            if(srcReplica->IsComplete())
+            std::shared_ptr<SReplica>& srcReplica = cur->second;
+            if(!srcReplica->IsComplete())
             {
+                //handle this case better
+                //replicas with high reusage number should still be preferred for primary storage
+                //even if they are not compelte yet
+                prev = cur;
+                cur++;
+                continue;
+            }
+
                 if(networkLink->mNumActiveTransfers < networkLink->mMaxNumActiveTransfers)
                 {
                     std::shared_ptr<SFile> file = srcReplica->GetFile();
@@ -184,28 +204,23 @@ void CCloudBufferTransferGen::OnUpdate(const TickType now)
                     if(!newReplica && info->mSecondaryLink)
                     {
                         networkLink = info->mSecondaryLink;
-                        if(networkLink->mNumActiveTransfers >= networkLink->mMaxNumActiveTransfers)
-                            break;
-
+                    if(networkLink->mNumActiveTransfers < networkLink->mMaxNumActiveTransfers)
+                    {
                         dstStorageElement = networkLink->GetDstStorageElement();
-
                         newReplica = dstStorageElement->CreateReplica(file, now);
                     }
+                }
 
                     if(newReplica)
                     {
                         mTransferMgr->CreateTransfer(srcReplica, newReplica, now, mDeleteSrcReplica);
-                        srcReplica = replicas.back();
-                        replicas.pop_back();
+                    cur = replicaInfo.erase_after(prev);
+                    continue; //same idx again
                     }
-                    else
-                        break;
                 }
-                else
+
                     break;
             }
-            ++idx;
-        }
     }
 
     mNextCallTick = now + mTickFreq;

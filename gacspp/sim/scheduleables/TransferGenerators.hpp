@@ -1,5 +1,6 @@
 #pragma once
 
+#include <forward_list>
 #include <unordered_map>
 
 #include "CScheduleable.hpp"
@@ -8,6 +9,7 @@
 
 class IBaseSim;
 class CNetworkLink;
+class IValueGenerator;
 class CTransferManager;
 class CFixedTimeTransferManager;
 class IPreparedInsert;
@@ -61,9 +63,10 @@ private:
 public:
     struct STransferGenInfo
     {
+        std::unique_ptr<IValueGenerator> mReusageNumGen;
         CNetworkLink* mPrimaryLink;
         CNetworkLink* mSecondaryLink;
-        std::vector<std::shared_ptr<SReplica>> mReplicas;
+        std::forward_list<std::pair<std::uint32_t, std::shared_ptr<SReplica>>> mReplicaInfo;
     };
     std::vector<std::unique_ptr<STransferGenInfo>> mTransferGenInfo;
 
