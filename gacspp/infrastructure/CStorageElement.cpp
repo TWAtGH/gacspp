@@ -51,7 +51,7 @@ auto CBaseStorageElementDelegate::CreateReplica(std::shared_ptr<SFile> file, con
             continue;
         }
 
-        listener->OnReplicaCreated(now, GetStorageElement(), newReplica);
+        listener->OnReplicaCreated(now, newReplica);
 
         ++i;
     }
@@ -94,7 +94,7 @@ void CBaseStorageElementDelegate::OnRemoveReplica(const SReplica* replica, const
             continue;
         }
 
-        listener->OnReplicaDeleted(now, GetStorageElement(), replicas[idxToDelete]);
+        listener->OnReplicaDeleted(now, replicas[idxToDelete]);
 
         ++i;
     }

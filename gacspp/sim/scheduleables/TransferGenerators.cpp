@@ -27,7 +27,7 @@ void CBaseOnDeletionInsert::OnFileCreated(const TickType now, std::shared_ptr<SF
     (void)file;
 }
 
-void CBaseOnDeletionInsert::OnReplicaCreated(const TickType now, CStorageElement* storageElement, std::shared_ptr<SReplica> replica)
+void CBaseOnDeletionInsert::OnReplicaCreated(const TickType now, std::shared_ptr<SReplica> replica)
 {
     (void)now;
     (void)replica;
@@ -71,7 +71,7 @@ void CBaseOnDeletionInsert::OnFilesDeleted(const TickType now, const std::vector
     COutput::GetRef().QueueInserts(std::move(mFileValueContainer));
 }
 
-void CBaseOnDeletionInsert::OnReplicaDeleted(const TickType now, CStorageElement* storageElement, std::weak_ptr<SReplica> replica)
+void CBaseOnDeletionInsert::OnReplicaDeleted(const TickType now, std::weak_ptr<SReplica> replica)
 {
     (void)now;
     std::unique_ptr<IInsertValuesContainer> mReplicaValueContainer = mReplicaInsertQuery->CreateValuesContainer();
@@ -104,6 +104,7 @@ void CBufferedOnDeletionInsert::FlushReplicaDeletes()
 
 void CBufferedOnDeletionInsert::OnFilesDeleted(const TickType now, const std::vector<std::weak_ptr<SFile>>& deletedFiles)
 {
+    (void)now;
     constexpr std::size_t valueBufSize = 5000 * 4;
     if(!mFileValueContainer)
         mFileValueContainer = mFileInsertQuery->CreateValuesContainer(valueBufSize);
@@ -114,8 +115,9 @@ void CBufferedOnDeletionInsert::OnFilesDeleted(const TickType now, const std::ve
         FlushFileDeletes();
 }
 
-void CBufferedOnDeletionInsert::OnReplicaDeleted(const TickType now, CStorageElement* storageElement, std::weak_ptr<SReplica> replica)
+void CBufferedOnDeletionInsert::OnReplicaDeleted(const TickType now, std::weak_ptr<SReplica> replica)
 {
+    (void)now;
     constexpr std::size_t valueBufSize = 5000 * 5;
     if(!mReplicaValueContainer)
         mReplicaValueContainer = mReplicaInsertQuery->CreateValuesContainer(valueBufSize);
@@ -138,11 +140,12 @@ CCloudBufferTransferGen::CCloudBufferTransferGen(IBaseSim* sim,
       mTickFreq(tickFreq)
 {}
 
-void CCloudBufferTransferGen::OnReplicaCreated(const TickType now, CStorageElement* storageElement, std::shared_ptr<SReplica> replica)
+void CCloudBufferTransferGen::OnReplicaCreated(const TickType now, std::shared_ptr<SReplica> replica)
 {
+    (void)now;
     for(std::unique_ptr<STransferGenInfo>& info : mTransferGenInfo)
     {
-        if(storageElement == info->mPrimaryLink->GetSrcStorageElement())
+        if(replica->GetStorageElement() == info->mPrimaryLink->GetSrcStorageElement())
         {
             info->mReplicas.push_back(std::move(replica));
             return;
@@ -150,10 +153,9 @@ void CCloudBufferTransferGen::OnReplicaCreated(const TickType now, CStorageEleme
     }
 }
 
-void CCloudBufferTransferGen::OnReplicaDeleted(const TickType now, CStorageElement* storageElement, std::weak_ptr<SReplica> replica)
+void CCloudBufferTransferGen::OnReplicaDeleted(const TickType now, std::weak_ptr<SReplica> replica)
 {
     (void)now;
-    (void)storageElement;
     (void)replica;
 }
 
@@ -558,6 +560,7 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
 
 void CCachedSrcTransferGen::Shutdown(const TickType now)
 {
+    (void)now;
     /*std::vector<std::weak_ptr<SFile>> files;
     files.reserve(mSim->mRucio->mFiles.size());
     std::vector<std::weak_ptr<SReplica>> replicas;

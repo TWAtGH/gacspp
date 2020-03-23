@@ -21,6 +21,6 @@ public:
 class IReplicaActionListener
 {
 public:
-    virtual void OnReplicaCreated(const TickType now, CStorageElement* storageElement, std::shared_ptr<SReplica> replica) = 0;
-    virtual void OnReplicaDeleted(const TickType now, CStorageElement* storageElement, std::weak_ptr<SReplica> replica) = 0;
+    virtual void OnReplicaCreated(const TickType now, std::shared_ptr<SReplica> replica) = 0;
+    virtual void OnReplicaDeleted(const TickType now, std::weak_ptr<SReplica> replica) = 0;
 };

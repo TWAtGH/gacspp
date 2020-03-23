@@ -31,8 +31,8 @@ public:
 
     void OnFileCreated(const TickType now, std::shared_ptr<SFile> file) override;
     void OnFilesDeleted(const TickType now, const std::vector<std::weak_ptr<SFile>>& deletedFiles) override;
-    void OnReplicaCreated(const TickType now, CStorageElement* storageElement, std::shared_ptr<SReplica> replica) override;
-    void OnReplicaDeleted(const TickType now, CStorageElement* storageElement, std::weak_ptr<SReplica> replica) override;
+    void OnReplicaCreated(const TickType now, std::shared_ptr<SReplica> replica) override;
+    void OnReplicaDeleted(const TickType now, std::weak_ptr<SReplica> replica) override;
 };
 
 
@@ -46,7 +46,7 @@ private:
 public:
     virtual ~CBufferedOnDeletionInsert();
     void OnFilesDeleted(const TickType now, const std::vector<std::weak_ptr<SFile>>& deletedFiles) override;
-    void OnReplicaDeleted(const TickType now, CStorageElement* storageElement, std::weak_ptr<SReplica> replica) override;
+    void OnReplicaDeleted(const TickType now, std::weak_ptr<SReplica> replica) override;
 };
 
 
@@ -69,8 +69,8 @@ public:
 
     bool mDeleteSrcReplica = false;
 
-    void OnReplicaCreated(const TickType now, CStorageElement* storageElement, std::shared_ptr<SReplica> replica) override;
-    void OnReplicaDeleted(const TickType now, CStorageElement* storageElement, std::weak_ptr<SReplica> replica) override;
+    void OnReplicaCreated(const TickType now, std::shared_ptr<SReplica> replica) override;
+    void OnReplicaDeleted(const TickType now, std::weak_ptr<SReplica> replica) override;
 
 public:
     CCloudBufferTransferGen(IBaseSim* sim,
