@@ -1,6 +1,7 @@
 #pragma once
 
 #include <forward_list>
+#include <list>
 #include <unordered_map>
 
 #include "CScheduleable.hpp"
@@ -66,7 +67,7 @@ public:
         std::unique_ptr<IValueGenerator> mReusageNumGen;
         CNetworkLink* mPrimaryLink;
         CNetworkLink* mSecondaryLink;
-        std::forward_list<std::pair<std::uint32_t, std::shared_ptr<SReplica>>> mReplicaInfo;
+        std::forward_list<std::shared_ptr<SReplica>> mReplicas;
     };
     std::vector<std::unique_ptr<STransferGenInfo>> mTransferGenInfo;
 
@@ -83,6 +84,48 @@ public:
 
     void OnUpdate(const TickType now) final;
     void Shutdown(const TickType now) final;
+};
+
+
+
+class CJobIOTransferGen : public CScheduleable
+{
+private:
+    IBaseSim* mSim;
+    std::shared_ptr<CTransferManager> mTransferMgr;
+
+    TickType mTickFreq;
+    TickType mLastUpdateTime = 0;
+
+    std::shared_ptr<IPreparedInsert> mTraceInsertQuery;
+
+public:
+    struct SJobInfo
+    {
+        TickType mStartedAt = 0;
+        TickType mFinishedAt = 0;
+        SpaceType mCurInputFileSize = 0;
+        std::shared_ptr<SFile> mInputFile;
+        std::shared_ptr<SReplica> mOutputReplica;
+    };
+    struct SSiteInfo
+    {
+        CNetworkLink* mCloudToDiskLink;
+        CNetworkLink* mDiskToCPULink;
+        CNetworkLink* mCPUToOutputLink;
+        std::unique_ptr<IValueGenerator> mJobDurationGen;
+        std::size_t mNumCores;
+        std::size_t mCoreFillRate;
+        std::list<SJobInfo> mJobInfos;
+    };
+    std::vector<SSiteInfo> mSiteInfos;
+
+    CJobIOTransferGen(IBaseSim* sim,
+                    std::shared_ptr<CTransferManager> transferMgr,
+                    const TickType tickFreq,
+                    const TickType startTick=0 );
+
+    void OnUpdate(const TickType now) final;
 };
 
 

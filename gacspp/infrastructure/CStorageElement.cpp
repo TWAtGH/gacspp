@@ -105,7 +105,7 @@ void CBaseStorageElementDelegate::OnRemoveReplica(const SReplica* replica, const
     if(idxToDelete != idxLastReplica)
     {
         idxLastReplica = idxToDelete;
-        replicas[idxToDelete] = lastReplica;
+        replicas[idxToDelete] = std::move(lastReplica);
     }
     replicas.pop_back();
     OnOperation(CStorageElement::DELETE);
@@ -177,3 +177,8 @@ auto CStorageElement::GetNetworkLink(const CStorageElement* const dstStorageElem
         return nullptr;
     return mNetworkLinks[result->second].get();
 }
+
+auto CStorageElement::GetUsedStorage() const -> SpaceType
+{return mDelegate->GetUsedStorage();}
+auto CStorageElement::GetUsedStorageQuotaRatio() const -> double
+{return mDelegate->GetUsedStorageQuotaRatio();}

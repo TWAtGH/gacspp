@@ -473,6 +473,66 @@ auto CDefaultBaseSim::CreateTransferGenerator(const json& transferGenCfg, const 
 
             transferGen = specTransferGen;
         }
+        else if (typeStr == "jobIO")
+        {
+            auto mgr = std::dynamic_pointer_cast<CTransferManager>(transferManager);
+            if(!mgr)
+            {
+                std::cout<<"Wrong manager given for generator: "<<name<<std::endl;
+                return transferGen;
+            }
+
+            auto specTransferGen = std::make_shared<CJobIOTransferGen>(this, mgr, tickFreq, startTick);
+
+            for(const json& infoJson : transferGenCfg.at("infos"))
+            {
+                CJobIOTransferGen::SSiteInfo info;
+                
+                info.mNumCores = infoJson.at("numCores").get<std::size_t>();
+                info.mCoreFillRate = infoJson.at("coreFillRate").get<std::size_t>();
+                info.mJobDurationGen = std::move(IValueGenerator::CreateFromJson(infoJson.at("jobDurationCfg")));
+
+                std::string name = infoJson.at("cloudStorageElement").get<std::string>();
+                CStorageElement* cloudStorageElement = GetStorageElementByName(name);
+                if(!cloudStorageElement)
+                {
+                    std::cout<<"Failed to find storage element by name: "<<name<<std::endl;
+                    continue;
+                }
+
+                name = infoJson.at("diskStorageElement").get<std::string>();
+                CStorageElement* diskStorageElement = GetStorageElementByName(name);
+                if(!diskStorageElement)
+                {
+                    std::cout<<"Failed to find storage element by name: "<<name<<std::endl;
+                    continue;
+                }
+
+                name = infoJson.at("cpuStorageElement").get<std::string>();
+                CStorageElement* cpuStorageElement = GetStorageElementByName(name);
+                if(!cpuStorageElement)
+                {
+                    std::cout<<"Failed to find storage element by name: "<<name<<std::endl;
+                    continue;
+                }
+                
+                name = infoJson.at("outputStorageElement").get<std::string>();
+                CStorageElement* outputStorageElement = GetStorageElementByName(name);
+                if(!outputStorageElement)
+                {
+                    std::cout<<"Failed to find storage element by name: "<<name<<std::endl;
+                    continue;
+                }
+                
+                info.mCloudToDiskLink = cloudStorageElement->GetNetworkLink(diskStorageElement);
+                info.mDiskToCPULink = diskStorageElement->GetNetworkLink(cpuStorageElement);
+                info.mCPUToOutputLink = cpuStorageElement->GetNetworkLink(outputStorageElement);
+
+                specTransferGen->mSiteInfos.push_back(std::move(info));
+            }
+
+            transferGen = specTransferGen;
+        }
 
         if (transferGen)
             transferGen->mName = name;

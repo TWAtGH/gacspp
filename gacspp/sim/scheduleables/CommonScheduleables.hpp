@@ -1,17 +1,16 @@
 #pragma once
 
-#include <chrono>
 #include <unordered_map>
 
 #include "CScheduleable.hpp"
 
 #include "common/utils.hpp"
 
+class IPreparedInsert;
 class IBaseSim;
 class CRucio;
 class CBaseTransferManager;
 class CStorageElement;
-class IPreparedInsert;
 
 
 class CDataGenerator : public CScheduleable
@@ -19,9 +18,9 @@ class CDataGenerator : public CScheduleable
 private:
     IBaseSim* mSim;
 
-    std::unique_ptr<IValueGenerator> mNumFilesRNG;
-    std::unique_ptr<IValueGenerator> mFileSizeRNG;
-    std::unique_ptr<IValueGenerator> mFileLifetimeRNG;
+    std::unique_ptr<IValueGenerator> mNumFilesGen;
+    std::unique_ptr<IValueGenerator> mFileSizeGen;
+    std::unique_ptr<IValueGenerator> mFileLifetimeGen;
 
     TickType mTickFreq;
 

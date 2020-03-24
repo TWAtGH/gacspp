@@ -27,8 +27,7 @@
                 "type": "normal",
                 "mean": 2.02,
                 "stddev": 0.25,
-                "min": 0.01,
-                "max": 10
+                "minCfg": {"type": "minAdd", "limit": 0.05}
             },
             "lifetimeCfg": {
                 "type": "fixed",
@@ -48,8 +47,7 @@
                 "type": "normal",
                 "mean": 2.02,
                 "stddev": 0.25,
-                "min": 0.01,
-                "max": 10
+                "minCfg": {"type": "minAdd", "limit": 0.05}
             },
             "lifetimeCfg": {
                 "type": "fixed",
@@ -66,13 +64,13 @@
     {
         "manager": {
             "type": "bandwidth",
-            "name": "TransferMgr",
+            "name": "Tape2DiskTransferMgr",
             "tickFreq": 20,
-            "startTick": 0
+            "startTick": 5
         },
         "generator": {
             "type": "cloudBuffer",
-            "name": "TransferGen",
+            "name": "Tape2DiskTransferGen",
             "tickFreq": 20,
             "startTick": 0,
             "readNewSrcReplicas": true,
@@ -98,6 +96,52 @@
                         "lambda": 15,
                         "minCfg": {"type": "minClip", "limit": 1},
                         "maxCfg": {"type": "maxModulo", "limit": 30}
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "manager": {
+            "type": "bandwidth",
+            "name": "JobIOTransferMgr",
+            "tickFreq": 20,
+            "startTick": 5
+        },
+        "generator": {
+            "type": "jobIO",
+            "name": "JobIOTransferGen",
+            "tickFreq": 20,
+            "startTick": 0,
+            "infos": [
+                {
+                    "cloudStorageElement": "google_eu",
+                    "diskStorageElement": "CERN-PROD_DATADISK",
+                    "cpuStorageElement": "CERN-PROD_CPU",
+                    "outputStorageElement": "CERN-PROD_OUTPUT",
+                    "numCores": 30000,
+                    "coreFillRate": 250,
+                    "jobDurationCfg": {
+                        "type": "normal",
+                        "mean": 5,
+                        "stddev": 0.25,
+                        "minCfg": {"type": "minClip", "limit": 1},
+                        "maxCfg": {"type": "maxClip", "limit": 30}
+                    }
+                },
+                {
+                    "cloudStorageElement": "google_eu",
+                    "diskStorageElement": "UKI-NORTHGRID-MAN-HEP_DATADISK",
+                    "cpuStorageElement": "UKI-NORTHGRID-MAN-HEP_CPU",
+                    "outputStorageElement": "UKI-NORTHGRID-MAN-HEP_OUTPUT",
+                    "numCores": 20000,
+                    "coreFillRate": 250,
+                    "jobDurationCfg": {
+                        "type": "normal",
+                        "mean": 5,
+                        "stddev": 0.25,
+                        "minCfg": {"type": "minClip", "limit": 1},
+                        "maxCfg": {"type": "maxClip", "limit": 30}
                     }
                 }
             ]

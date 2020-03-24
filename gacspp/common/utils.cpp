@@ -52,7 +52,7 @@ auto IValueLimiter::GetLimitValue() const -> double
 
 auto CMinAddLimiter::GetLimited(double value) const -> double
 {
-    return (mLimit + value);
+    return (mLimit + std::abs(value));
 }
 
 

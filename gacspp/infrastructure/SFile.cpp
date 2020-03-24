@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "CStorageElement.hpp"
 #include "SFile.hpp"
 
@@ -20,6 +22,7 @@ void SFile::Remove(const TickType now)
         replica->OnRemoveByFile(now);
     mReplicas.clear();
 }
+
 void SFile::RemoveReplica(const TickType now, const std::shared_ptr<SReplica>& replica)
 {
     std::size_t idx = 0;
@@ -35,6 +38,7 @@ void SFile::RemoveReplica(const TickType now, const std::shared_ptr<SReplica>& r
     }
     assert(false);
 }
+
 auto SFile::RemoveExpiredReplicas(const TickType now) -> std::size_t
 {
     const std::size_t numReplicas = mReplicas.size();
@@ -137,6 +141,7 @@ auto SFile::GetReplicaByStorageElement(const CStorageElement* storageElement) ->
             return replica;
     return std::shared_ptr<SReplica>();
 }
+
 
 
 SReplica::SReplica(std::shared_ptr<SFile>& file, CStorageElement* const storageElement, const TickType createdAt, const std::size_t indexAtStorageElement)

@@ -1,4 +1,5 @@
 #include <cassert>
+#include <iostream>
 
 #include "TransferGenerators.hpp"
 #include "TransferManager.hpp"
@@ -148,18 +149,19 @@ void CCloudBufferTransferGen::OnReplicaCreated(const TickType now, std::shared_p
         if(replica->GetStorageElement() == info->mPrimaryLink->GetSrcStorageElement())
         {
             const std::uint32_t numReusages = info->mReusageNumGen->GetValue(mSim->mRNGEngine);
-            std::forward_list<std::pair<std::uint32_t, std::shared_ptr<SReplica>>>& replicaInfo = info->mReplicaInfo;
-            auto prev = replicaInfo.before_begin();
-            auto cur = replicaInfo.begin();
-            while(cur != replicaInfo.end())
+            replica->GetFile()->mPopularity = numReusages;
+            std::forward_list<std::shared_ptr<SReplica>>& replicas = info->mReplicas;
+            auto prev = replicas.before_begin();
+            auto cur = replicas.begin();
+            while(cur != replicas.end())
             {
-                if(cur->first >= numReusages)
+                if((*cur)->GetFile()->mPopularity >= numReusages)
                     break;
 
                 prev = cur;
                 cur++;
             }
-            replicaInfo.insert_after(prev, std::make_pair(numReusages, replica));
+            replicas.insert_after(prev, replica);
             return;
         }
     }
@@ -181,12 +183,30 @@ void CCloudBufferTransferGen::OnUpdate(const TickType now)
     {
         CNetworkLink* networkLink = info->mPrimaryLink;
         CStorageElement* dstStorageElement = networkLink->GetDstStorageElement();
-        std::forward_list<std::pair<std::uint32_t, std::shared_ptr<SReplica>>>& replicaInfo = info->mReplicaInfo;
-        auto prev = replicaInfo.before_begin();
-        auto cur = replicaInfo.begin();
-        while(cur != replicaInfo.end())
+        std::forward_list<std::shared_ptr<SReplica>>& replicas = info->mReplicas;
+        auto prev = replicas.before_begin();
+        auto cur = replicas.begin();
+        while(cur != replicas.end())
         {
-            std::shared_ptr<SReplica>& srcReplica = cur->second;
+            std::shared_ptr<SReplica> srcReplica = (*cur);
+            if(!srcReplica->GetFile())
+            {
+                std::cout<<srcReplica->GetStorageElement()->GetName()<<std::endl;
+                std::cout<<srcReplica->GetId()<<std::endl;
+                std::cout<<"checking!"<<std::endl;
+                for(const auto& f : mSim->mRucio->mFiles)
+                {
+                    if(f->GetId() == 23)
+                    {
+                        std::cout<<f.use_count()<<std::endl;
+                        std::cout<<f->mReplicas.size()<<std::endl;
+                        for(const auto& r : f->mReplicas)
+                            std::cout<<r->GetId()<<std::endl;
+                    }
+                }
+                std::cout<<"found?"<<std::endl;
+
+            }
             if(!srcReplica->IsComplete())
             {
                 //handle this case better
@@ -197,13 +217,13 @@ void CCloudBufferTransferGen::OnUpdate(const TickType now)
                 continue;
             }
 
-                if(networkLink->mNumActiveTransfers < networkLink->mMaxNumActiveTransfers)
+            if(networkLink->mNumActiveTransfers < networkLink->mMaxNumActiveTransfers)
+            {
+                std::shared_ptr<SFile> file = srcReplica->GetFile();
+                std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(file, now);
+                if(!newReplica && info->mSecondaryLink)
                 {
-                    std::shared_ptr<SFile> file = srcReplica->GetFile();
-                    std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(file, now);
-                    if(!newReplica && info->mSecondaryLink)
-                    {
-                        networkLink = info->mSecondaryLink;
+                    networkLink = info->mSecondaryLink;
                     if(networkLink->mNumActiveTransfers < networkLink->mMaxNumActiveTransfers)
                     {
                         dstStorageElement = networkLink->GetDstStorageElement();
@@ -211,16 +231,16 @@ void CCloudBufferTransferGen::OnUpdate(const TickType now)
                     }
                 }
 
-                    if(newReplica)
-                    {
-                        mTransferMgr->CreateTransfer(srcReplica, newReplica, now, mDeleteSrcReplica);
-                    cur = replicaInfo.erase_after(prev);
+                if(newReplica)
+                {
+                    mTransferMgr->CreateTransfer(srcReplica, newReplica, now, mDeleteSrcReplica);
+                    cur = replicas.erase_after(prev);
                     continue; //same idx again
-                    }
                 }
-
-                    break;
             }
+
+            break;
+        }
     }
 
     mNextCallTick = now + mTickFreq;
@@ -254,6 +274,173 @@ void CCloudBufferTransferGen::Shutdown(const TickType now)
         files.back()->Remove(now);
         files.pop_back();
     }
+}
+
+
+
+CJobIOTransferGen::CJobIOTransferGen(IBaseSim* sim,
+                                    std::shared_ptr<CTransferManager> transferMgr,
+                                    const TickType tickFreq,
+                                    const TickType startTick)
+    : CScheduleable(startTick),
+      mSim(sim),
+      mTransferMgr(transferMgr),
+      mTickFreq(tickFreq)
+{
+    mTraceInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Traces(id, storageElementId, fileId, replicaId, type, startedAt, finishedAt, traffic) FROM STDIN with(FORMAT csv);", 8, '?');
+}
+
+void CJobIOTransferGen::OnUpdate(const TickType now)
+{
+    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
+    
+    assert(now >= mLastUpdateTime);
+    const TickType tDelta = now - mLastUpdateTime;
+    mLastUpdateTime = now;
+    std::unique_ptr<IInsertValuesContainer> traceInsertQueries = mTraceInsertQuery->CreateValuesContainer(800);
+    for(SSiteInfo& siteInfo : mSiteInfos)
+    {
+        std::list<SJobInfo>& jobInfos = siteInfo.mJobInfos;
+        CNetworkLink* const diskToCPULink = siteInfo.mDiskToCPULink;
+        CNetworkLink* const cpuToOutputLink = siteInfo.mCPUToOutputLink;
+
+        const SpaceType bytesDownloaded = (diskToCPULink->mBandwidthBytesPerSecond / (double)(diskToCPULink->mNumActiveTransfers+1)) * tDelta;
+        const SpaceType bytesUploaded = (cpuToOutputLink->mBandwidthBytesPerSecond / (double)(cpuToOutputLink->mNumActiveTransfers+1)) * tDelta;
+
+        auto jobInfoIt = jobInfos.begin();
+        while(jobInfoIt != jobInfos.end())
+        {
+            std::shared_ptr<SFile>& inputFile = jobInfoIt->mInputFile;
+            std::shared_ptr<SReplica>& outputReplica = jobInfoIt->mOutputReplica;
+            if(jobInfoIt->mCurInputFileSize < inputFile->GetSize())
+            {
+                //update download
+                if(jobInfoIt->mCurInputFileSize == 0)
+                {
+                    jobInfoIt->mCurInputFileSize += 1;
+                    jobInfoIt->mStartedAt = now;
+                    diskToCPULink->mNumActiveTransfers += 1;
+                }
+
+                SpaceType newSize = jobInfoIt->mCurInputFileSize + bytesDownloaded;
+                if(newSize >= inputFile->GetSize())
+                {
+                    newSize = inputFile->GetSize();
+                    diskToCPULink->mUsedTraffic += newSize - jobInfoIt->mCurInputFileSize;
+                    diskToCPULink->mNumActiveTransfers -= 1;
+                    diskToCPULink->mNumDoneTransfers += 1;
+
+                    traceInsertQueries->AddValue(GetNewId());
+                    traceInsertQueries->AddValue(diskToCPULink->GetSrcStorageElement()->GetId());
+                    traceInsertQueries->AddValue(inputFile->GetId());
+                    //ensure src replica stays available
+                    IdType srcReplicaId = inputFile->GetReplicaByStorageElement(diskToCPULink->GetSrcStorageElement())->GetId();
+                    traceInsertQueries->AddValue(srcReplicaId);
+                    traceInsertQueries->AddValue(0);
+                    traceInsertQueries->AddValue(jobInfoIt->mStartedAt);
+                    traceInsertQueries->AddValue(now);
+                    traceInsertQueries->AddValue(inputFile->GetSize());
+
+                    jobInfoIt->mStartedAt = now;
+                    jobInfoIt->mFinishedAt = now + siteInfo.mJobDurationGen->GetValue(mSim->mRNGEngine);
+                }
+                else
+                    diskToCPULink->mUsedTraffic += bytesDownloaded;
+                
+                jobInfoIt->mCurInputFileSize = newSize;
+            }
+            else if(!outputReplica && (now >= jobInfoIt->mFinishedAt))
+            {
+                //create upload
+                //todo: consider cpuToOutputLink->mMaxNumActiveTransfers
+                std::shared_ptr<SFile> outputFile = mSim->mRucio->CreateFile(ONE_MiB, now, SECONDS_PER_MONTH*6);
+                outputReplica = cpuToOutputLink->GetDstStorageElement()->CreateReplica(outputFile, now);
+                assert(outputReplica);
+            }
+            else if(outputReplica)
+            {
+                //update upload
+                const SpaceType amount = outputReplica->Increase(bytesUploaded, now);
+                cpuToOutputLink->mUsedTraffic += amount;
+
+                if(outputReplica->IsComplete())
+                {
+                    cpuToOutputLink->mNumActiveTransfers -= 1;
+                    cpuToOutputLink->mNumDoneTransfers += 1;
+
+                    traceInsertQueries->AddValue(GetNewId());
+                    traceInsertQueries->AddValue(outputReplica->GetStorageElement()->GetId());
+                    traceInsertQueries->AddValue(outputReplica->GetFile()->GetId());
+                    traceInsertQueries->AddValue(outputReplica->GetId());
+                    traceInsertQueries->AddValue(1);
+                    traceInsertQueries->AddValue(jobInfoIt->mFinishedAt);
+                    traceInsertQueries->AddValue(now);
+                    traceInsertQueries->AddValue(outputReplica->GetFile()->GetSize());
+
+                    std::shared_ptr<SReplica> inputSrcReplica = inputFile->GetReplicaByStorageElement(diskToCPULink->GetSrcStorageElement());
+                    assert(inputSrcReplica);
+                    if(inputSrcReplica->mNumStagedIn >= inputFile->mPopularity)
+                        inputFile->RemoveReplica(now, inputSrcReplica); //inputSrcReplica could still be in use by disk -> CPU
+
+                    jobInfoIt = jobInfos.erase(jobInfoIt);
+                    continue;
+                }
+            }
+            jobInfoIt++;
+        }
+
+        assert(siteInfo.mNumCores >= jobInfos.size());
+
+        std::size_t numJobsToCreate = std::min(siteInfo.mNumCores - jobInfos.size(), siteInfo.mCoreFillRate);
+        std::vector<std::shared_ptr<SReplica>>& replicas = diskToCPULink->GetSrcStorageElement()->mReplicas;
+        for(std::shared_ptr<SReplica>& replica : replicas) // consider staging in the same replica multiple times
+        {
+            if(numJobsToCreate == 0)
+                break;
+            if(!replica->IsComplete())
+                continue;
+            if(replica->mNumStagedIn >= replica->GetFile()->mPopularity)
+                continue;
+            
+            SJobInfo& newJobInfo = jobInfos.emplace_front();
+            newJobInfo.mInputFile = replica->GetFile();
+            
+            replica->mNumStagedIn += 1;
+            numJobsToCreate -= 1;
+        }
+
+        if(diskToCPULink->GetSrcStorageElement()->GetUsedStorageQuotaRatio() <= 0.5)
+        {
+            std::size_t numTransfers = (diskToCPULink->mMaxNumActiveTransfers - diskToCPULink->mNumActiveTransfers) / 2.0;
+            for(std::shared_ptr<SReplica>& replica : siteInfo.mCloudToDiskLink->GetSrcStorageElement()->mReplicas)
+            {
+                if(numTransfers == 0)
+                    break;
+                if(!replica->IsComplete())
+                    continue;
+
+                std::shared_ptr<SFile> file = replica->GetFile();
+                bool exists = false;
+                for(SSiteInfo& siteInfoCheck : mSiteInfos)
+                {
+                    if(file->GetReplicaByStorageElement(siteInfoCheck.mDiskToCPULink->GetSrcStorageElement()))
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+                if(exists)
+                    continue;
+                
+                std::shared_ptr<SReplica> newReplica = diskToCPULink->GetSrcStorageElement()->CreateReplica(file, now);
+                assert(newReplica);
+                mTransferMgr->CreateTransfer(replica, newReplica, now, true);
+                numTransfers -= 1;
+            }
+        }
+    }
+    COutput::GetRef().QueueInserts(std::move(traceInsertQueries));
+    mNextCallTick = now + mTickFreq;
 }
 
 

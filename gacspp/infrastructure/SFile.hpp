@@ -12,11 +12,6 @@ struct SReplica;
 struct SFile
 {
     SFile(const SpaceType size, const TickType createdAt, const TickType lifetime);
-    SFile(SFile&&) = default;
-    SFile& operator=(SFile&&) = default;
-
-    SFile(SFile const&) = delete;
-    SFile& operator=(SFile const&) = delete;
 
     void Remove(const TickType now);
     void RemoveReplica(const TickType now, const std::shared_ptr<SReplica>& replica);
@@ -37,6 +32,8 @@ struct SFile
     std::vector<std::shared_ptr<SReplica>> mReplicas;
     TickType mExpiresAt;
 
+    std::uint32_t mPopularity = 1; //workaroung: to be removed
+
 private:
     IdType mId;
     TickType mCreatedAt;
@@ -46,12 +43,6 @@ private:
 struct SReplica
 {
     SReplica(std::shared_ptr<SFile>& file, CStorageElement* const storageElement, const TickType createdAt, const std::size_t indexAtStorageElement);
-
-    SReplica(SReplica&&) = default;
-    SReplica& operator=(SReplica&&) = default;
-
-    SReplica(SReplica const&) = delete;
-    SReplica& operator=(SReplica const&) = delete;
 
     auto Increase(const SpaceType amount, const TickType now) -> SpaceType;
     void OnRemoveByFile(const TickType now);
@@ -78,6 +69,8 @@ struct SReplica
     std::size_t mIndexAtStorageElement;
     TickType mExpiresAt;
 
+    std::uint32_t mNumStagedIn = 0; //workaroung: to be removed
+    
 private:
     IdType mId;
     TickType mCreatedAt;

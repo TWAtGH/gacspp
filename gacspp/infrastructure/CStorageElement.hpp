@@ -48,6 +48,9 @@ public:
     inline auto GetSite() -> ISite*
     {return mSite;}
 
+    auto GetUsedStorage() const -> SpaceType;
+    auto GetUsedStorageQuotaRatio() const -> double;
+
     auto GetNetworkLink(const CStorageElement* const dstStorageElement) -> CNetworkLink*;
     auto GetNetworkLink(const CStorageElement* const dstStorageElement) const -> const CNetworkLink*;
 
@@ -90,8 +93,10 @@ public:
 
     inline auto GetStorageElement() -> CStorageElement*
     {return mStorageElement;}
-    inline auto GetUsedStorage() -> SpaceType
+    inline auto GetUsedStorage() const -> SpaceType
     {return mUsedStorage;}
+    inline auto GetUsedStorageQuotaRatio() const -> double
+    {return (mQuota > 0) ? static_cast<double>(mUsedStorage) / mQuota : 0;}
 
 protected:
     CStorageElement *mStorageElement;

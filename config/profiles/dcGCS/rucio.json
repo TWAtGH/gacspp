@@ -16,10 +16,14 @@
                 {
                     "name": "CERN-PROD_DATADISK",
                     "allowDuplicateReplicas": false,
-                    "quota": 1e+15
+                    "quota": 5e+14
                 },
                 {
                     "name": "CERN-PROD_CPU",
+                    "allowDuplicateReplicas": true
+                },
+                {
+                    "name": "CERN-PROD_OUTPUT",
                     "allowDuplicateReplicas": true
                 }
             ]
@@ -37,10 +41,14 @@
                 {
                     "name": "UKI-NORTHGRID-MAN-HEP_DATADISK",
                     "allowDuplicateReplicas": false,
-                    "quota": 1e+15
+                    "quota": 5e+14
                 },
                 {
                     "name": "UKI-NORTHGRID-MAN-HEP_CPU",
+                    "allowDuplicateReplicas": true
+                },
+                {
+                    "name": "UKI-NORTHGRID-MAN-HEP_OUTPUT",
                     "allowDuplicateReplicas": true
                 }
             ]

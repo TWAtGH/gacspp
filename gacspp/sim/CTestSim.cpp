@@ -34,6 +34,7 @@ bool CTestSim::SetupDefaults(const json& profileJson)
 
 
     auto heartbeat = std::make_shared<CHeartbeat>(this, static_cast<std::uint32_t>(SECONDS_PER_DAY), static_cast<TickType>(SECONDS_PER_DAY));
+    heartbeat->mName = "Heartbeat";
 
     for (const json& transferCfg : profileJson.at("transferCfgs"))
     {
@@ -55,20 +56,29 @@ bool CTestSim::SetupDefaults(const json& profileJson)
             std::cout << "Failed creating transfer manager" << std::endl;
             return false;
         }
+        heartbeat->mProccessDurations[transferManager->mName] = &(transferManager->mUpdateDurationSummed);
 
         auto transferGen = std::dynamic_pointer_cast<CCloudBufferTransferGen>(CreateTransferGenerator(transferGenCfg, transferManager));
         if (!transferGen)
         {
-            std::cout << "Failed creating transfer generator" << std::endl;
-            return false;
+            auto transferGen2 = std::dynamic_pointer_cast<CJobIOTransferGen>(CreateTransferGenerator(transferGenCfg, transferManager));
+            if(!transferGen2)
+            {
+                std::cout << "Failed creating transfer generator" << std::endl;
+                return false;
+            }
+            heartbeat->mProccessDurations[transferGen2->mName] = &(transferGen2->mUpdateDurationSummed);
+            mSchedule.push(transferGen2);
+        }
+        else
+        {
+            heartbeat->mProccessDurations[transferGen->mName] = &(transferGen->mUpdateDurationSummed);
+            mSchedule.push(transferGen);
         }
 
         heartbeat->mTransferManagers.push_back(transferManager);
-        heartbeat->mProccessDurations[transferManager->mName] = &(transferManager->mUpdateDurationSummed);
-        heartbeat->mProccessDurations[transferGen->mName] = &(transferGen->mUpdateDurationSummed);
 
         mSchedule.push(transferManager);
-        mSchedule.push(transferGen);
     }
 
     std::vector<CStorageElement*> storageElements;
@@ -94,7 +104,6 @@ bool CTestSim::SetupDefaults(const json& profileJson)
             if(dataGenCfg.contains("startTick"))
                 tickFreq = dataGenCfg["startTick"].get<TickType>();
 
-
             std::unordered_map<std::string, std::unique_ptr<IValueGenerator>> jsonPropNameToValueGen;
 
             if(!dataGenCfg.contains("numFilesCfg"))
@@ -106,18 +115,7 @@ bool CTestSim::SetupDefaults(const json& profileJson)
                     continue;
 
                 const json& propJson = dataGenCfg.at(propName);
-                const std::string type = propJson.at("type").get<std::string>();
-                if(type == "normal")
-                {
-                    const double mean = propJson.at("mean");
-                    const double stddev = propJson.at("stddev");
-                    jsonPropNameToValueGen[propName] = std::make_unique<CNormalRandomValueGenerator>(mean, stddev);
-                }
-                else if(type == "fixed")
-                {
-                    const double value = propJson.at("value");
-                    jsonPropNameToValueGen[propName] = std::make_unique<CFixedValueGenerator>(value);
-                }
+                jsonPropNameToValueGen[propName] = IValueGenerator::CreateFromJson(propJson);
             }
 
             std::shared_ptr<CDataGenerator> dataGen = std::make_shared<CDataGenerator>(this,
@@ -171,7 +169,9 @@ bool CTestSim::SetupDefaults(const json& profileJson)
         reaper->mName = "DefaultReaper";
     }
 
-    mSchedule.push(std::make_shared<CBillingGenerator>(this));
+    auto billGen = std::make_shared<CBillingGenerator>(this);
+    billGen->mName = "BillingGenerator";
+    mSchedule.push(billGen);
     //mSchedule.push(reaper);
     mSchedule.push(heartbeat);
 
