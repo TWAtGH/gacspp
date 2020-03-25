@@ -102,11 +102,12 @@ private:
 public:
     struct SJobInfo
     {
+        IdType mJobId;
         TickType mStartedAt = 0;
         TickType mFinishedAt = 0;
         SpaceType mCurInputFileSize = 0;
         std::shared_ptr<SFile> mInputFile;
-        std::shared_ptr<SReplica> mOutputReplica;
+        std::vector<std::shared_ptr<SReplica>> mOutputReplicas;
     };
     struct SSiteInfo
     {
@@ -114,6 +115,8 @@ public:
         CNetworkLink* mDiskToCPULink;
         CNetworkLink* mCPUToOutputLink;
         std::unique_ptr<IValueGenerator> mJobDurationGen;
+        std::unique_ptr<IValueGenerator> mNumOutputGen;
+        std::unique_ptr<IValueGenerator> mOutputSizeGen;
         std::size_t mNumCores;
         std::size_t mCoreFillRate;
         std::list<SJobInfo> mJobInfos;

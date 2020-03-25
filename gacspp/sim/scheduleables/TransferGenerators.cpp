@@ -18,7 +18,7 @@
 
 CBaseOnDeletionInsert::CBaseOnDeletionInsert()
 {
-    mFileInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Files(id, createdAt, expiredAt, filesize) FROM STDIN with(FORMAT csv);", 4, '?');
+    mFileInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Files(id, createdAt, expiredAt, filesize, popularity) FROM STDIN with(FORMAT csv);", 5, '?');
     mReplicaInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Replicas(id, fileId, storageElementId, createdAt, expiredAt) FROM STDIN with(FORMAT csv);", 5, '?');
 }
 
@@ -46,6 +46,7 @@ void CBaseOnDeletionInsert::AddFileDeletes(const std::vector<std::weak_ptr<SFile
         mFileValueContainer->AddValue(file->GetCreatedAt());
         mFileValueContainer->AddValue(file->mExpiresAt);
         mFileValueContainer->AddValue(file->GetSize());
+        mFileValueContainer->AddValue(file->mPopularity);
     }
 }
 
@@ -189,24 +190,6 @@ void CCloudBufferTransferGen::OnUpdate(const TickType now)
         while(cur != replicas.end())
         {
             std::shared_ptr<SReplica> srcReplica = (*cur);
-            if(!srcReplica->GetFile())
-            {
-                std::cout<<srcReplica->GetStorageElement()->GetName()<<std::endl;
-                std::cout<<srcReplica->GetId()<<std::endl;
-                std::cout<<"checking!"<<std::endl;
-                for(const auto& f : mSim->mRucio->mFiles)
-                {
-                    if(f->GetId() == 23)
-                    {
-                        std::cout<<f.use_count()<<std::endl;
-                        std::cout<<f->mReplicas.size()<<std::endl;
-                        for(const auto& r : f->mReplicas)
-                            std::cout<<r->GetId()<<std::endl;
-                    }
-                }
-                std::cout<<"found?"<<std::endl;
-
-            }
             if(!srcReplica->IsComplete())
             {
                 //handle this case better
@@ -287,7 +270,7 @@ CJobIOTransferGen::CJobIOTransferGen(IBaseSim* sim,
       mTransferMgr(transferMgr),
       mTickFreq(tickFreq)
 {
-    mTraceInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Traces(id, storageElementId, fileId, replicaId, type, startedAt, finishedAt, traffic) FROM STDIN with(FORMAT csv);", 8, '?');
+    mTraceInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Traces(id, jobId, storageElementId, fileId, replicaId, type, startedAt, finishedAt, traffic) FROM STDIN with(FORMAT csv);", 9, '?');
 }
 
 void CJobIOTransferGen::OnUpdate(const TickType now)
@@ -295,6 +278,7 @@ void CJobIOTransferGen::OnUpdate(const TickType now)
     CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
     
     assert(now >= mLastUpdateTime);
+    RNGEngineType& rngEngine = mSim->mRNGEngine;
     const TickType tDelta = now - mLastUpdateTime;
     mLastUpdateTime = now;
     std::unique_ptr<IInsertValuesContainer> traceInsertQueries = mTraceInsertQuery->CreateValuesContainer(800);
@@ -304,14 +288,14 @@ void CJobIOTransferGen::OnUpdate(const TickType now)
         CNetworkLink* const diskToCPULink = siteInfo.mDiskToCPULink;
         CNetworkLink* const cpuToOutputLink = siteInfo.mCPUToOutputLink;
 
+        //should firstly update all mNumActiveTransfers and then calculate bytesDownloaded/uploaded
         const SpaceType bytesDownloaded = (diskToCPULink->mBandwidthBytesPerSecond / (double)(diskToCPULink->mNumActiveTransfers+1)) * tDelta;
-        const SpaceType bytesUploaded = (cpuToOutputLink->mBandwidthBytesPerSecond / (double)(cpuToOutputLink->mNumActiveTransfers+1)) * tDelta;
 
         auto jobInfoIt = jobInfos.begin();
         while(jobInfoIt != jobInfos.end())
         {
             std::shared_ptr<SFile>& inputFile = jobInfoIt->mInputFile;
-            std::shared_ptr<SReplica>& outputReplica = jobInfoIt->mOutputReplica;
+            std::vector<std::shared_ptr<SReplica>>& outputReplicas = jobInfoIt->mOutputReplicas;
             if(jobInfoIt->mCurInputFileSize < inputFile->GetSize())
             {
                 //update download
@@ -331,6 +315,7 @@ void CJobIOTransferGen::OnUpdate(const TickType now)
                     diskToCPULink->mNumDoneTransfers += 1;
 
                     traceInsertQueries->AddValue(GetNewId());
+                    traceInsertQueries->AddValue(jobInfoIt->mJobId);
                     traceInsertQueries->AddValue(diskToCPULink->GetSrcStorageElement()->GetId());
                     traceInsertQueries->AddValue(inputFile->GetId());
                     //ensure src replica stays available
@@ -342,46 +327,68 @@ void CJobIOTransferGen::OnUpdate(const TickType now)
                     traceInsertQueries->AddValue(inputFile->GetSize());
 
                     jobInfoIt->mStartedAt = now;
-                    jobInfoIt->mFinishedAt = now + siteInfo.mJobDurationGen->GetValue(mSim->mRNGEngine);
+                    jobInfoIt->mFinishedAt = now + siteInfo.mJobDurationGen->GetValue(rngEngine);
                 }
                 else
                     diskToCPULink->mUsedTraffic += bytesDownloaded;
                 
                 jobInfoIt->mCurInputFileSize = newSize;
             }
-            else if(!outputReplica && (now >= jobInfoIt->mFinishedAt))
+            else if(outputReplicas.empty() && (now >= jobInfoIt->mFinishedAt))
             {
                 //create upload
                 //todo: consider cpuToOutputLink->mMaxNumActiveTransfers
-                std::shared_ptr<SFile> outputFile = mSim->mRucio->CreateFile(ONE_MiB, now, SECONDS_PER_MONTH*6);
-                outputReplica = cpuToOutputLink->GetDstStorageElement()->CreateReplica(outputFile, now);
-                assert(outputReplica);
-            }
-            else if(outputReplica)
-            {
-                //update upload
-                const SpaceType amount = outputReplica->Increase(bytesUploaded, now);
-                cpuToOutputLink->mUsedTraffic += amount;
-
-                if(outputReplica->IsComplete())
+                std::size_t numOutputReplicas = siteInfo.mNumOutputGen->GetValue(rngEngine);
+                for(;numOutputReplicas>0; --numOutputReplicas)
                 {
-                    cpuToOutputLink->mNumActiveTransfers -= 1;
-                    cpuToOutputLink->mNumDoneTransfers += 1;
+                    SpaceType size = siteInfo.mOutputSizeGen->GetValue(rngEngine);
+                    std::shared_ptr<SFile> outputFile = mSim->mRucio->CreateFile(size, now, SECONDS_PER_MONTH*6);
+                    outputReplicas.emplace_back(cpuToOutputLink->GetDstStorageElement()->CreateReplica(outputFile, now));
+                    assert(outputReplicas.back());
+                }
+            }
+            else if(!outputReplicas.empty())
+            {
+                //update uploads
+                const SpaceType bytesUploaded = (cpuToOutputLink->mBandwidthBytesPerSecond / (double)(cpuToOutputLink->mNumActiveTransfers+1)) * tDelta;
+                std::size_t idx = 0;
+                while ( idx < outputReplicas.size() )
+                {
+                    std::shared_ptr<SReplica>& outputReplica = outputReplicas[idx];
+                    
+                    const SpaceType amount = outputReplica->Increase(bytesUploaded, now);
+                    cpuToOutputLink->mUsedTraffic += amount;
 
-                    traceInsertQueries->AddValue(GetNewId());
-                    traceInsertQueries->AddValue(outputReplica->GetStorageElement()->GetId());
-                    traceInsertQueries->AddValue(outputReplica->GetFile()->GetId());
-                    traceInsertQueries->AddValue(outputReplica->GetId());
-                    traceInsertQueries->AddValue(1);
-                    traceInsertQueries->AddValue(jobInfoIt->mFinishedAt);
-                    traceInsertQueries->AddValue(now);
-                    traceInsertQueries->AddValue(outputReplica->GetFile()->GetSize());
+                    if(outputReplica->IsComplete())
+                    {
+                        cpuToOutputLink->mNumActiveTransfers -= 1;
+                        cpuToOutputLink->mNumDoneTransfers += 1;
 
+                        traceInsertQueries->AddValue(GetNewId());
+                        traceInsertQueries->AddValue(jobInfoIt->mJobId);
+                        traceInsertQueries->AddValue(outputReplica->GetStorageElement()->GetId());
+                        traceInsertQueries->AddValue(outputReplica->GetFile()->GetId());
+                        traceInsertQueries->AddValue(outputReplica->GetId());
+                        traceInsertQueries->AddValue(1);
+                        traceInsertQueries->AddValue(jobInfoIt->mFinishedAt);
+                        traceInsertQueries->AddValue(now);
+                        traceInsertQueries->AddValue(outputReplica->GetFile()->GetSize());
+
+                        outputReplica = std::move(outputReplicas.back());
+                        outputReplicas.pop_back();
+
+                        continue;
+                    }
+                    ++idx;
+                }
+
+                if(outputReplicas.empty())
+                {
                     std::shared_ptr<SReplica> inputSrcReplica = inputFile->GetReplicaByStorageElement(diskToCPULink->GetSrcStorageElement());
                     assert(inputSrcReplica);
                     if(inputSrcReplica->mNumStagedIn >= inputFile->mPopularity)
                         inputFile->RemoveReplica(now, inputSrcReplica); //inputSrcReplica could still be in use by disk -> CPU
-
+                    
                     jobInfoIt = jobInfos.erase(jobInfoIt);
                     continue;
                 }
@@ -403,6 +410,7 @@ void CJobIOTransferGen::OnUpdate(const TickType now)
                 continue;
             
             SJobInfo& newJobInfo = jobInfos.emplace_front();
+            newJobInfo.mJobId = GetNewId();
             newJobInfo.mInputFile = replica->GetFile();
             
             replica->mNumStagedIn += 1;

@@ -49,8 +49,8 @@ void  CDataGenerator::CreateFilesAndReplicas(const std::uint32_t numFiles, const
     std::uniform_int_distribution<std::uint32_t> rngSampler(0, numStorageElements);
     for(std::uint32_t i = 0; i < numFiles; ++i)
     {
-        const SpaceType fileSize = GiB_TO_BYTES(static_cast<SpaceType>(mFileSizeGen->GetValue(mSim->mRNGEngine)));
-        const TickType lifetime = DAYS_TO_SECONDS(static_cast<TickType>(mFileLifetimeGen->GetValue(mSim->mRNGEngine)));
+        const SpaceType fileSize = static_cast<SpaceType>(GiB_TO_BYTES(mFileSizeGen->GetValue(mSim->mRNGEngine)));
+        const TickType lifetime = static_cast<TickType>(DAYS_TO_SECONDS(mFileLifetimeGen->GetValue(mSim->mRNGEngine)));
 
         std::shared_ptr<SFile> file = mSim->mRucio->CreateFile(fileSize, now, lifetime);
 

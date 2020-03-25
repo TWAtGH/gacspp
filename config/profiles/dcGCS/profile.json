@@ -74,7 +74,7 @@
             "tickFreq": 20,
             "startTick": 0,
             "readNewSrcReplicas": true,
-            "deleteSrcReplica": true,
+            "deleteSrcReplica": false,
             "infos": [
                 {
                     "srcStorageElement": "CERN-PROD_DATATAPE",
@@ -127,6 +127,19 @@
                         "stddev": 0.25,
                         "minCfg": {"type": "minClip", "limit": 1},
                         "maxCfg": {"type": "maxClip", "limit": 30}
+                    },
+                    "numOutputCfg": {
+                        "type": "normal",
+                        "mean": 3,
+                        "stddev": 0.3,
+                        "minCfg": {"type": "minAdd", "limit": 1},
+                        "maxCfg": {"type": "maxModulo", "limit": 8}
+                    },
+                    "outputSizeCfg": {
+                        "type": "normal",
+                        "mean": 0.1,
+                        "stddev": 0.4,
+                        "minCfg": {"type": "minAdd", "limit": 0.01}
                     }
                 },
                 {
@@ -142,6 +155,19 @@
                         "stddev": 0.25,
                         "minCfg": {"type": "minClip", "limit": 1},
                         "maxCfg": {"type": "maxClip", "limit": 30}
+                    },
+                    "numOutputCfg": {
+                        "type": "normal",
+                        "mean": 3,
+                        "stddev": 0.3,
+                        "minCfg": {"type": "minAdd", "limit": 1},
+                        "maxCfg": {"type": "maxModulo", "limit": 8}
+                    },
+                    "outputSizeCfg": {
+                        "type": "normal",
+                        "mean": 0.1,
+                        "stddev": 0.4,
+                        "minCfg": {"type": "minAdd", "limit": 0.01}
                     }
                 }
             ]

@@ -414,7 +414,7 @@ auto CDefaultBaseSim::CreateTransferGenerator(const json& transferGenCfg, const 
             for(const json& infoJson : transferGenCfg.at("infos"))
             {
                 auto info = std::make_unique<CCloudBufferTransferGen::STransferGenInfo>();
-                info->mReusageNumGen = std::move(IValueGenerator::CreateFromJson(infoJson.at("reusageNumCfg")));
+                info->mReusageNumGen = IValueGenerator::CreateFromJson(infoJson.at("reusageNumCfg"));
                 std::string name = infoJson.at("srcStorageElement").get<std::string>();
                 CStorageElement* srcStorageElement = GetStorageElementByName(name);
                 if(!srcStorageElement)
@@ -490,7 +490,9 @@ auto CDefaultBaseSim::CreateTransferGenerator(const json& transferGenCfg, const 
                 
                 info.mNumCores = infoJson.at("numCores").get<std::size_t>();
                 info.mCoreFillRate = infoJson.at("coreFillRate").get<std::size_t>();
-                info.mJobDurationGen = std::move(IValueGenerator::CreateFromJson(infoJson.at("jobDurationCfg")));
+                info.mJobDurationGen = IValueGenerator::CreateFromJson(infoJson.at("jobDurationCfg"));
+                info.mNumOutputGen = IValueGenerator::CreateFromJson(infoJson.at("numOutputCfg"));
+                info.mOutputSizeGen = IValueGenerator::CreateFromJson(infoJson.at("outputSizeCfg"));
 
                 std::string name = infoJson.at("cloudStorageElement").get<std::string>();
                 CStorageElement* cloudStorageElement = GetStorageElementByName(name);

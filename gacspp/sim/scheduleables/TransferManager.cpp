@@ -180,8 +180,8 @@ void CTransferManager::OnUpdate(const TickType now)
     const std::uint32_t timeDiff = static_cast<std::uint32_t>(now - mLastUpdated);
     mLastUpdated = now;
 
-
-    for (std::size_t i = 0; i < mQueuedTransfers.size(); ++i)
+    std::size_t i = 0;
+    while(i < mQueuedTransfers.size())
     {
         if (mQueuedTransfers[i].mStartAt <= now)
         {
@@ -190,6 +190,8 @@ void CTransferManager::OnUpdate(const TickType now)
             mQueuedTransfers[i] = std::move(mQueuedTransfers.back());
             mQueuedTransfers.pop_back();
         }
+        else
+            ++i;
     }
 
     std::size_t idx = 0;
