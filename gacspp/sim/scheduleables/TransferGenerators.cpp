@@ -344,6 +344,7 @@ void CJobIOTransferGen::OnUpdate(const TickType now)
                     SpaceType size = siteInfo.mOutputSizeGen->GetValue(rngEngine);
                     std::shared_ptr<SFile> outputFile = mSim->mRucio->CreateFile(size, now, SECONDS_PER_MONTH*6);
                     outputReplicas.emplace_back(cpuToOutputLink->GetDstStorageElement()->CreateReplica(outputFile, now));
+                    cpuToOutputLink->mNumActiveTransfers += 1;
                     assert(outputReplicas.back());
                 }
             }
