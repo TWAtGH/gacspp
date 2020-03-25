@@ -6,11 +6,12 @@
 #include "common/utils.hpp"
 
 
-SFile::SFile(const SpaceType size, const TickType createdAt, const TickType lifetime)
+SFile::SFile(const SpaceType size, const TickType createdAt, const TickType lifetime, std::size_t indexAtRucio)
     : mExpiresAt(createdAt+lifetime),
       mId(GetNewId()),
       mCreatedAt(createdAt),
-      mSize(size)
+      mSize(size),
+      mIndexAtRucio(indexAtRucio)
 
 {
     mReplicas.reserve(8);

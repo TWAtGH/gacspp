@@ -375,6 +375,9 @@ void CJobIOTransferGen::OnUpdate(const TickType now)
                         traceInsertQueries->AddValue(now);
                         traceInsertQueries->AddValue(outputReplica->GetFile()->GetSize());
 
+                        //workaround to reduce memory load/file not needed after trace is stored
+                        mSim->mRucio->RemoveFile(outputReplica->GetFile(), now);
+
                         outputReplica = std::move(outputReplicas.back());
                         outputReplicas.pop_back();
 

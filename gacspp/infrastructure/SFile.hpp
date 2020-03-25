@@ -11,7 +11,7 @@ struct SReplica;
 
 struct SFile
 {
-    SFile(const SpaceType size, const TickType createdAt, const TickType lifetime);
+    SFile(const SpaceType size, const TickType createdAt, const TickType lifetime, std::size_t indexAtRucio);
 
     void Remove(const TickType now);
     void RemoveReplica(const TickType now, const std::shared_ptr<SReplica>& replica);
@@ -33,7 +33,7 @@ struct SFile
     TickType mExpiresAt;
 
     std::uint32_t mPopularity = 1; //workaroung: to be removed
-
+    std::size_t mIndexAtRucio; //another workaround
 private:
     IdType mId;
     TickType mCreatedAt;

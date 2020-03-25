@@ -252,7 +252,7 @@ CRucio::~CRucio() = default;
 
 auto CRucio::CreateFile(const SpaceType size, const TickType now, const TickType lifetime) -> std::shared_ptr<SFile>
 {
-    std::shared_ptr<SFile> newFile = std::make_shared<SFile>(size, now, lifetime);
+    std::shared_ptr<SFile> newFile = std::make_shared<SFile>(size, now, lifetime, mFiles.size());
     mFiles.emplace_back(newFile);
 
     //notify all listeners
@@ -273,6 +273,17 @@ auto CRucio::CreateFile(const SpaceType size, const TickType now, const TickType
     }
 
     return newFile;
+}
+
+void CRucio::RemoveFile(const std::shared_ptr<SFile>& file, TickType now)
+{
+    file->Remove(now);
+    if(file->mIndexAtRucio != mFiles.back()->mIndexAtRucio)
+    {
+        mFiles.back()->mIndexAtRucio = file->mIndexAtRucio;
+        mFiles[file->mIndexAtRucio] = std::move(mFiles.back());
+    }
+    mFiles.pop_back();
 }
 
 auto CRucio::CreateGridSite(std::string&& name, std::string&& locationName, const std::uint8_t multiLocationIdx) -> CGridSite*
