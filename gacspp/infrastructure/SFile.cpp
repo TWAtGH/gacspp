@@ -8,10 +8,10 @@
 
 SFile::SFile(const SpaceType size, const TickType createdAt, const TickType lifetime, std::size_t indexAtRucio)
     : mExpiresAt(createdAt+lifetime),
+      mIndexAtRucio(indexAtRucio),
       mId(GetNewId()),
       mCreatedAt(createdAt),
-      mSize(size),
-      mIndexAtRucio(indexAtRucio)
+      mSize(size)
 
 {
     mReplicas.reserve(8);

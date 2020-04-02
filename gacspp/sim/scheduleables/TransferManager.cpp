@@ -366,6 +366,7 @@ void CFixedTimeTransferManager::OnUpdate(const TickType now)
 
 void CFixedTimeTransferManager::Shutdown(const TickType now)
 {
+    (void)now;
     std::size_t numWithDst=0, numWithoutDst=0;
     SpaceType sumCurSizes=0, sumFileSizes=0;
     for(const STransfer& transfer : mQueuedTransfers)

@@ -442,6 +442,7 @@ public:
 
     void Shutdown(const TickType now)
     {
+        (void)now;
         std::size_t numQueuedStageOut = 0;
         while(!mJobBatchList.empty())
         {
@@ -507,14 +508,14 @@ bool CDeterministicSim01::SetupDefaults(const json& profileJson)
 
         transferGen = std::make_shared<CDeterministicTransferGen>(this, transferManager, fileDataFilePathTmpl, fileDataFileFirstIdx);
 
-        for(const json& storageElementName : transferGenCfg.at("diskStorageElements"))
-        {
+        //for(const json& storageElementName : transferGenCfg.at("diskStorageElements"))
+        //{
             //CStorageElement* storageElement = mRucio->GetStorageElementByName(storageElementName.get<std::string>());
             //if(storageElement)
                 //transferGen->mDiskStorageElement = storageElement;
             //else
                 //std::cout<<"Failed to find diskStorageElements: "<<storageElementName.get<std::string>()<<std::endl;
-        }
+        //}
 
         for(const json& storageElementName : transferGenCfg.at("computingStorageElements"))
         {
