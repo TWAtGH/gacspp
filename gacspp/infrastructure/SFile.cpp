@@ -8,7 +8,7 @@
 
 SFile::SFile(const SpaceType size, const TickType createdAt, const TickType lifetime, std::size_t indexAtRucio)
     : mExpiresAt(createdAt+lifetime),
-      mIndexAtRucio(indexAtRucio),
+      //mIndexAtRucio(indexAtRucio),
       mId(GetNewId()),
       mCreatedAt(createdAt),
       mSize(size)
@@ -22,6 +22,7 @@ void SFile::Remove(const TickType now)
     for(const std::shared_ptr<SReplica>& replica : mReplicas)
         replica->OnRemoveByFile(now);
     mReplicas.clear();
+    //mFlags.set(FLAG_IS_DELETED);
 }
 
 void SFile::RemoveReplica(const TickType now, const std::shared_ptr<SReplica>& replica)
@@ -165,6 +166,7 @@ auto SReplica::Increase(const SpaceType amount, const TickType now) -> SpaceType
 void SReplica::OnRemoveByFile(const TickType now)
 {
     mStorageElement->OnRemoveReplica(this, now);
+   // mFlags.set(FLAG_IS_DELETED);
 }
 
 void SReplica::ExtendExpirationTime(const TickType newExpiresAt)

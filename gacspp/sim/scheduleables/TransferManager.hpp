@@ -9,6 +9,19 @@ struct SFile;
 struct SReplica;
 
 
+class ITransferStartListener
+{
+public:
+    virtual void OnTransferStarted(const std::weak_ptr<SReplica>& srcReplica, const std::weak_ptr<SReplica>& dstReplica, CNetworkLink* networkLink) = 0;
+};
+class ITransferStopListener
+{
+public:
+    virtual void OnTransferStopped(const std::weak_ptr<SReplica>& srcReplica, const std::weak_ptr<SReplica>& dstReplica, CNetworkLink* networkLink) = 0;
+};
+
+
+
 class CBaseTransferManager : public CScheduleable
 {
 public:
@@ -19,6 +32,9 @@ public:
     TickType mSummedTransferDuration = 0;
 
     virtual auto GetNumActiveTransfers() const -> std::size_t = 0;
+
+    std::vector<std::unique_ptr<ITransferStartListener>> mStartListeners;
+    std::vector<std::unique_ptr<ITransferStopListener>> mStopListeners;
 };
 
 

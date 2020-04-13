@@ -180,21 +180,26 @@ void CTransferManager::OnUpdate(const TickType now)
     const std::uint32_t timeDiff = static_cast<std::uint32_t>(now - mLastUpdated);
     mLastUpdated = now;
 
-    std::size_t i = 0;
-    while(i < mQueuedTransfers.size())
+    const std::size_t firstNewActiveIdx = mActiveTransfers.size();
+    std::size_t idx = 0;
+    while(idx < mQueuedTransfers.size())
     {
-        if (mQueuedTransfers[i].mStartAt <= now)
+        if (mQueuedTransfers[idx].mStartAt <= now)
         {
             assert(mActiveTransfers.size() < mActiveTransfers.capacity());
-            mActiveTransfers.emplace_back(std::move(mQueuedTransfers[i]));
-            mQueuedTransfers[i] = std::move(mQueuedTransfers.back());
+            mActiveTransfers.emplace_back(std::move(mQueuedTransfers[idx]));
+            mQueuedTransfers[idx] = std::move(mQueuedTransfers.back());
             mQueuedTransfers.pop_back();
         }
         else
-            ++i;
+            ++idx;
     }
 
-    std::size_t idx = 0;
+    for(std::unique_ptr<ITransferStartListener>& listener: mStartListeners)
+        for(idx=firstNewActiveIdx; idx<mActiveTransfers.size(); ++idx)
+            listener->OnTransferStarted(mActiveTransfers[idx].mSrcReplica, mActiveTransfers[idx].mSrcReplica, mActiveTransfers[idx].mNetworkLink);
+
+    idx = 0;
     std::unique_ptr<IInsertValuesContainer> transferInsertQueries = mOutputTransferInsertQuery->CreateValuesContainer(6 + mActiveTransfers.size());
 
     while (idx < mActiveTransfers.size())
@@ -206,6 +211,9 @@ void CTransferManager::OnUpdate(const TickType now)
 
         if(!srcReplica || !dstReplica)
         {
+            for(std::unique_ptr<ITransferStopListener>& listener: mStopListeners)
+                listener->OnTransferStopped(transfer.mSrcReplica, transfer.mDstReplica, transfer.mNetworkLink);
+            
             networkLink->mNumFailedTransfers += 1;
             networkLink->mNumActiveTransfers -= 1;
             transfer = std::move(mActiveTransfers.back());
@@ -220,6 +228,9 @@ void CTransferManager::OnUpdate(const TickType now)
 
         if(dstReplica->IsComplete())
         {
+            for(std::unique_ptr<ITransferStopListener>& listener: mStopListeners)
+                listener->OnTransferStopped(transfer.mSrcReplica, transfer.mDstReplica, transfer.mNetworkLink);
+
             transferInsertQueries->AddValue(GetNewId());
             transferInsertQueries->AddValue(srcReplica->GetStorageElement()->GetId());
             transferInsertQueries->AddValue(dstReplica->GetStorageElement()->GetId());

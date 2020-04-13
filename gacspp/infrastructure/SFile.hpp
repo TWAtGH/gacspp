@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bitset>
 #include <memory>
 #include <vector>
 
@@ -33,7 +34,10 @@ struct SFile
     TickType mExpiresAt;
 
     std::uint32_t mPopularity = 1; //workaroung: to be removed
-    std::size_t mIndexAtRucio; //another workaround
+   // std::size_t mIndexAtRucio; //another workaround
+
+    //constexpr static std::size_t FLAG_IS_DELETED = 0;
+    //std::bitset<8> mFlags;
 private:
     IdType mId;
     TickType mCreatedAt;
@@ -71,6 +75,8 @@ struct SReplica
 
     std::uint32_t mNumStagedIn = 0; //workaroung: to be removed
     
+    //constexpr static std::size_t FLAG_IS_DELETED = 0;
+    //std::bitset<8> mFlags;
 private:
     IdType mId;
     TickType mCreatedAt;

@@ -277,6 +277,8 @@ auto CRucio::CreateFile(const SpaceType size, const TickType now, const TickType
 
 void CRucio::RemoveFile(const std::shared_ptr<SFile>& file, TickType now)
 {
+    assert(false);
+    /*
     file->Remove(now);
     if(file->mIndexAtRucio != mFiles.back()->mIndexAtRucio)
     {
@@ -284,6 +286,7 @@ void CRucio::RemoveFile(const std::shared_ptr<SFile>& file, TickType now)
         mFiles[file->mIndexAtRucio] = std::move(mFiles.back());
     }
     mFiles.pop_back();
+    */
 }
 
 auto CRucio::CreateGridSite(std::string&& name, std::string&& locationName, const std::uint8_t multiLocationIdx) -> CGridSite*

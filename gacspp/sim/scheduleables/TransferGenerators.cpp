@@ -275,13 +275,16 @@ CJobIOTransferGen::CJobIOTransferGen(IBaseSim* sim,
 
 void CJobIOTransferGen::OnUpdate(const TickType now)
 {
-    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
-    
     assert(now >= mLastUpdateTime);
-    RNGEngineType& rngEngine = mSim->mRNGEngine;
+
+    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
+
     const TickType tDelta = now - mLastUpdateTime;
     mLastUpdateTime = now;
+    
     std::unique_ptr<IInsertValuesContainer> traceInsertQueries = mTraceInsertQuery->CreateValuesContainer(800);
+    RNGEngineType& rngEngine = mSim->mRNGEngine;
+    
     for(SSiteInfo& siteInfo : mSiteInfos)
     {
         std::list<SJobInfo>& jobInfos = siteInfo.mJobInfos;
@@ -298,6 +301,8 @@ void CJobIOTransferGen::OnUpdate(const TickType now)
             std::vector<std::shared_ptr<SReplica>>& outputReplicas = jobInfoIt->mOutputReplicas;
             if(jobInfoIt->mCurInputFileSize < inputFile->GetSize())
             {
+                //still downloading input
+
                 //update download
                 if(jobInfoIt->mCurInputFileSize == 0)
                 {
@@ -336,6 +341,8 @@ void CJobIOTransferGen::OnUpdate(const TickType now)
             }
             else if(outputReplicas.empty() && (now >= jobInfoIt->mFinishedAt))
             {
+                //no upload created yet but job finished
+
                 //create upload
                 //todo: consider cpuToOutputLink->mMaxNumActiveTransfers
                 std::size_t numOutputReplicas = siteInfo.mNumOutputGen->GetValue(rngEngine);
@@ -375,7 +382,7 @@ void CJobIOTransferGen::OnUpdate(const TickType now)
                         traceInsertQueries->AddValue(now);
                         traceInsertQueries->AddValue(outputReplica->GetFile()->GetSize());
 
-                        //workaround to reduce memory load/file not needed after trace is stored
+                        //workaround to reduce memory load/output file not needed after trace is stored
                         mSim->mRucio->RemoveFile(outputReplica->GetFile(), now);
 
                         outputReplica = std::move(outputReplicas.back());
