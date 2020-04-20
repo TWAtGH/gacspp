@@ -110,6 +110,7 @@ private:
                     TickType queuedAt,
                     TickType startAt,
                     bool deleteSrcReplica);
+        ~STransfer();
 
         bool PreRemoveReplica(SReplica* replica, TickType now) override;
     };
@@ -118,7 +119,7 @@ private:
     std::vector<std::unique_ptr<STransfer>> mQueuedTransfers;
 
 public:
-    CTransferManager(TickType tickFreq, TickType startTick=0);
+    CTransferManager(TickType tickFreq, TickType startTick = 0);
 
     void OnUpdate(TickType now) final;
 
@@ -152,7 +153,8 @@ private:
                     CNetworkLink* networkLink,
                     TickType queuedAt,
                     TickType startAt,
-                    SpaceType increasePerTick);
+            SpaceType increasePerTick);
+        ~STransfer();
 
         bool PreRemoveReplica(SReplica* replica, TickType now) override;
     };

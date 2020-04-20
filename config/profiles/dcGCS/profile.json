@@ -1,5 +1,6 @@
 {
-"maxTick": 12960000,
+"_maxTick": 12960000,
+"maxTick": 2160000,
 "clouds": [
 		{
 			"id": "gcp",

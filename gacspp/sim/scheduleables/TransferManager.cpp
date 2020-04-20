@@ -199,6 +199,12 @@ CTransferManager::STransfer::STransfer( SReplica* srcReplica,
       mDeleteSrcReplica(deleteSrcReplica)
 {}
 
+CTransferManager::STransfer::~STransfer()
+{
+    RemoveListener(mSrcReplica, this);
+    RemoveListener(mDstReplica, this);
+}
+
 bool CTransferManager::STransfer::PreRemoveReplica(SReplica* replica, TickType now)
 {
     if (replica == mSrcReplica)
@@ -340,6 +346,12 @@ CFixedTimeTransferManager::STransfer::STransfer( SReplica* srcReplica,
       mStartAt(startAt),
       mIncreasePerTick(increasePerTick)
 {}
+
+CFixedTimeTransferManager::STransfer::~STransfer()
+{
+    RemoveListener(mSrcReplica, this);
+    RemoveListener(mDstReplica, this);
+}
 
 bool CFixedTimeTransferManager::STransfer::PreRemoveReplica(SReplica* replica, TickType now)
 {
