@@ -9,10 +9,10 @@
 #include "common/constants.h"
 #include "common/IConfigConsumer.hpp"
 
+class IRucioActionListener;
+class CReaper;
 struct SFile;
 struct SReplica;
-class CReaper;
-class IFileActionListener;
 
 
 class CGridSite : public ISite
@@ -24,7 +24,7 @@ public:
 
 
     auto CreateStorageElement(std::string&& name, bool allowDuplicateReplicas = false, SpaceType quota = 0) -> CStorageElement*;
-    void GetStorageElements(std::vector<CStorageElement*>& storageElements);
+    auto GetStorageElements() const -> std::vector<CStorageElement*> override;
 
     std::vector<std::unique_ptr<CStorageElement>> mStorageElements;
 };
@@ -35,23 +35,30 @@ class CRucio : public IConfigConsumer
 {
 private:
     std::unique_ptr<CReaper> mReaper;
+    std::vector<std::unique_ptr<SFile>> mFiles;
 
 public:
-    std::vector<std::shared_ptr<SFile>> mFiles;
     std::vector<std::unique_ptr<CGridSite>> mGridSites;
 
-    std::vector<std::weak_ptr<IFileActionListener>> mFileActionListeners;
+    std::vector<IRucioActionListener*> mActionListener;
 
     CRucio();
     ~CRucio();
 
-    auto CreateFile(const SpaceType size, const TickType now, const TickType lifetime) -> std::shared_ptr<SFile>;
-    auto CreateGridSite(std::string&& name, std::string&& locationName, const std::uint8_t multiLocationIdx) -> CGridSite*;
-    auto RunReaper(const TickType now) -> std::size_t;
+    auto CreateFile(SpaceType size, TickType now, TickType lifetime) -> SFile*;
+    
+    void RemoveFile(SFile* file, TickType now);
+    auto RemoveExpiredReplicasFromFile(SFile* file, TickType now) -> std::size_t;
+    auto ExtractExpiredReplicasFromFile(SFile* file, TickType now) -> std::vector<SReplica*>;
 
-    void RemoveFile(const std::shared_ptr<SFile>& file, TickType now);
+    auto RunReaper(TickType now)->std::size_t;
 
-    auto GetStorageElementByName(const std::string& name) -> CStorageElement*;
+    auto GetFiles() const -> const std::vector<std::unique_ptr<SFile>>&
+    {return mFiles;}
+
+    auto CreateGridSite(std::string&& name, std::string&& locationName, std::uint8_t multiLocationIdx) -> CGridSite*;
+
+    auto GetStorageElementByName(const std::string& name) const -> CStorageElement*;
 
     bool LoadConfig(const json& config) final;
 };

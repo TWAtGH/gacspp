@@ -6,7 +6,7 @@
 #include "common/utils.hpp"
 
 
-CNetworkLink::CNetworkLink(const SpaceType bandwidthBytesPerSecond, CStorageElement* const srcStorageElement, CStorageElement* const dstStorageElement)
+CNetworkLink::CNetworkLink(SpaceType bandwidthBytesPerSecond, CStorageElement* srcStorageElement, CStorageElement* dstStorageElement)
     : mId(GetNewId()),
       mSrcStorageElement(srcStorageElement),
       mDstStorageElement(dstStorageElement),

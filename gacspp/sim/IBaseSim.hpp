@@ -38,7 +38,7 @@ public:
     std::vector<std::unique_ptr<IBaseCloud>> mClouds;
 
     virtual bool SetupDefaults(const json& profileJson) = 0;
-    virtual void Run(const TickType maxTick);
+    virtual void Run(TickType maxTick);
 
     void Stop();
 

@@ -55,7 +55,7 @@ namespace gcp
     }
 
 
-    void CBucket::OnOperation(const OPERATION op)
+    void CBucket::OnOperation(OPERATION op)
     {
         CStorageElement::OnOperation(op);
         switch(op)
@@ -70,7 +70,7 @@ namespace gcp
         }
     }
 
-    void CBucket::OnIncreaseReplica(const SpaceType amount, const TickType now)
+    void CBucket::OnIncreaseReplica(SpaceType amount, TickType now)
     {
         if (now > mTimeLastCostUpdate)
         {
@@ -80,18 +80,17 @@ namespace gcp
         CStorageElement::OnIncreaseReplica(amount, now);
     }
 
-    void CBucket::OnRemoveReplica(const SReplica* replica, const TickType now, bool needLock)
+    void CBucket::RemoveReplica(SReplica* replica, TickType now, bool needLock)
     {
-        //std::unique_lock<std::mutex> lock(mReplicaRemoveMutex);
         if (now > mTimeLastCostUpdate)
         {
             mCostTracking->mStorageCosts += (BYTES_TO_GiB(mDelegate->GetUsedStorage()) * GetCurStoragePrice() * (now - mTimeLastCostUpdate)) / 1000000000.0;
             mTimeLastCostUpdate = now;
         }
-        CStorageElement::OnRemoveReplica(replica, now, needLock);
+        CStorageElement::RemoveReplica(replica, now, needLock);
     }
 
-    auto CBucket::CalculateStorageCosts(const TickType now) -> double
+    auto CBucket::CalculateStorageCosts(TickType now) -> double
     {
         if (now > mTimeLastCostUpdate)
         {
@@ -145,14 +144,16 @@ namespace gcp
         return mStorageElements.back().get();
     }
 
-    void CRegion::GetStorageElements(std::vector<CStorageElement*>& storageElements)
+    auto CRegion::GetStorageElements() const -> std::vector<CStorageElement*>
     {
-        storageElements.reserve(mStorageElements.size());
-        for (std::unique_ptr<CBucket>& bucket : mStorageElements)
+        std::vector<CStorageElement*> storageElements;
+        for (const std::unique_ptr<CBucket>& bucket : mStorageElements)
             storageElements.push_back(bucket.get());
+
+        return storageElements;
     }
 
-    double CRegion::CalculateStorageCosts(const TickType now)
+    double CRegion::CalculateStorageCosts(TickType now)
     {
         double regionStorageCosts = 0;
         for (const std::unique_ptr<CBucket>& bucket : mStorageElements)
@@ -178,7 +179,7 @@ namespace gcp
 
         for(const std::unique_ptr<CBucket>& srcBucket : mStorageElements)
         {
-            for (const std::unique_ptr<CNetworkLink>& networkLink : srcBucket->mNetworkLinks)
+            for (const std::unique_ptr<CNetworkLink>& networkLink : srcBucket->GetNetworkLinks())
             {
                 const TieredPriceType& networkPrice = mNetworkLinkIdToPrice.at(networkLink->GetId());
                 const double inGiB = BYTES_TO_GiB(networkLink->mUsedTraffic);
@@ -201,14 +202,15 @@ namespace gcp
 
     auto CCloud::CreateRegion(  std::string&& name,
                                 std::string&& locationName,
-                                const std::uint8_t multiLocationIdx) -> CRegion*
+                                std::uint8_t multiLocationIdx) -> CRegion*
     {
-        CRegion* newRegion = new CRegion(std::move(name), std::move(locationName), multiLocationIdx);
-        mRegions.emplace_back(newRegion);
-        return newRegion;
+        auto newRegion = std::make_unique<CRegion>(std::move(name), std::move(locationName), multiLocationIdx);
+        CRegion* newRegionRaw = newRegion.get();
+        mRegions.emplace_back(std::move(newRegion));
+        return newRegionRaw;
     }
 
-    auto CCloud::ProcessBilling(const TickType now) -> std::unique_ptr<ICloudBill>
+    auto CCloud::ProcessBilling(TickType now) -> std::unique_ptr<ICloudBill>
     {
         double totalStorageCosts = 0;
         double totalOperationCosts = 0;
@@ -240,7 +242,7 @@ namespace gcp
 
             for (const std::unique_ptr<CBucket>& srcBucket : srcRegion->mStorageElements)
             {
-                for (const std::unique_ptr<CNetworkLink>& networkLink : srcBucket->mNetworkLinks)
+                for (const std::unique_ptr<CNetworkLink>& networkLink : srcBucket->GetNetworkLinks())
                 {
                     const ISite* dstSite = networkLink->GetDstStorageElement()->GetSite();
                     const std::string dstRegionMultiLocationIdx = std::to_string(dstSite->GetMultiLocationIdx());

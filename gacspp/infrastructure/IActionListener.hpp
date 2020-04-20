@@ -6,21 +6,28 @@
 
 struct SFile;
 struct SReplica;
-class CStorageElement;
 
 
-class IFileActionListener
+class IRucioActionListener
 {
 public:
-    virtual void OnFileCreated(const TickType now, std::shared_ptr<SFile> file) = 0;
-    virtual void OnFilesDeleted(const TickType now, const std::vector<std::weak_ptr<SFile>>& deletedFiles) = 0;
+    virtual void PostCreateFile(SFile* file, TickType now) = 0;
+    virtual void PreRemoveFile(SFile* file, TickType now) = 0;
+    //virtual void PreRemoveFilse(TickType now, const std::vector<SFile*>& files) = 0;
 };
 
 
-
-class IReplicaActionListener
+class IStorageElementActionListener
 {
 public:
-    virtual void OnReplicaCreated(const TickType now, std::shared_ptr<SReplica> replica) = 0;
-    virtual void OnReplicaDeleted(const TickType now, std::weak_ptr<SReplica> replica) = 0;
+    virtual void PostCreateReplica(SReplica* replica, TickType now) = 0;
+    virtual void PreRemoveReplica(SReplica* replica, TickType now) = 0;
+    //virtual void PreRemoveReplicas(TickType now, const std::vector<SReplica*>& replica) = 0;
+};
+
+
+class IReplicaPreRemoveListener
+{
+public:
+    virtual bool PreRemoveReplica(SReplica* replica, TickType now) = 0;
 };

@@ -47,6 +47,7 @@ Release/
 
 # db connection
 config/psql_connection.json
+gacspp/third_party/pgsql
 
 # swan
 .swanproject

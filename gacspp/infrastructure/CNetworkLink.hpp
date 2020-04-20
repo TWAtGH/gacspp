@@ -10,7 +10,7 @@ class CStorageElement;
 class CNetworkLink
 {
 public:
-    CNetworkLink(const SpaceType bandwidthBytesPerSecond, CStorageElement* const srcStorageElement, CStorageElement* const dstStorageElement);
+    CNetworkLink(SpaceType bandwidthBytesPerSecond, CStorageElement* srcStorageElement, CStorageElement* dstStorageElement);
 
     inline auto GetId() const -> IdType
     {return mId;}

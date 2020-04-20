@@ -11,7 +11,7 @@
 IBaseSim::IBaseSim() = default;
 IBaseSim::~IBaseSim() = default;
 
-void IBaseSim::Run(const TickType maxTick)
+void IBaseSim::Run(TickType maxTick)
 {
     mCurrentTick = 0;
     mIsRunning = true;

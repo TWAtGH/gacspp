@@ -21,51 +21,26 @@ IStorageElementDelegate::~IStorageElementDelegate() = default;
 
 
 
-void CBaseStorageElementDelegate::OnOperation(const CStorageElement::OPERATION op)
+void CBaseStorageElementDelegate::OnOperation(CStorageElement::OPERATION op)
 {
     (void)op;
 }
 
-auto CBaseStorageElementDelegate::CreateReplica(std::shared_ptr<SFile> file, const TickType now) -> std::shared_ptr<SReplica>
+auto CBaseStorageElementDelegate::CreateReplica(SFile* file, TickType now) -> SReplica*
 {
     if(mQuota > 0 && (mUsedStorage + file->GetSize()) > mQuota)
         return nullptr;
 
-    auto& replicas = GetStorageElement()->mReplicas;
-    auto newReplica = std::make_shared<SReplica>(file, mStorageElement, now, replicas.size());
-    file->mReplicas.emplace_back(newReplica);
-    replicas.emplace_back(newReplica);
+    mReplicas.emplace_back(std::make_unique<SReplica>(file, mStorageElement, now, mReplicas.size()));
+    SReplica* newReplica = mReplicas.back().get();
+    file->PostCreateReplica(newReplica);
 
     OnOperation(CStorageElement::INSERT);
-
-    //notify all listeners
-    auto& listeners = GetStorageElement()->mReplicaActionListeners;
-    for(std::size_t i=0; i<listeners.size();)
-    {
-        std::shared_ptr<IReplicaActionListener> listener = listeners[i].lock();
-        if(!listener)
-        {
-            //remove invalid listeners
-            listeners[i] = std::move(listeners.back());
-            listeners.pop_back();
-            continue;
-        }
-
-        listener->OnReplicaCreated(now, newReplica);
-
-        ++i;
-    }
 
     return newReplica;
 }
 
-void CBaseStorageElementDelegate::OnIncreaseReplica(const SpaceType amount, const TickType now)
-{
-    (void)now;
-    mUsedStorage += amount;
-}
-
-void CBaseStorageElementDelegate::OnRemoveReplica(const SReplica* replica, const TickType now, bool needLock)
+void CBaseStorageElementDelegate::RemoveReplica(SReplica* replica, TickType now, bool needLock)
 {
     (void)now;
 
@@ -73,51 +48,44 @@ void CBaseStorageElementDelegate::OnRemoveReplica(const SReplica* replica, const
     if (needLock)
         lock.lock();
 
-    auto& replicas = GetStorageElement()->mReplicas;
+    if (replica->mRemoveListener)
+    {
+        if (replica->mRemoveListener->PreRemoveReplica(replica, now) == false)
+        {
+            delete replica->mRemoveListener;
+            replica->mRemoveListener = nullptr;
+        }
+    }
+
+    replica->GetFile()->PreRemoveReplica(replica);
+
     const SpaceType curSize = replica->GetCurSize();
     const std::size_t idxToDelete = replica->mIndexAtStorageElement;
-    std::shared_ptr<SReplica>& lastReplica = replicas.back();
 
     assert(curSize <= mUsedStorage);
-    assert(idxToDelete < replicas.size());
-
-    //notify all listeners
-    auto& listeners = GetStorageElement()->mReplicaActionListeners;
-    for(std::size_t i=0; i<listeners.size();)
-    {
-        std::shared_ptr<IReplicaActionListener> listener = listeners[i].lock();
-        if(!listener)
-        {
-            //remove invalid listeners
-            listeners[i] = std::move(listeners.back());
-            listeners.pop_back();
-            continue;
-        }
-
-        listener->OnReplicaDeleted(now, replicas[idxToDelete]);
-
-        ++i;
-    }
+    assert(idxToDelete < mReplicas.size());
 
     mUsedStorage -= curSize;
 
-    std::size_t& idxLastReplica = lastReplica->mIndexAtStorageElement;
-    if(idxToDelete != idxLastReplica)
-    {
-        idxLastReplica = idxToDelete;
-        replicas[idxToDelete] = std::move(lastReplica);
-    }
-    replicas.pop_back();
+    mReplicas[idxToDelete] = std::move(mReplicas.back());
+    mReplicas[idxToDelete]->mIndexAtStorageElement = idxToDelete;
+    mReplicas.pop_back();
+
     OnOperation(CStorageElement::DELETE);
+}
+
+void CBaseStorageElementDelegate::OnIncreaseReplica(SpaceType amount, TickType now)
+{
+    (void)now;
+    mUsedStorage += amount;
 }
 
 
 
-auto CUniqueReplicaStorageElementDelegate::CreateReplica(std::shared_ptr<SFile> file, const TickType now) -> std::shared_ptr<SReplica>
+auto CUniqueReplicaStorageElementDelegate::CreateReplica(SFile* file, TickType now) -> SReplica*
 {
-    for (const std::shared_ptr<SReplica>& replica : file->mReplicas)
-        if (replica->GetStorageElement()->GetId() == mStorageElement->GetId())
-            return nullptr;
+    if(file->GetReplicaByStorageElement(mStorageElement) != nullptr)
+        return nullptr;
 
     return CBaseStorageElementDelegate::CreateReplica(file, now);
 }
@@ -135,34 +103,48 @@ CStorageElement::CStorageElement(std::string&& name, ISite* site, bool allowDupl
         mDelegate.reset(new CUniqueReplicaStorageElementDelegate(this, quota));
 }
 
-void CStorageElement::OnOperation(const OPERATION op)
+void CStorageElement::OnOperation(OPERATION op)
 {
     mDelegate->OnOperation(op);
 }
 
-auto CStorageElement::CreateNetworkLink(CStorageElement* const dstStorageElement, const SpaceType bandwidthBytesPerSecond) -> CNetworkLink*
+auto CStorageElement::CreateNetworkLink(CStorageElement* dstStorageElement, SpaceType bandwidthBytesPerSecond) -> CNetworkLink*
 {
     auto result = mDstSiteIdToNetworkLinkIdx.insert({ dstStorageElement->mId, mNetworkLinks.size() });
     assert(result.second);
-    CNetworkLink* newNetworkLink = new CNetworkLink(bandwidthBytesPerSecond, this, dstStorageElement);
-    mNetworkLinks.emplace_back(newNetworkLink);
-    return newNetworkLink;
+    mNetworkLinks.emplace_back(std::make_unique<CNetworkLink>(bandwidthBytesPerSecond, this, dstStorageElement));
+    return mNetworkLinks.back().get();
 }
 
-auto CStorageElement::CreateReplica(std::shared_ptr<SFile> file, const TickType now) -> std::shared_ptr<SReplica>
+auto CStorageElement::CreateReplica(SFile* file, TickType now) -> SReplica*
 {
-    return mDelegate->CreateReplica(file, now);
+    SReplica* replica = mDelegate->CreateReplica(file, now);
+    
+    if (!replica)
+        return nullptr;
+
+    for (IStorageElementActionListener* listener : mActionListener)
+        listener->PostCreateReplica(replica, now);
+
+    return replica;
 }
-void CStorageElement::OnIncreaseReplica(const SpaceType amount, const TickType now)
+
+void CStorageElement::RemoveReplica(SReplica* replica, TickType now, bool needLock)
+{
+    assert(this == replica->GetStorageElement());
+
+    for (IStorageElementActionListener* listener : mActionListener)
+        listener->PreRemoveReplica(replica, now);
+
+    mDelegate->RemoveReplica(replica, now, needLock);
+}
+
+void CStorageElement::OnIncreaseReplica(SpaceType amount, TickType now)
 {
     mDelegate->OnIncreaseReplica(amount, now);
 }
-void CStorageElement::OnRemoveReplica(const SReplica* replica, const TickType now, const bool needLock)
-{
-    mDelegate->OnRemoveReplica(replica, now, needLock);
-}
 
-auto CStorageElement::GetNetworkLink(const CStorageElement* const dstStorageElement) -> CNetworkLink*
+auto CStorageElement::GetNetworkLink(const CStorageElement* dstStorageElement) const -> CNetworkLink*
 {
     auto result = mDstSiteIdToNetworkLinkIdx.find(dstStorageElement->mId);
     if (result == mDstSiteIdToNetworkLinkIdx.end())
@@ -170,15 +152,11 @@ auto CStorageElement::GetNetworkLink(const CStorageElement* const dstStorageElem
     return mNetworkLinks[result->second].get();
 }
 
-auto CStorageElement::GetNetworkLink(const CStorageElement* const dstStorageElement) const -> const CNetworkLink*
-{
-    auto result = mDstSiteIdToNetworkLinkIdx.find(dstStorageElement->mId);
-    if (result == mDstSiteIdToNetworkLinkIdx.end())
-        return nullptr;
-    return mNetworkLinks[result->second].get();
-}
+auto CStorageElement::GetReplicas() const -> const std::vector<std::unique_ptr<SReplica>>&
+{return mDelegate->GetReplicas(); }
 
 auto CStorageElement::GetUsedStorage() const -> SpaceType
 {return mDelegate->GetUsedStorage();}
+
 auto CStorageElement::GetUsedStorageQuotaRatio() const -> double
 {return mDelegate->GetUsedStorageQuotaRatio();}

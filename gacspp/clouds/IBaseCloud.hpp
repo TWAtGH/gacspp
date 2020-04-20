@@ -35,13 +35,13 @@ public:
 
     virtual auto CreateRegion(std::string&& name,
                               std::string&& locationName,
-                              const std::uint8_t multiLocationIdx) -> ISite* = 0;
+                              std::uint8_t multiLocationIdx) -> ISite* = 0;
 
     virtual auto ProcessBilling(const TickType now) -> std::unique_ptr<ICloudBill> = 0;
     virtual void InitialiseNetworkLinks() = 0;
 
 public:
-    auto GetStorageElementByName(const std::string& name) -> CStorageElement*;
+    auto GetStorageElementByName(const std::string& name) const -> CStorageElement*;
 
     inline auto GetName() const -> const std::string&
     {return mName;}

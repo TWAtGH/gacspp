@@ -38,12 +38,12 @@ namespace gcp
 
         using CStorageElement::CStorageElement;
 
-        virtual void OnOperation(const OPERATION op) final;
+        virtual void OnOperation(OPERATION op) final;
 
-        virtual void OnIncreaseReplica(const SpaceType amount, const TickType now) final;
-        virtual void OnRemoveReplica(const SReplica* replica, const TickType now, bool needLock=true) final;
+        virtual void OnIncreaseReplica(SpaceType amount, TickType now) final;
+        virtual void RemoveReplica(SReplica* replica, TickType now, bool needLock = true) final;
 
-        auto CalculateStorageCosts(const TickType now) -> double;
+        auto CalculateStorageCosts(TickType now) -> double;
         auto CalculateOperationCosts() -> double;
 
         auto GetCurStoragePrice() const -> long double;
@@ -74,9 +74,9 @@ namespace gcp
         using ISite::ISite;
 
         auto CreateStorageElement(std::string&& name, bool allowDuplicateReplicas = false, SpaceType quota = 0) -> CBucket* final;
-        void GetStorageElements(std::vector<CStorageElement*>& storageElements) final;
+        auto GetStorageElements() const -> std::vector<CStorageElement*> final;
 
-        auto CalculateStorageCosts(const TickType now) -> double;
+        auto CalculateStorageCosts(TickType now) -> double;
         auto CalculateOperationCosts(std::size_t& numClassA, std::size_t& numClassB) -> double;
         auto CalculateNetworkCosts(double& sumUsedTraffic, std::uint64_t& sumDoneTransfers) -> double;
 
@@ -94,7 +94,7 @@ namespace gcp
 
         auto CreateRegion(std::string&& name,
                           std::string&& locationName,
-                          const std::uint8_t multiLocationIdx) -> CRegion* final;
+                          std::uint8_t multiLocationIdx) -> CRegion* final;
 
         auto ProcessBilling(const TickType now) -> std::unique_ptr<ICloudBill> final;
         void InitialiseNetworkLinks() final;

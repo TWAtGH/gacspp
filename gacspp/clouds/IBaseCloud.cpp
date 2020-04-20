@@ -10,14 +10,17 @@ IBaseCloud::IBaseCloud(std::string&& name)
 
 IBaseCloud::~IBaseCloud() = default;
 
-auto IBaseCloud::GetStorageElementByName(const std::string& name) -> CStorageElement*
+auto IBaseCloud::GetStorageElementByName(const std::string& name) const -> CStorageElement*
 {
     std::vector<CStorageElement*> storageElements;
     for (const std::unique_ptr<ISite>& region : mRegions)
-        region->GetStorageElements(storageElements);
-    for (CStorageElement* storageElement : storageElements)
-        if (storageElement->GetName() == name)
-            return storageElement;
+    {
+        std::vector<CStorageElement*> storageElements = region->GetStorageElements();
+        for (CStorageElement* storageElement : storageElements)
+            if (storageElement->GetName() == name)
+                return storageElement;
+
+    }
     return nullptr;
 }
 

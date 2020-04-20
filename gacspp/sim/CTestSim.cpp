@@ -56,7 +56,7 @@ bool CTestSim::SetupDefaults(const json& profileJson)
             std::cout << "Failed creating transfer manager" << std::endl;
             return false;
         }
-        heartbeat->mProccessDurations[transferManager->mName] = &(transferManager->mUpdateDurationSummed);
+        heartbeat->mProccessDurations.push_back(transferManager);
 
         auto transferGen = std::dynamic_pointer_cast<CCloudBufferTransferGen>(CreateTransferGenerator(transferGenCfg, transferManager));
         if (!transferGen)
@@ -67,12 +67,12 @@ bool CTestSim::SetupDefaults(const json& profileJson)
                 std::cout << "Failed creating transfer generator" << std::endl;
                 return false;
             }
-            heartbeat->mProccessDurations[transferGen2->mName] = &(transferGen2->mUpdateDurationSummed);
+            heartbeat->mProccessDurations.push_back(transferGen2);
             mSchedule.push(transferGen2);
         }
         else
         {
-            heartbeat->mProccessDurations[transferGen->mName] = &(transferGen->mUpdateDurationSummed);
+            heartbeat->mProccessDurations.push_back(transferGen);
             mSchedule.push(transferGen);
         }
 
@@ -83,15 +83,24 @@ bool CTestSim::SetupDefaults(const json& profileJson)
 
     std::vector<CStorageElement*> storageElements;
     for (const std::unique_ptr<CGridSite>& site : mRucio->mGridSites)
-        site->GetStorageElements(storageElements);
+    {
+        std::vector<CStorageElement*> s = site->GetStorageElements();
+        storageElements.insert(storageElements.end(), s.begin(), s.end());
+    }
+
     for (const std::unique_ptr<IBaseCloud>& cloud : mClouds)
+    {
         for (const std::unique_ptr<ISite>& region : cloud->mRegions)
-            region->GetStorageElements(storageElements);
+        {
+            std::vector<CStorageElement*> s = region->GetStorageElements();
+            storageElements.insert(storageElements.end(), s.begin(), s.end());
+        }
+    }
 
     mDeletionInserter = std::make_shared<CBufferedOnDeletionInsert>();
     for (CStorageElement* storageElement : storageElements)
-        storageElement->mReplicaActionListeners.emplace_back(mDeletionInserter);
-    mRucio->mFileActionListeners.emplace_back(mDeletionInserter);
+        storageElement->mActionListener.emplace_back(mDeletionInserter.get());
+    mRucio->mActionListener.emplace_back(mDeletionInserter.get());
 
     try
     {
@@ -140,7 +149,7 @@ bool CTestSim::SetupDefaults(const json& profileJson)
 
             dataGen->mSelectStorageElementsRandomly = dataGenCfg.at("selectStorageElementsRandomly").get<bool>();
 
-            heartbeat->mProccessDurations[dataGen->mName] = &(dataGen->mUpdateDurationSummed);
+            heartbeat->mProccessDurations.push_back(dataGen);
 
             mSchedule.push(dataGen);
         }
@@ -160,7 +169,7 @@ bool CTestSim::SetupDefaults(const json& profileJson)
         reaper = std::make_shared<CReaperCaller>(mRucio.get(), tickFreq, startTick);
         reaper->mName = reaperCfg.at("name").get<std::string>();
 
-        heartbeat->mProccessDurations[reaper->mName] = &(reaper->mUpdateDurationSummed);
+        heartbeat->mProccessDurations.push_back(reaper);
     }
     catch(const json::out_of_range& error)
     {

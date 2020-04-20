@@ -1,7 +1,5 @@
 #pragma once
 
-#include <unordered_map>
-
 #include "CScheduleable.hpp"
 
 #include "common/utils.hpp"
@@ -23,10 +21,6 @@ private:
     std::unique_ptr<IValueGenerator> mFileLifetimeGen;
 
     TickType mTickFreq;
-
-    auto GetRandomFileSize() const -> SpaceType;
-    auto GetRandomNumFilesToGenerate() const -> std::uint32_t;
-    auto GetRandomLifeTime() const -> TickType;
 
     void CreateFilesAndReplicas(const std::uint32_t numFiles, const std::uint32_t numReplicasPerFile, const TickType now);
 
@@ -89,7 +83,7 @@ private:
     std::chrono::high_resolution_clock::time_point mTimeLastUpdate;
 
 public:
-    std::unordered_map<std::string, std::chrono::duration<double>*> mProccessDurations;
+    std::vector<std::weak_ptr<CScheduleable>> mProccessDurations;
     std::vector<std::shared_ptr<CBaseTransferManager>> mTransferManagers;
 
 public:

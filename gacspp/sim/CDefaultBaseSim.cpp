@@ -203,8 +203,7 @@ bool CDefaultBaseSim::SetupLinks(const json& profileJson)
         for(const std::unique_ptr<ISite>& cloudSite : cloud->mRegions)
         {
             assert(cloudSite);
-            std::vector<CStorageElement*> storageElements;
-            cloudSite->GetStorageElements(storageElements);
+            std::vector<CStorageElement*> storageElements = cloudSite->GetStorageElements();
             for (CStorageElement* storageElement : storageElements)
             {
                 if (!nameToStorageElement.insert({ storageElement->GetName(), storageElement }).second)
@@ -468,7 +467,7 @@ auto CDefaultBaseSim::CreateTransferGenerator(const json& transferGenCfg, const 
                 specTransferGen->mTransferGenInfo.push_back(std::move(info));
 
                 if(addNewReplicas)
-                    srcStorageElement->mReplicaActionListeners.push_back(specTransferGen);
+                    srcStorageElement->mActionListener.push_back(specTransferGen.get());
             }
 
             transferGen = specTransferGen;

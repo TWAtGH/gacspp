@@ -15,9 +15,10 @@ class CTransferManager;
 class CFixedTimeTransferManager;
 class IPreparedInsert;
 class IInsertValuesContainer;
+class CStorageElement;
 
 
-class CBaseOnDeletionInsert : public IFileActionListener, public IReplicaActionListener
+class CBaseOnDeletionInsert : public IRucioActionListener, public IStorageElementActionListener
 {
 protected:
     std::unique_ptr<IInsertValuesContainer> mFileValueContainer;
@@ -26,16 +27,16 @@ protected:
     std::shared_ptr<IPreparedInsert> mFileInsertQuery;
     std::shared_ptr<IPreparedInsert> mReplicaInsertQuery;
 
-    void AddFileDeletes(const std::vector<std::weak_ptr<SFile>>& deletedFiles);
-    void AddReplicaDelete(const std::weak_ptr<SReplica>& replica);
+    void AddFileDelete(SFile* file);
+    void AddReplicaDelete(SReplica* replica);
 
 public:
     CBaseOnDeletionInsert();
 
-    void OnFileCreated(const TickType now, std::shared_ptr<SFile> file) override;
-    void OnFilesDeleted(const TickType now, const std::vector<std::weak_ptr<SFile>>& deletedFiles) override;
-    void OnReplicaCreated(const TickType now, std::shared_ptr<SReplica> replica) override;
-    void OnReplicaDeleted(const TickType now, std::weak_ptr<SReplica> replica) override;
+    void PostCreateFile(SFile* file, TickType now) override;
+    void PreRemoveFile(SFile* file, TickType now) override;
+    void PostCreateReplica(SReplica* replica, TickType now) override;
+    void PreRemoveReplica(SReplica* replica, TickType now) override;
 };
 
 
@@ -48,13 +49,14 @@ private:
 
 public:
     virtual ~CBufferedOnDeletionInsert();
-    void OnFilesDeleted(const TickType now, const std::vector<std::weak_ptr<SFile>>& deletedFiles) override;
-    void OnReplicaDeleted(const TickType now, std::weak_ptr<SReplica> replica) override;
+
+    void PreRemoveFile(SFile* file, TickType now) override;
+    void PreRemoveReplica(SReplica* replica, TickType now) override;
 };
 
 
 
-class CCloudBufferTransferGen : public CScheduleable, public IReplicaActionListener
+class CCloudBufferTransferGen : public CScheduleable, public IStorageElementActionListener
 {
 private:
     IBaseSim* mSim;
@@ -67,14 +69,14 @@ public:
         std::unique_ptr<IValueGenerator> mReusageNumGen;
         CNetworkLink* mPrimaryLink;
         CNetworkLink* mSecondaryLink;
-        std::forward_list<std::shared_ptr<SReplica>> mReplicas;
+        std::forward_list<SReplica*> mReplicas;
     };
     std::vector<std::unique_ptr<STransferGenInfo>> mTransferGenInfo;
 
     bool mDeleteSrcReplica = false;
 
-    void OnReplicaCreated(const TickType now, std::shared_ptr<SReplica> replica) override;
-    void OnReplicaDeleted(const TickType now, std::weak_ptr<SReplica> replica) override;
+    void PostCreateReplica(SReplica* replica, TickType now) override;
+    void PreRemoveReplica(SReplica* replica, TickType now) override;
 
 public:
     CCloudBufferTransferGen(IBaseSim* sim,
@@ -106,8 +108,8 @@ public:
         TickType mStartedAt = 0;
         TickType mFinishedAt = 0;
         SpaceType mCurInputFileSize = 0;
-        std::shared_ptr<SFile> mInputFile;
-        std::vector<std::shared_ptr<SReplica>> mOutputReplicas;
+        SFile* mInputFile;
+        std::vector<SReplica*> mOutputReplicas;
     };
     struct SSiteInfo
     {
@@ -125,10 +127,10 @@ public:
 
     CJobIOTransferGen(IBaseSim* sim,
                     std::shared_ptr<CTransferManager> transferMgr,
-                    const TickType tickFreq,
-                    const TickType startTick=0 );
+                    TickType tickFreq,
+                    TickType startTick=0 );
 
-    void OnUpdate(const TickType now) final;
+    void OnUpdate(TickType now) final;
 };
 
 
@@ -154,23 +156,23 @@ public:
 public:
     CJobSlotTransferGen(IBaseSim* sim,
                         std::shared_ptr<CFixedTimeTransferManager> transferMgr,
-                        const TickType tickFreq,
-                        const TickType startTick=0 );
+                        TickType tickFreq,
+                        TickType startTick=0 );
 
-    void OnUpdate(const TickType now) final;
+    void OnUpdate(TickType now) final;
 };
 
 
 
-class CCachedSrcTransferGen : public CScheduleable, public CBaseOnDeletionInsert
+class CCachedSrcTransferGen : public CScheduleable
 {
 private:
     IBaseSim* mSim;
     std::shared_ptr<CFixedTimeTransferManager> mTransferMgr;
     TickType mTickFreq;
 
-    bool ExistsFileAtStorageElement(const std::shared_ptr<SFile>& file, const CStorageElement* storageElement) const;
-    void ExpireReplica(CStorageElement* storageElement, const TickType now);
+    bool ExistsFileAtStorageElement(const SFile* file, const CStorageElement* storageElement) const;
+    void ExpireReplica(CStorageElement* storageElement, TickType now);
 
 public:
     struct SCacheElementInfo
@@ -182,20 +184,18 @@ public:
 
     CCachedSrcTransferGen(IBaseSim* sim,
                         std::shared_ptr<CFixedTimeTransferManager> transferMgr,
-                        const std::size_t numPerDay,
-                        const TickType defaultReplicaLifetime,
-                        const TickType tickFreq,
-                        const TickType startTick=0 );
+                        std::size_t numPerDay,
+                        TickType defaultReplicaLifetime,
+                        TickType tickFreq,
+                        TickType startTick=0 );
 
-    std::vector<std::pair<float, std::vector<std::weak_ptr<SFile>>>> mRatiosAndFilesPerAccessCount{ {0.62f, {}}, {0.16f, {}}, {0.08f, {}}, {0.05f, {}} };
+    std::vector<std::pair<float, std::vector<SFile*>>> mRatiosAndFilesPerAccessCount{ {0.62f, {}}, {0.16f, {}}, {0.08f, {}}, {0.05f, {}} };
     std::vector<CStorageElement*> mSrcStorageElements;
     std::vector<SCacheElementInfo> mCacheElements;
     std::vector<CStorageElement*> mDstStorageElements;
     std::size_t mNumPerDay;
     TickType mDefaultReplicaLifetime;
 
-    void OnUpdate(const TickType now) final;
-    void Shutdown(const TickType now) final;
-
-    void OnFileCreated(const TickType now, std::shared_ptr<SFile> file) final;
+    void OnUpdate(TickType now) final;
+    void Shutdown(TickType now) final;
 };

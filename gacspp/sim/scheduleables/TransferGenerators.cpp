@@ -9,6 +9,7 @@
 #include "infrastructure/CRucio.hpp"
 #include "infrastructure/CNetworkLink.hpp"
 #include "infrastructure/CStorageElement.hpp"
+#include "infrastructure/IActionListener.hpp"
 #include "infrastructure/SFile.hpp"
 
 #include "sim/IBaseSim.hpp"
@@ -22,58 +23,47 @@ CBaseOnDeletionInsert::CBaseOnDeletionInsert()
     mReplicaInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Replicas(id, fileId, storageElementId, createdAt, expiredAt) FROM STDIN with(FORMAT csv);", 5, '?');
 }
 
-void CBaseOnDeletionInsert::OnFileCreated(const TickType now, std::shared_ptr<SFile> file)
+void CBaseOnDeletionInsert::PostCreateFile(SFile* file, TickType now)
 {
-    (void)now;
     (void)file;
+    (void)now;
 }
 
-void CBaseOnDeletionInsert::OnReplicaCreated(const TickType now, std::shared_ptr<SReplica> replica)
+void CBaseOnDeletionInsert::PostCreateReplica(SReplica* replica, TickType now)
 {
-    (void)now;
     (void)replica;
+    (void)now;
 }
 
-void CBaseOnDeletionInsert::AddFileDeletes(const std::vector<std::weak_ptr<SFile>>& deletedFiles)
+void CBaseOnDeletionInsert::AddFileDelete(SFile* file)
 {
-    for(const std::weak_ptr<SFile>& weakFile : deletedFiles)
-    {
-        std::shared_ptr<SFile> file = weakFile.lock();
-
-        assert(file);
-
-        mFileValueContainer->AddValue(file->GetId());
-        mFileValueContainer->AddValue(file->GetCreatedAt());
-        mFileValueContainer->AddValue(file->mExpiresAt);
-        mFileValueContainer->AddValue(file->GetSize());
-        mFileValueContainer->AddValue(file->mPopularity);
-    }
+    mFileValueContainer->AddValue(file->GetId());
+    mFileValueContainer->AddValue(file->GetCreatedAt());
+    mFileValueContainer->AddValue(file->mExpiresAt);
+    mFileValueContainer->AddValue(file->GetSize());
+    mFileValueContainer->AddValue(file->mPopularity);
 }
 
-void CBaseOnDeletionInsert::AddReplicaDelete(const std::weak_ptr<SReplica>& replica)
+void CBaseOnDeletionInsert::AddReplicaDelete(SReplica* replica)
 {
-    std::shared_ptr<SReplica> r = replica.lock();
-
-    assert(r);
-
-    mReplicaValueContainer->AddValue(r->GetId());
-    mReplicaValueContainer->AddValue(r->GetFile()->GetId());
-    mReplicaValueContainer->AddValue(r->GetStorageElement()->GetId());
-    mReplicaValueContainer->AddValue(r->GetCreatedAt());
-    mReplicaValueContainer->AddValue(r->mExpiresAt);
+    mReplicaValueContainer->AddValue(replica->GetId());
+    mReplicaValueContainer->AddValue(replica->GetFile()->GetId());
+    mReplicaValueContainer->AddValue(replica->GetStorageElement()->GetId());
+    mReplicaValueContainer->AddValue(replica->GetCreatedAt());
+    mReplicaValueContainer->AddValue(replica->mExpiresAt);
 }
 
-void CBaseOnDeletionInsert::OnFilesDeleted(const TickType now, const std::vector<std::weak_ptr<SFile>>& deletedFiles)
+void CBaseOnDeletionInsert::PreRemoveFile(SFile* file, TickType now)
 {
     (void)now;
-    std::unique_ptr<IInsertValuesContainer> mFileValueContainer = mFileInsertQuery->CreateValuesContainer(deletedFiles.size() * 4);
+    std::unique_ptr<IInsertValuesContainer> mFileValueContainer = mFileInsertQuery->CreateValuesContainer();
 
-    AddFileDeletes(deletedFiles);
+    AddFileDelete(file);
 
     COutput::GetRef().QueueInserts(std::move(mFileValueContainer));
 }
 
-void CBaseOnDeletionInsert::OnReplicaDeleted(const TickType now, std::weak_ptr<SReplica> replica)
+void CBaseOnDeletionInsert::PreRemoveReplica(SReplica* replica, TickType now)
 {
     (void)now;
     std::unique_ptr<IInsertValuesContainer> mReplicaValueContainer = mReplicaInsertQuery->CreateValuesContainer();
@@ -104,20 +94,20 @@ void CBufferedOnDeletionInsert::FlushReplicaDeletes()
         COutput::GetRef().QueueInserts(std::move(mReplicaValueContainer));
 }
 
-void CBufferedOnDeletionInsert::OnFilesDeleted(const TickType now, const std::vector<std::weak_ptr<SFile>>& deletedFiles)
+void CBufferedOnDeletionInsert::PreRemoveFile(SFile* file, TickType now)
 {
     (void)now;
     constexpr std::size_t valueBufSize = 5000 * 4;
     if(!mFileValueContainer)
         mFileValueContainer = mFileInsertQuery->CreateValuesContainer(valueBufSize);
 
-    AddFileDeletes(deletedFiles);
+    AddFileDelete(file);
 
     if(mFileValueContainer->GetSize() >= valueBufSize)
         FlushFileDeletes();
 }
 
-void CBufferedOnDeletionInsert::OnReplicaDeleted(const TickType now, std::weak_ptr<SReplica> replica)
+void CBufferedOnDeletionInsert::PreRemoveReplica(SReplica* replica, TickType now)
 {
     (void)now;
     constexpr std::size_t valueBufSize = 5000 * 5;
@@ -134,15 +124,15 @@ void CBufferedOnDeletionInsert::OnReplicaDeleted(const TickType now, std::weak_p
 
 CCloudBufferTransferGen::CCloudBufferTransferGen(IBaseSim* sim,
                                                  std::shared_ptr<CTransferManager> transferMgr,
-                                                 const TickType tickFreq,
-                                                 const TickType startTick )
+                                                 TickType tickFreq,
+                                                 TickType startTick )
     : CScheduleable(startTick),
       mSim(sim),
       mTransferMgr(std::move(transferMgr)),
       mTickFreq(tickFreq)
 {}
 
-void CCloudBufferTransferGen::OnReplicaCreated(const TickType now, std::shared_ptr<SReplica> replica)
+void CCloudBufferTransferGen::PostCreateReplica(SReplica* replica, TickType now)
 {
     (void)now;
     for(std::unique_ptr<STransferGenInfo>& info : mTransferGenInfo)
@@ -151,7 +141,7 @@ void CCloudBufferTransferGen::OnReplicaCreated(const TickType now, std::shared_p
         {
             const std::uint32_t numReusages = info->mReusageNumGen->GetValue(mSim->mRNGEngine);
             replica->GetFile()->mPopularity = numReusages;
-            std::forward_list<std::shared_ptr<SReplica>>& replicas = info->mReplicas;
+            std::forward_list<SReplica*>& replicas = info->mReplicas;
             auto prev = replicas.before_begin();
             auto cur = replicas.begin();
             while(cur != replicas.end())
@@ -168,13 +158,21 @@ void CCloudBufferTransferGen::OnReplicaCreated(const TickType now, std::shared_p
     }
 }
 
-void CCloudBufferTransferGen::OnReplicaDeleted(const TickType now, std::weak_ptr<SReplica> replica)
+void CCloudBufferTransferGen::PreRemoveReplica(SReplica* replica, TickType now)
 {
+    //shouldnt be called
     (void)now;
-    (void)replica;
+    for (std::unique_ptr<STransferGenInfo>& info : mTransferGenInfo)
+    {
+        if (replica->GetStorageElement() == info->mPrimaryLink->GetSrcStorageElement())
+        {
+            info->mReplicas.remove(replica);
+            break;
+        }
+    }
 }
 
-void CCloudBufferTransferGen::OnUpdate(const TickType now)
+void CCloudBufferTransferGen::OnUpdate(TickType now)
 {
     CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
 
@@ -184,17 +182,17 @@ void CCloudBufferTransferGen::OnUpdate(const TickType now)
     {
         CNetworkLink* networkLink = info->mPrimaryLink;
         CStorageElement* dstStorageElement = networkLink->GetDstStorageElement();
-        std::forward_list<std::shared_ptr<SReplica>>& replicas = info->mReplicas;
+        std::forward_list<SReplica*>& replicas = info->mReplicas;
         auto prev = replicas.before_begin();
         auto cur = replicas.begin();
         while(cur != replicas.end())
         {
-            std::shared_ptr<SReplica> srcReplica = (*cur);
+            SReplica* srcReplica = (*cur);
             if(!srcReplica->IsComplete())
             {
                 //handle this case better
-                //replicas with high reusage number should still be preferred for primary storage
-                //even if they are not compelte yet
+                //replicas with high re-usage number should still be preferred for primary storage
+                //even if they are not complete yet
                 prev = cur;
                 cur++;
                 continue;
@@ -202,8 +200,8 @@ void CCloudBufferTransferGen::OnUpdate(const TickType now)
 
             if(networkLink->mNumActiveTransfers < networkLink->mMaxNumActiveTransfers)
             {
-                std::shared_ptr<SFile> file = srcReplica->GetFile();
-                std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(file, now);
+                SFile* file = srcReplica->GetFile();
+                SReplica* newReplica = dstStorageElement->CreateReplica(file, now);
                 if(!newReplica && info->mSecondaryLink)
                 {
                     networkLink = info->mSecondaryLink;
@@ -229,42 +227,17 @@ void CCloudBufferTransferGen::OnUpdate(const TickType now)
     mNextCallTick = now + mTickFreq;
 }
 
-void CCloudBufferTransferGen::Shutdown(const TickType now)
+void CCloudBufferTransferGen::Shutdown(TickType now)
 {
-    std::vector<std::weak_ptr<IFileActionListener>>& listeners = mSim->mRucio->mFileActionListeners;
-    std::vector<std::shared_ptr<SFile>>& files = mSim->mRucio->mFiles;
-    if (!listeners.empty())
-    {
-        std::vector<std::weak_ptr<SFile>> weakFileRefs(files.begin(), files.end());
-        for (std::size_t i = 0; i < listeners.size();)
-        {
-            std::shared_ptr<IFileActionListener> listener = listeners[i].lock();
-            if (!listener)
-            {
-                //remove invalid listeners
-                listeners[i] = std::move(listeners.back());
-                listeners.pop_back();
-                continue;
-            }
-
-            listener->OnFilesDeleted(now, weakFileRefs);
-
-            ++i;
-        }
-    }
-    while (!files.empty())
-    {
-        files.back()->Remove(now);
-        files.pop_back();
-    }
+    //rucio->RemoveAllFiles();
 }
 
 
 
 CJobIOTransferGen::CJobIOTransferGen(IBaseSim* sim,
                                     std::shared_ptr<CTransferManager> transferMgr,
-                                    const TickType tickFreq,
-                                    const TickType startTick)
+                                    TickType tickFreq,
+                                    TickType startTick)
     : CScheduleable(startTick),
       mSim(sim),
       mTransferMgr(transferMgr),
@@ -273,7 +246,7 @@ CJobIOTransferGen::CJobIOTransferGen(IBaseSim* sim,
     mTraceInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Traces(id, jobId, storageElementId, fileId, replicaId, type, startedAt, finishedAt, traffic) FROM STDIN with(FORMAT csv);", 9, '?');
 }
 
-void CJobIOTransferGen::OnUpdate(const TickType now)
+void CJobIOTransferGen::OnUpdate(TickType now)
 {
     assert(now >= mLastUpdateTime);
 
@@ -288,8 +261,12 @@ void CJobIOTransferGen::OnUpdate(const TickType now)
     for(SSiteInfo& siteInfo : mSiteInfos)
     {
         std::list<SJobInfo>& jobInfos = siteInfo.mJobInfos;
-        CNetworkLink* const diskToCPULink = siteInfo.mDiskToCPULink;
-        CNetworkLink* const cpuToOutputLink = siteInfo.mCPUToOutputLink;
+        CNetworkLink* diskToCPULink = siteInfo.mDiskToCPULink;
+        CNetworkLink* cpuToOutputLink = siteInfo.mCPUToOutputLink;
+
+        CStorageElement* diskSE = diskToCPULink->GetSrcStorageElement();
+        CStorageElement* cpuSE = diskToCPULink->GetDstStorageElement();
+        CStorageElement* outputSE = cpuToOutputLink->GetDstStorageElement();
 
         //should firstly update all mNumActiveTransfers and then calculate bytesDownloaded/uploaded
         const SpaceType bytesDownloaded = (diskToCPULink->mBandwidthBytesPerSecond / (double)(diskToCPULink->mNumActiveTransfers+1)) * tDelta;
@@ -297,8 +274,8 @@ void CJobIOTransferGen::OnUpdate(const TickType now)
         auto jobInfoIt = jobInfos.begin();
         while(jobInfoIt != jobInfos.end())
         {
-            std::shared_ptr<SFile>& inputFile = jobInfoIt->mInputFile;
-            std::vector<std::shared_ptr<SReplica>>& outputReplicas = jobInfoIt->mOutputReplicas;
+            SFile* inputFile = jobInfoIt->mInputFile;
+            std::vector<SReplica*>& outputReplicas = jobInfoIt->mOutputReplicas;
             if(jobInfoIt->mCurInputFileSize < inputFile->GetSize())
             {
                 //still downloading input
@@ -306,6 +283,7 @@ void CJobIOTransferGen::OnUpdate(const TickType now)
                 //update download
                 if(jobInfoIt->mCurInputFileSize == 0)
                 {
+                    //download just started
                     jobInfoIt->mCurInputFileSize += 1;
                     jobInfoIt->mStartedAt = now;
                     diskToCPULink->mNumActiveTransfers += 1;
@@ -314,6 +292,7 @@ void CJobIOTransferGen::OnUpdate(const TickType now)
                 SpaceType newSize = jobInfoIt->mCurInputFileSize + bytesDownloaded;
                 if(newSize >= inputFile->GetSize())
                 {
+                    //download completed
                     newSize = inputFile->GetSize();
                     diskToCPULink->mUsedTraffic += newSize - jobInfoIt->mCurInputFileSize;
                     diskToCPULink->mNumActiveTransfers -= 1;
@@ -321,10 +300,10 @@ void CJobIOTransferGen::OnUpdate(const TickType now)
 
                     traceInsertQueries->AddValue(GetNewId());
                     traceInsertQueries->AddValue(jobInfoIt->mJobId);
-                    traceInsertQueries->AddValue(diskToCPULink->GetSrcStorageElement()->GetId());
+                    traceInsertQueries->AddValue(diskSE->GetId());
                     traceInsertQueries->AddValue(inputFile->GetId());
                     //ensure src replica stays available
-                    IdType srcReplicaId = inputFile->GetReplicaByStorageElement(diskToCPULink->GetSrcStorageElement())->GetId();
+                    IdType srcReplicaId = inputFile->GetReplicaByStorageElement(diskSE)->GetId();
                     traceInsertQueries->AddValue(srcReplicaId);
                     traceInsertQueries->AddValue(0);
                     traceInsertQueries->AddValue(jobInfoIt->mStartedAt);
@@ -349,8 +328,8 @@ void CJobIOTransferGen::OnUpdate(const TickType now)
                 for(;numOutputReplicas>0; --numOutputReplicas)
                 {
                     SpaceType size = siteInfo.mOutputSizeGen->GetValue(rngEngine);
-                    std::shared_ptr<SFile> outputFile = mSim->mRucio->CreateFile(size, now, SECONDS_PER_MONTH*6);
-                    outputReplicas.emplace_back(cpuToOutputLink->GetDstStorageElement()->CreateReplica(outputFile, now));
+                    SFile* outputFile = mSim->mRucio->CreateFile(size, now, SECONDS_PER_MONTH*6);
+                    outputReplicas.emplace_back(outputSE->CreateReplica(outputFile, now));
                     cpuToOutputLink->mNumActiveTransfers += 1;
                     assert(outputReplicas.back());
                 }
@@ -362,7 +341,7 @@ void CJobIOTransferGen::OnUpdate(const TickType now)
                 std::size_t idx = 0;
                 while ( idx < outputReplicas.size() )
                 {
-                    std::shared_ptr<SReplica>& outputReplica = outputReplicas[idx];
+                    SReplica* outputReplica = outputReplicas[idx];
                     
                     const SpaceType amount = outputReplica->Increase(bytesUploaded, now);
                     cpuToOutputLink->mUsedTraffic += amount;
@@ -385,7 +364,7 @@ void CJobIOTransferGen::OnUpdate(const TickType now)
                         //workaround to reduce memory load/output file not needed after trace is stored
                         mSim->mRucio->RemoveFile(outputReplica->GetFile(), now);
 
-                        outputReplica = std::move(outputReplicas.back());
+                        outputReplicas[idx] = outputReplicas.back();
                         outputReplicas.pop_back();
 
                         continue;
@@ -395,10 +374,11 @@ void CJobIOTransferGen::OnUpdate(const TickType now)
 
                 if(outputReplicas.empty())
                 {
-                    std::shared_ptr<SReplica> inputSrcReplica = inputFile->GetReplicaByStorageElement(diskToCPULink->GetSrcStorageElement());
+                    SReplica* inputSrcReplica = inputFile->GetReplicaByStorageElement(diskSE);
                     assert(inputSrcReplica);
-                    if(inputSrcReplica->mNumStagedIn >= inputFile->mPopularity)
-                        inputFile->RemoveReplica(now, inputSrcReplica); //inputSrcReplica could still be in use by disk -> CPU
+                    if (inputSrcReplica->mNumStagedIn >= inputFile->mPopularity)
+                        diskSE->RemoveReplica(inputSrcReplica, now);
+                        //inputFile->RemoveReplica(now, inputSrcReplica); //inputSrcReplica could still be in use by disk -> CPU
                     
                     jobInfoIt = jobInfos.erase(jobInfoIt);
                     continue;
@@ -410,9 +390,9 @@ void CJobIOTransferGen::OnUpdate(const TickType now)
         assert(siteInfo.mNumCores >= jobInfos.size());
 
         std::size_t numJobsToCreate = std::min(siteInfo.mNumCores - jobInfos.size(), siteInfo.mCoreFillRate);
-        std::vector<std::shared_ptr<SReplica>>& replicas = diskToCPULink->GetSrcStorageElement()->mReplicas;
-        for(std::shared_ptr<SReplica>& replica : replicas) // consider staging in the same replica multiple times
+        for(const std::unique_ptr<SReplica>& replica : diskSE->GetReplicas()) // consider staging in the same replica multiple times
         {
+            //create new jobs from diskSE replicas
             if(numJobsToCreate == 0)
                 break;
             if(!replica->IsComplete())
@@ -428,21 +408,22 @@ void CJobIOTransferGen::OnUpdate(const TickType now)
             numJobsToCreate -= 1;
         }
 
-        if(diskToCPULink->GetSrcStorageElement()->GetUsedStorageQuotaRatio() <= 0.5)
+        if(diskSE->GetUsedStorageQuotaRatio() <= 0.5)
         {
+            //if storage on diskSE available create transfers from cloudSE to diskSE
             std::size_t numTransfers = (diskToCPULink->mMaxNumActiveTransfers - diskToCPULink->mNumActiveTransfers) / 2.0;
-            for(std::shared_ptr<SReplica>& replica : siteInfo.mCloudToDiskLink->GetSrcStorageElement()->mReplicas)
+            for(const std::unique_ptr<SReplica>& replica : siteInfo.mCloudToDiskLink->GetSrcStorageElement()->GetReplicas())
             {
                 if(numTransfers == 0)
                     break;
                 if(!replica->IsComplete())
                     continue;
 
-                std::shared_ptr<SFile> file = replica->GetFile();
+                SFile* file = replica->GetFile();
                 bool exists = false;
                 for(SSiteInfo& siteInfoCheck : mSiteInfos)
                 {
-                    if(file->GetReplicaByStorageElement(siteInfoCheck.mDiskToCPULink->GetSrcStorageElement()))
+                    if(file->GetReplicaByStorageElement(diskSE))
                     {
                         exists = true;
                         break;
@@ -451,9 +432,9 @@ void CJobIOTransferGen::OnUpdate(const TickType now)
                 if(exists)
                     continue;
                 
-                std::shared_ptr<SReplica> newReplica = diskToCPULink->GetSrcStorageElement()->CreateReplica(file, now);
+                SReplica* newReplica = diskSE->CreateReplica(file, now);
                 assert(newReplica);
-                mTransferMgr->CreateTransfer(replica, newReplica, now, true);
+                mTransferMgr->CreateTransfer(replica.get(), newReplica, now, true);
                 numTransfers -= 1;
             }
         }
@@ -466,19 +447,19 @@ void CJobIOTransferGen::OnUpdate(const TickType now)
 
 CJobSlotTransferGen::CJobSlotTransferGen(IBaseSim* sim,
                                          std::shared_ptr<CFixedTimeTransferManager> transferMgr,
-                                         const TickType tickFreq,
-                                         const TickType startTick )
+                                         TickType tickFreq,
+                                         TickType startTick )
     : CScheduleable(startTick),
       mSim(sim),
       mTransferMgr(transferMgr),
       mTickFreq(tickFreq)
 {}
 
-void CJobSlotTransferGen::OnUpdate(const TickType now)
+void CJobSlotTransferGen::OnUpdate(TickType now)
 {
     CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
 
-    const std::vector<std::shared_ptr<SFile>>& allFiles = mSim->mRucio->mFiles;
+    const std::vector<std::unique_ptr<SFile>>& allFiles = mSim->mRucio->GetFiles();
     assert(allFiles.size() > 0);
 
     RNGEngineType& rngEngine = mSim->mRNGEngine;
@@ -487,7 +468,7 @@ void CJobSlotTransferGen::OnUpdate(const TickType now)
 
     for(auto& dstInfo : mDstInfo)
     {
-        CStorageElement* const dstStorageElement = dstInfo.first;
+        CStorageElement* dstStorageElement = dstInfo.first;
         SJobSlotInfo& jobSlotInfo = dstInfo.second;
 
         auto& schedule = jobSlotInfo.mSchedule;
@@ -512,25 +493,25 @@ void CJobSlotTransferGen::OnUpdate(const TickType now)
         std::pair<TickType, std::uint32_t> newJobs = std::make_pair(now+900, 0);
         for(std::uint32_t totalTransfersCreated=0; totalTransfersCreated<flexCreationLimit; ++totalTransfersCreated)
         {
-            std::shared_ptr<SFile> fileToTransfer = allFiles[fileRndSelector(rngEngine)];
+            SFile* fileToTransfer = allFiles[fileRndSelector(rngEngine)].get();
 
-            for(std::uint32_t i = 0; i < 10 && fileToTransfer->mReplicas.empty() && fileToTransfer->mExpiresAt < (now + 100); ++i)
-                fileToTransfer = allFiles[fileRndSelector(rngEngine)];
+            for(std::uint32_t i = 0; i < 10 && fileToTransfer->GetReplicas().empty() && fileToTransfer->mExpiresAt < (now + 100); ++i)
+                fileToTransfer = allFiles[fileRndSelector(rngEngine)].get();
 
-            const std::vector<std::shared_ptr<SReplica>>& replicas = fileToTransfer->mReplicas;
+            const std::vector<SReplica*>& replicas = fileToTransfer->GetReplicas();
             if(replicas.empty())
             {
                 flexCreationLimit += 1;
                 continue;
             }
 
-            std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(fileToTransfer, now);
+            SReplica* newReplica = dstStorageElement->CreateReplica(fileToTransfer, now);
             if(newReplica != nullptr)
             {
                 newReplica->mExpiresAt = now + SECONDS_PER_DAY;
                 int minPrio = std::numeric_limits<int>::max();
-                std::vector<std::shared_ptr<SReplica>> bestSrcReplicas;
-                for(const std::shared_ptr<SReplica>& replica : replicas)
+                std::vector<SReplica*> bestSrcReplicas;
+                for(SReplica* replica : replicas)
                 {
                     if(!replica->IsComplete())
                         continue; // at least the newly created one will be skipped
@@ -555,11 +536,11 @@ void CJobSlotTransferGen::OnUpdate(const TickType now)
                     continue;
                 }
 
-                std::shared_ptr<SReplica> bestSrcReplica = bestSrcReplicas[0];
+                SReplica* bestSrcReplica = bestSrcReplicas[0];
                 if (minPrio > 0)
                 {
                     double minWeight = std::numeric_limits<double>::max();
-                    for (std::shared_ptr<SReplica>& replica : bestSrcReplicas)
+                    for (SReplica* replica : bestSrcReplicas)
                     {
                         double w = 0; //todo
                         if (w < minWeight)
@@ -589,10 +570,10 @@ void CJobSlotTransferGen::OnUpdate(const TickType now)
 
 CCachedSrcTransferGen::CCachedSrcTransferGen(IBaseSim* sim,
                                              std::shared_ptr<CFixedTimeTransferManager> transferMgr,
-                                             const std::size_t numPerDay,
-                                             const TickType defaultReplicaLifetime,
-                                             const TickType tickFreq,
-                                             const TickType startTick)
+                                             std::size_t numPerDay,
+                                             TickType defaultReplicaLifetime,
+                                             TickType tickFreq,
+                                             TickType startTick)
     : CScheduleable(startTick),
       mSim(sim),
       mTransferMgr(transferMgr),
@@ -601,9 +582,9 @@ CCachedSrcTransferGen::CCachedSrcTransferGen(IBaseSim* sim,
       mDefaultReplicaLifetime(defaultReplicaLifetime)
 {}
 
-bool CCachedSrcTransferGen::ExistsFileAtStorageElement(const std::shared_ptr<SFile>& file, const CStorageElement* storageElement) const
+bool CCachedSrcTransferGen::ExistsFileAtStorageElement(const SFile* file, const CStorageElement* storageElement) const
 {
-    for(const std::shared_ptr<SReplica>& r : file->mReplicas)
+    for(SReplica* r : file->GetReplicas())
     {
         if(r->GetStorageElement() == storageElement)
             return true;
@@ -613,7 +594,7 @@ bool CCachedSrcTransferGen::ExistsFileAtStorageElement(const std::shared_ptr<SFi
 
 void CCachedSrcTransferGen::ExpireReplica(CStorageElement* storageElement, const TickType now)
 {
-    const std::vector<std::shared_ptr<SReplica>>& replicas = storageElement->mReplicas;
+    const std::vector<std::unique_ptr<SReplica>>& replicas = storageElement->GetReplicas();
     if(replicas.empty())
         return;
     auto replicasIt = replicas.begin();
@@ -648,7 +629,7 @@ void CCachedSrcTransferGen::ExpireReplica(CStorageElement* storageElement, const
         }
     }
     (*oldestReplicaIt)->mExpiresAt = now;
-    (*oldestReplicaIt)->GetFile()->RemoveExpiredReplicas(now);
+    mSim->mRucio->RemoveExpiredReplicasFromFile((*oldestReplicaIt)->GetFile(), now);
 }
 
 void CCachedSrcTransferGen::OnUpdate(const TickType now)
@@ -661,7 +642,7 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
     for(auto it=mRatiosAndFilesPerAccessCount.rbegin(); it!=mRatiosAndFilesPerAccessCount.rend(); ++it)
     {
         const std::size_t numTransfersToCreate = 1 + static_cast<std::size_t>(numTotalTransfersPerUpdate * it->first);
-        std::vector<std::weak_ptr<SFile>>& fileVec = it->second;
+        std::vector<SFile*>& fileVec = it->second;
 
         if(fileVec.empty())
             continue;
@@ -677,18 +658,18 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
 
                 //try to find a file that is not already on the dst storage element
                 std::size_t fileIdx;
-                std::shared_ptr<SFile> fileToTransfer = nullptr;
+                SFile* fileToTransfer = nullptr;
                 for(std::size_t i=0; (i<numFileSelectRetries) && !fileToTransfer ; ++i)
                 {
                     fileIdx = fileRndSelector(rngEngine);
-                    fileToTransfer = fileVec[fileIdx].lock();
+                    fileToTransfer = fileVec[fileIdx];
                     if(!fileToTransfer)
                     {
                         std::swap(fileVec[fileIdx], fileVec.back());
                         fileVec.pop_back();
                         continue;
                     }
-                    if(fileToTransfer->mReplicas.empty() || ExistsFileAtStorageElement(fileToTransfer, dstStorageElement))
+                    if(fileToTransfer->GetReplicas().empty() || ExistsFileAtStorageElement(fileToTransfer, dstStorageElement))
                         fileToTransfer = nullptr;
                 }
 
@@ -696,14 +677,14 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
                     continue;
 
                 //find best src replica
-                std::shared_ptr<SReplica> bestSrcReplica = nullptr;
+                SReplica* bestSrcReplica = nullptr;
 
                 //check caches first
                 if(!mCacheElements.empty())
                 {
                     for(const SCacheElementInfo& cacheElement : mCacheElements)
                     {
-                        for (const std::shared_ptr<SReplica>& r : fileToTransfer->mReplicas)
+                        for (SReplica* r : fileToTransfer->GetReplicas())
                         {
                             if (r->GetStorageElement() == cacheElement.mStorageElement)
                             {
@@ -719,7 +700,7 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
                 if(!bestSrcReplica)
                 {
                     double minWeight = 0;
-                    for(std::shared_ptr<SReplica>& srcReplica : fileToTransfer->mReplicas)
+                    for(SReplica* srcReplica : fileToTransfer->GetReplicas())
                     {
                         if(!srcReplica->IsComplete())
                             continue;
@@ -741,10 +722,10 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
                     {
                         //todo: randomise cache element selection?
                         CStorageElement* cacheStorageElement = mCacheElements[0].mStorageElement;
-                        if(cacheStorageElement->mReplicas.size() >= mCacheElements[0].mCacheSize)
+                        if(cacheStorageElement->GetReplicas().size() >= mCacheElements[0].mCacheSize)
                             ExpireReplica(cacheStorageElement, now);
 
-                        std::shared_ptr<SReplica> newCacheReplica = cacheStorageElement->CreateReplica(fileToTransfer, now);
+                        SReplica* newCacheReplica = cacheStorageElement->CreateReplica(fileToTransfer, now);
                         assert(newCacheReplica);
                         newCacheReplica->mExpiresAt = now + mCacheElements[0].mDefaultReplicaLifetime;
 
@@ -762,7 +743,7 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
                     //->delete after transfer
                 }
 
-                std::shared_ptr<SReplica> newReplica = dstStorageElement->CreateReplica(fileToTransfer, now);
+                SReplica* newReplica = dstStorageElement->CreateReplica(fileToTransfer, now);
                 assert(newReplica);
                 newReplica->mExpiresAt = now + mDefaultReplicaLifetime;
 
@@ -795,9 +776,9 @@ void CCachedSrcTransferGen::Shutdown(const TickType now)
     OnFilesDeleted(now, files);
     OnReplicasDeleted(now, replicas);*/
 }
-
+/*
 void CCachedSrcTransferGen::OnFileCreated(const TickType now, std::shared_ptr<SFile> file)
 {
     CBaseOnDeletionInsert::OnFileCreated(now, file);
     mRatiosAndFilesPerAccessCount[0].second.emplace_back(file);
-}
+}*/

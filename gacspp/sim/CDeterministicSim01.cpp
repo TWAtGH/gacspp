@@ -52,7 +52,7 @@ private:
     std::list<JobBatchType> mJobBatchList;
     std::list<JobBatchType>::iterator mCurJobBatch;
 
-    std::list<std::shared_ptr<SReplica>> mTmpReplicas;
+    std::list<SReplica*> mTmpReplicas;
 
     std::vector<std::size_t> mFileIndices;
 
@@ -166,25 +166,25 @@ public:
     CDeterministicTransferGen(IBaseSim* sim,
                               std::shared_ptr<CTransferBatchManager> transferMgr,
                               const std::string& filePathTmpl,
-                              const std::uint32_t startFileIdx=0)
+                              std::uint32_t startFileIdx=0)
         : mSim(sim), mTransferMgr(transferMgr),
           mFilePathTmpl(filePathTmpl), mCurFileIdx(startFileIdx)
     {
         bool ok = ReadNextJobBatch();
         assert(ok);
         mNextCallTick = mCurJobBatch->first;
-        mSim->mRucio->mFiles.reserve(12000000);
-        mFileIndices.resize(12000000, 12000000);
+        //mSim->mRucio->mFiles.reserve(12000000);
+        //mFileIndices.resize(12000000, 12000000);
     }
 
-    void InsertTmpReplica(std::shared_ptr<SReplica> replica)
+    void InsertTmpReplica(SReplica* replica)
     {
         auto tmpReplicaIt = mTmpReplicas.begin();
         while (tmpReplicaIt != mTmpReplicas.end())
         {
             if ((*tmpReplicaIt)->mExpiresAt <= replica->mExpiresAt)
             {
-                mTmpReplicas.insert(tmpReplicaIt, std::move(replica));
+                mTmpReplicas.insert(tmpReplicaIt, replica);
                 return;
             }
             ++tmpReplicaIt;
@@ -193,20 +193,20 @@ public:
             mTmpReplicas.emplace_back(replica);
     }
 
-    void CleanupTmpReplicas(const TickType now)
+    void CleanupTmpReplicas(TickType now)
     {
-        std::vector<std::shared_ptr<SReplica>> expiredReplicas;
+        std::vector<SReplica*> expiredReplicas;
         while (!mTmpReplicas.empty())
         {
-            std::shared_ptr<SReplica>& replica = mTmpReplicas.back();
+            SReplica* replica = mTmpReplicas.back();
             if (now < replica->mExpiresAt)
             {
                 mNextCallTick = std::min(mNextCallTick, replica->mExpiresAt);
                 break;
             }
-
-            std::vector<std::shared_ptr<SReplica>>& fileReplicas = replica->GetFile()->mReplicas;
-            replica->OnRemoveByFile(now);
+            /*
+            const std::vector<SReplica*>& fileReplicas = replica->GetFile()->GetReplicas();
+            replica->GetStorageElement()->RemoveReplica(replica, now);
             expiredReplicas.emplace_back(replica);
             for(std::size_t i=0; i<fileReplicas.size(); ++i)
             {
@@ -217,7 +217,7 @@ public:
                     break;
                 }
             }
-            mTmpReplicas.pop_back();
+            mTmpReplicas.pop_back();*/
         }
 
         if (expiredReplicas.empty())
@@ -251,7 +251,7 @@ public:
         }*/
     }
 
-    void UpdateTmpReplicaExpiresAt(std::shared_ptr<SReplica> replica, const TickType newExpiresAt)
+    void UpdateTmpReplicaExpiresAt(SReplica* replica, const TickType newExpiresAt)
     {
         const TickType oldExpiresAt = replica->mExpiresAt;
         replica->ExtendExpirationTime(newExpiresAt);
@@ -287,7 +287,7 @@ public:
             mTmpReplicas.erase(curReplicaPos);
     }
 
-    void StageOut(const TickType now)
+    void StageOut(TickType now)
     {
         for (auto jobBatchIt = mJobBatchList.begin(); jobBatchIt != mJobBatchList.end(); ++jobBatchIt)
         {
@@ -305,9 +305,9 @@ public:
                 {
                     assert(mFileIndices[outFile.first] == mFileIndices.size());
 
-                    mFileIndices[outFile.first] = mSim->mRucio->mFiles.size();
-                    std::shared_ptr<SFile> file = mSim->mRucio->CreateFile(outFile.second, now, SECONDS_PER_MONTH * 13);
-                    std::shared_ptr<SReplica> srcReplica = mComputingStorageElement->CreateReplica(file, now);
+                    mFileIndices[outFile.first] = mSim->mRucio->GetFiles().size();
+                    SFile* file = mSim->mRucio->CreateFile(outFile.second, now, SECONDS_PER_MONTH * 13);
+                    SReplica* srcReplica = mComputingStorageElement->CreateReplica(file, now);
 
                     assert(srcReplica);
 
@@ -331,7 +331,7 @@ public:
         }
     }
 
-    void StageIn(const TickType now)
+    void StageIn(TickType now)
     {
         if (mCurJobBatch == mJobBatchList.end())
             return;
@@ -348,15 +348,16 @@ public:
             std::pair<CStorageElement*, CStorageElement*> tapeDiskStorageElement{nullptr, nullptr};
             for (const std::pair<std::uint64_t, SpaceType>& inFile : job.mInputFiles)
             {
-                std::shared_ptr<SFile> file;
+                SFile* file;
+                const std::vector<std::unique_ptr<SFile>>& files = mSim->mRucio->GetFiles();
                 if(mFileIndices[inFile.first] == mFileIndices.size())
                 {
-                    mFileIndices[inFile.first] = mSim->mRucio->mFiles.size();
+                    mFileIndices[inFile.first] = files.size();
                     file = mSim->mRucio->CreateFile(inFile.second, now, SECONDS_PER_MONTH * 13);
                 }
                 else if(!tapeDiskStorageElement.first)
                 {
-                    file = mSim->mRucio->mFiles[mFileIndices[inFile.first]];
+                    file = files[mFileIndices[inFile.first]].get();
 
                     for(const std::pair<CStorageElement*, CStorageElement*>& tapeDisk : mTapeStorageElements)
                     {
@@ -380,8 +381,8 @@ public:
 
             for (const std::pair<std::uint64_t, SpaceType>& inFile : job.mInputFiles)
             {
-                std::shared_ptr<SFile> file = mSim->mRucio->mFiles[mFileIndices[inFile.first]];
-                std::shared_ptr<SReplica> srcReplica = file->GetReplicaByStorageElement(tapeDiskStorageElement.first);
+                SFile* file = mSim->mRucio->GetFiles()[mFileIndices[inFile.first]].get();
+                SReplica* srcReplica = file->GetReplicaByStorageElement(tapeDiskStorageElement.first);
 
                 if(!srcReplica)
                 {
@@ -390,7 +391,7 @@ public:
                     srcReplica->Increase(inFile.second, now);
                 }
 
-                std::shared_ptr<SReplica> dstReplica = tapeDiskStorageElement.second->CreateReplica(file, now);
+                SReplica* dstReplica = tapeDiskStorageElement.second->CreateReplica(file, now);
                 assert(dstReplica);
 
                 //dstReplica->mExpiresAt = job.mJobEndTime + 60;
@@ -411,7 +412,7 @@ public:
         mNextCallTick = std::min(mNextCallTick, mCurJobBatch->first);
     }
 
-    void OnUpdate(const TickType now)
+    void OnUpdate(TickType now)
     {
         CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
 
@@ -440,7 +441,7 @@ public:
         }
     }
 
-    void Shutdown(const TickType now)
+    void Shutdown(TickType now)
     {
         (void)now;
         std::size_t numQueuedStageOut = 0;
@@ -526,7 +527,7 @@ bool CDeterministicSim01::SetupDefaults(const json& profileJson)
                 std::cout<<"Failed to find computingStorageElements: "<<storageElementName.get<std::string>()<<std::endl;
         }
 
-        mRucio->mFileActionListeners.emplace_back(transferGen);
+        //mRucio->mFileActionListeners.emplace_back(transferGen);
         //mRucio->mReplicaActionListeners.emplace_back(transferGen);
     }
     catch(const json::out_of_range& error)
@@ -550,11 +551,11 @@ bool CDeterministicSim01::SetupDefaults(const json& profileJson)
     }
     //heartbeat->mProccessDurations[reaper->mName] = &(reaper->mUpdateDurationSummed);
 
-    heartbeat->mProccessDurations[transferManager->mName] = &(transferManager->mUpdateDurationSummed);
-    heartbeat->mProccessDurations[transferGen->mName] = &(transferGen->mUpdateDurationSummed);
-    heartbeat->mProccessDurations["TransferGenClean"] = &(transferGen->mUpdateCleanDurationSummed);
-    heartbeat->mProccessDurations["TransferGenIn"] = &(transferGen->mUpdateInDurationSummed);
-    heartbeat->mProccessDurations["TransferGenOut"] = &(transferGen->mUpdateOutDurationSummed);
+    //heartbeat->mProccessDurations[transferManager->mName] = &(transferManager->mUpdateDurationSummed);
+    //heartbeat->mProccessDurations[transferGen->mName] = &(transferGen->mUpdateDurationSummed);
+    //heartbeat->mProccessDurations["TransferGenClean"] = &(transferGen->mUpdateCleanDurationSummed);
+    //heartbeat->mProccessDurations["TransferGenIn"] = &(transferGen->mUpdateInDurationSummed);
+    //heartbeat->mProccessDurations["TransferGenOut"] = &(transferGen->mUpdateOutDurationSummed);
 
     mSchedule.push(transferManager);
     mSchedule.push(transferGen);

@@ -112,7 +112,7 @@
             "type": "jobIO",
             "name": "JobIOTransferGen",
             "tickFreq": 20,
-            "startTick": 0,
+            "startTick": 1814400,
             "infos": [
                 {
                     "cloudStorageElement": "google_eu",

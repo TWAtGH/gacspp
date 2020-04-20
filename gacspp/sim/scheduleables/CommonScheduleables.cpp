@@ -52,7 +52,7 @@ void  CDataGenerator::CreateFilesAndReplicas(const std::uint32_t numFiles, const
         const SpaceType fileSize = static_cast<SpaceType>(GiB_TO_BYTES(mFileSizeGen->GetValue(mSim->mRNGEngine)));
         const TickType lifetime = static_cast<TickType>(DAYS_TO_SECONDS(mFileLifetimeGen->GetValue(mSim->mRNGEngine)));
 
-        std::shared_ptr<SFile> file = mSim->mRucio->CreateFile(fileSize, now, lifetime);
+        SFile* file = mSim->mRucio->CreateFile(fileSize, now, lifetime);
 
         auto reverseRSEIt = mStorageElements.rbegin();
         auto selectedElementIt = mStorageElements.begin();
@@ -62,7 +62,7 @@ void  CDataGenerator::CreateFilesAndReplicas(const std::uint32_t numFiles, const
             if(mSelectStorageElementsRandomly)
                 selectedElementIt = mStorageElements.begin() + (rngSampler(mSim->mRNGEngine) % (numStorageElements - numCreated));
 
-            std::shared_ptr<SReplica> r = (*selectedElementIt)->CreateReplica(file, now);
+            SReplica* r = (*selectedElementIt)->CreateReplica(file, now);
 
             r->Increase(fileSize, now);
             r->mExpiresAt = now + (lifetime / numReplicasPerFile);
@@ -187,7 +187,7 @@ void CHeartbeat::OnUpdate(const TickType now)
 
     statusOutput << "[" << std::setw(6) << static_cast<TickType>(now / 1000.0) << "k]: ";
     statusOutput << "Runtime: " << mUpdateDurationSummed.count() << "s; ";
-    statusOutput << "numFiles: " << static_cast<std::size_t>(mSim->mRucio->mFiles.size() / 1000.0) << "k" << std::endl;
+    statusOutput << "numFiles: " << static_cast<std::size_t>(mSim->mRucio->GetFiles().size() / 1000.0) << "k" << std::endl;
 
     statusOutput << "Transfer stats:" << std::endl;
     for (std::shared_ptr<CBaseTransferManager>& transferManager : mTransferManagers)
@@ -213,18 +213,29 @@ void CHeartbeat::OnUpdate(const TickType now)
 
 
     std::size_t maxW = 0;
-    for (auto it : mProccessDurations)
-        if (it.first.size() > maxW)
-            maxW = it.first.size();
+    std::size_t idx = 0;
+    while(idx < mProccessDurations.size())
+    {
+        std::shared_ptr<CScheduleable> scheduleable = mProccessDurations[idx].lock();
+        if (!scheduleable)
+        {
+            mProccessDurations.erase(mProccessDurations.begin() + idx);
+            continue;
+        }
+        if (scheduleable->mName.size() > maxW)
+            maxW = scheduleable->mName.size();
+        ++idx;
+    }
 
     statusOutput << "Sim stats:" << std::endl;
     statusOutput << "  " << std::setw(maxW) << "Duration: " << std::setw(6) << timeDiff.count() << "s\n";
-    for(auto it : mProccessDurations)
+    for(std::weak_ptr<CScheduleable> weakptr : mProccessDurations)
     {
-        statusOutput << "  " << std::setw(maxW) << it.first;
-        statusOutput << ": " << std::setw(6) << it.second->count();
-        statusOutput << "s ("<< std::setw(5) << (it.second->count() / timeDiff.count()) * 100 << "%)\n";
-        *(it.second) = std::chrono::duration<double>::zero();
+        std::shared_ptr<CScheduleable> scheduleable = weakptr.lock();
+        statusOutput << "  " << std::setw(maxW) << scheduleable->mName;
+        statusOutput << ": " << std::setw(6) << scheduleable->mUpdateDurationSummed.count();
+        statusOutput << "s ("<< std::setw(5) << (scheduleable->mUpdateDurationSummed.count() / timeDiff.count()) * 100 << "%)\n";
+        scheduleable->mUpdateDurationSummed = std::chrono::duration<double>::zero();
     }
     std::cout << statusOutput.str() << std::endl;
 

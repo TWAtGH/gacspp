@@ -15,7 +15,7 @@ class IStorageElementDelegate;
 class ISite
 {
 public:
-    ISite(std::string&& name, std::string&& locationName, const std::uint8_t multiLocationIdx);
+    ISite(std::string&& name, std::string&& locationName, std::uint8_t multiLocationIdx);
 
     ISite(ISite&&) = delete;
     ISite& operator=(ISite&&) = delete;
@@ -31,7 +31,7 @@ public:
     {return mId != b.mId;}
 
     virtual auto CreateStorageElement(std::string&& name, bool allowDuplicateReplicas = false, SpaceType quota = 0) -> CStorageElement* = 0;
-    virtual void GetStorageElements(std::vector<CStorageElement*>& storageElements) = 0;
+    virtual auto GetStorageElements() const -> std::vector<CStorageElement*> = 0;
 
     inline auto GetId() const -> IdType
     {return mId;}

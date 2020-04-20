@@ -15,7 +15,7 @@ struct SFile;
 struct SReplica;
 
 class IStorageElementDelegate;
-class IReplicaActionListener;
+class IStorageElementActionListener;
 
 
 class CStorageElement
@@ -32,36 +32,38 @@ public:
 
     CStorageElement(std::string&& name, ISite* site, bool allowDuplicateReplicas = false, SpaceType quota = 0);
 
-    virtual void OnOperation(const OPERATION op);
+    virtual void OnOperation(OPERATION op);
 
-    virtual auto CreateNetworkLink(CStorageElement* const dstStorageElement, const SpaceType bandwidth) -> CNetworkLink*;
-    virtual auto CreateReplica(std::shared_ptr<SFile> file, const TickType now) -> std::shared_ptr<SReplica>;
-    virtual void OnIncreaseReplica(const SpaceType amount, const TickType now);
-    virtual void OnRemoveReplica(const SReplica* replica, const TickType now, const bool needLock=true);
+    virtual auto CreateNetworkLink(CStorageElement* dstStorageElement, SpaceType bandwidth) -> CNetworkLink*;
+
+    virtual auto CreateReplica(SFile* file, TickType now) -> SReplica*;
+    virtual void RemoveReplica(SReplica* replica, TickType now, bool needLock = true);
+    virtual void OnIncreaseReplica(SpaceType amount, TickType now);
 
     inline auto GetId() const -> IdType
     {return mId;}
     inline auto GetName() const -> const std::string&
     {return mName;}
-    inline auto GetSite() const -> const ISite*
-    {return mSite;}
-    inline auto GetSite() -> ISite*
+    inline auto GetSite() const -> ISite*
     {return mSite;}
 
-    auto GetUsedStorage() const -> SpaceType;
+    auto GetReplicas() const -> const std::vector<std::unique_ptr<SReplica>>&;
+
+    inline auto GetNetworkLinks() const -> const std::vector<std::unique_ptr<CNetworkLink>>&
+    {return mNetworkLinks;}
+    auto GetNetworkLink(const CStorageElement* dstStorageElement) const -> CNetworkLink*;
+
+    auto GetUsedStorage() const->SpaceType;
     auto GetUsedStorageQuotaRatio() const -> double;
 
-    auto GetNetworkLink(const CStorageElement* const dstStorageElement) -> CNetworkLink*;
-    auto GetNetworkLink(const CStorageElement* const dstStorageElement) const -> const CNetworkLink*;
+    std::vector<IStorageElementActionListener*> mActionListener;
 
-    std::vector<std::unique_ptr<CNetworkLink>> mNetworkLinks;
-    std::vector<std::shared_ptr<SReplica>> mReplicas;
-
-    std::vector<std::weak_ptr<IReplicaActionListener>> mReplicaActionListeners;
 
 private:
     IdType mId;
     std::string mName;
+
+    std::vector<std::unique_ptr<CNetworkLink>> mNetworkLinks;
 
 protected:
     ISite* mSite;
@@ -85,13 +87,15 @@ public:
     virtual ~IStorageElementDelegate();
 
 
-    virtual void OnOperation(const CStorageElement::OPERATION op) = 0;
+    virtual void OnOperation(CStorageElement::OPERATION op) = 0;
 
-    virtual auto CreateReplica(std::shared_ptr<SFile> file, const TickType now) -> std::shared_ptr<SReplica> = 0;
-    virtual void OnIncreaseReplica(const SpaceType amount, const TickType now) = 0;
-    virtual void OnRemoveReplica(const SReplica* replica, const TickType now, bool needLock=true) = 0;
+    virtual auto CreateReplica(SFile* file, TickType now)->SReplica* = 0;
+    virtual void RemoveReplica(SReplica* replica, TickType now, bool needLock = true) = 0;
+    virtual void OnIncreaseReplica(SpaceType amount, TickType now) = 0;
 
-    inline auto GetStorageElement() -> CStorageElement*
+    inline auto GetReplicas() const -> const std::vector<std::unique_ptr<SReplica>>&
+    {return mReplicas;}
+    inline auto GetStorageElement() const -> CStorageElement*
     {return mStorageElement;}
     inline auto GetUsedStorage() const -> SpaceType
     {return mUsedStorage;}
@@ -99,6 +103,7 @@ public:
     {return (mQuota > 0) ? static_cast<double>(mUsedStorage) / mQuota : 0;}
 
 protected:
+    std::vector<std::unique_ptr<SReplica>> mReplicas;
     CStorageElement *mStorageElement;
     SpaceType mUsedStorage = 0;
     SpaceType mQuota;
@@ -112,11 +117,11 @@ public:
     using IStorageElementDelegate::IStorageElementDelegate;
 
 
-    virtual void OnOperation(const CStorageElement::OPERATION op);
+    void OnOperation(CStorageElement::OPERATION op) override;
 
-    virtual auto CreateReplica(std::shared_ptr<SFile> file, const TickType now) -> std::shared_ptr<SReplica>;
-    virtual void OnIncreaseReplica(const SpaceType amount, const TickType now);
-    virtual void OnRemoveReplica(const SReplica* replica, const TickType now, bool needLock=true);
+    auto CreateReplica(SFile* file, TickType now)->SReplica* override;
+    void RemoveReplica(SReplica* replica, TickType now, bool needLock = true) override;
+    void OnIncreaseReplica(SpaceType amount, TickType now) override;
 
 protected:
     std::mutex mReplicaRemoveMutex;
@@ -130,5 +135,5 @@ public:
     using CBaseStorageElementDelegate::CBaseStorageElementDelegate;
 
 
-    virtual auto CreateReplica(std::shared_ptr<SFile> file, const TickType now) -> std::shared_ptr<SReplica>;
+    auto CreateReplica(SFile* file, TickType now) -> SReplica* override;
 };
