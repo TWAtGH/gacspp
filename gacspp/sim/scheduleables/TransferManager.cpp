@@ -242,7 +242,6 @@ void CTransferManager::OnUpdate(TickType now)
     const std::uint32_t timeDiff = static_cast<std::uint32_t>(now - mLastUpdated);
     mLastUpdated = now;
 
-    const std::size_t firstNewActiveIdx = mActiveTransfers.size();
     std::size_t idx = 0;
     while(idx < mQueuedTransfers.size())
     {

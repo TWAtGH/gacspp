@@ -189,6 +189,22 @@ void CRucio::RemoveFile(SFile* file, TickType now)
     mFiles.pop_back();
 }
 
+void CRucio::RemoveAllFiles(TickType now)
+{
+    while (mFiles.size() > 0)
+    {
+        SFile* file = mFiles.back().get();
+
+        for (IRucioActionListener* listener : mActionListener)
+            listener->PreRemoveFile(file, now);
+
+        for (SReplica* replica : file->GetReplicas())
+            replica->GetStorageElement()->RemoveReplica(replica, now, false);
+
+        mFiles.pop_back();
+    }
+}
+
 auto CRucio::RemoveExpiredReplicasFromFile(SFile* file, TickType now) -> std::size_t
 {
     std::vector<SReplica*> replicas = file->GetReplicas();

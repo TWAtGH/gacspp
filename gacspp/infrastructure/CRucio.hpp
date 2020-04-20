@@ -48,6 +48,7 @@ public:
     auto CreateFile(SpaceType size, TickType now, TickType lifetime) -> SFile*;
     
     void RemoveFile(SFile* file, TickType now);
+    void RemoveAllFiles(TickType now);
     auto RemoveExpiredReplicasFromFile(SFile* file, TickType now) -> std::size_t;
     auto ExtractExpiredReplicasFromFile(SFile* file, TickType now) -> std::vector<SReplica*>;
 

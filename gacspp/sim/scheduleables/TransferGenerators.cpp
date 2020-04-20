@@ -227,11 +227,6 @@ void CCloudBufferTransferGen::OnUpdate(TickType now)
     mNextCallTick = now + mTickFreq;
 }
 
-void CCloudBufferTransferGen::Shutdown(TickType now)
-{
-    //rucio->RemoveAllFiles();
-}
-
 
 
 CJobIOTransferGen::CJobIOTransferGen(IBaseSim* sim,
@@ -419,21 +414,10 @@ void CJobIOTransferGen::OnUpdate(TickType now)
                 if(!replica->IsComplete())
                     continue;
 
-                SFile* file = replica->GetFile();
-                bool exists = false;
-                for(SSiteInfo& siteInfoCheck : mSiteInfos)
-                {
-                    if(file->GetReplicaByStorageElement(diskSE))
-                    {
-                        exists = true;
-                        break;
-                    }
-                }
-                if(exists)
+                SReplica* newReplica = diskSE->CreateReplica(replica->GetFile(), now);
+                if (!newReplica)
                     continue;
-                
-                SReplica* newReplica = diskSE->CreateReplica(file, now);
-                assert(newReplica);
+
                 mTransferMgr->CreateTransfer(replica.get(), newReplica, now, true);
                 numTransfers -= 1;
             }
@@ -759,26 +743,3 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
 
     mNextCallTick = now + mTickFreq;
 }
-
-void CCachedSrcTransferGen::Shutdown(const TickType now)
-{
-    (void)now;
-    /*std::vector<std::weak_ptr<SFile>> files;
-    files.reserve(mSim->mRucio->mFiles.size());
-    std::vector<std::weak_ptr<SReplica>> replicas;
-    replicas.reserve(files.size() * 4);
-    for(std::shared_ptr<SFile>& file : mSim->mRucio->mFiles)
-    {
-        files.emplace_back(file);
-        for(std::shared_ptr<SReplica>& replica : file->mReplicas)
-            replicas.emplace_back(replica);
-    }
-    OnFilesDeleted(now, files);
-    OnReplicasDeleted(now, replicas);*/
-}
-/*
-void CCachedSrcTransferGen::OnFileCreated(const TickType now, std::shared_ptr<SFile> file)
-{
-    CBaseOnDeletionInsert::OnFileCreated(now, file);
-    mRatiosAndFilesPerAccessCount[0].second.emplace_back(file);
-}*/

@@ -37,6 +37,8 @@ void IBaseSim::Run(TickType maxTick)
         mSchedule.top()->Shutdown(mCurrentTick);
         mSchedule.pop();
     }
+
+    mRucio->RemoveAllFiles(mCurrentTick);
 }
 
 void IBaseSim::Stop()

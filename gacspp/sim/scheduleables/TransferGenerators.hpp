@@ -85,7 +85,6 @@ public:
                         const TickType startTick=0 );
 
     void OnUpdate(const TickType now) final;
-    void Shutdown(const TickType now) final;
 };
 
 
@@ -197,5 +196,4 @@ public:
     TickType mDefaultReplicaLifetime;
 
     void OnUpdate(TickType now) final;
-    void Shutdown(TickType now) final;
 };
