@@ -132,6 +132,22 @@ CCloudBufferTransferGen::CCloudBufferTransferGen(IBaseSim* sim,
       mTickFreq(tickFreq)
 {}
 
+CCloudBufferTransferGen::~CCloudBufferTransferGen()
+{
+    for (std::unique_ptr<STransferGenInfo>& info : mTransferGenInfo)
+    {
+        auto listenerIt = info->mPrimaryLink->GetSrcStorageElement()->mActionListener.begin();
+        auto listenerEnd = info->mPrimaryLink->GetSrcStorageElement()->mActionListener.end();
+        for (; listenerIt != listenerEnd; ++listenerIt)
+        {
+            if ((*listenerIt) == this)
+                break;
+        }
+        if (listenerIt != listenerEnd)
+            info->mPrimaryLink->GetSrcStorageElement()->mActionListener.erase(listenerIt);
+    }
+}
+
 void CCloudBufferTransferGen::PostCreateReplica(SReplica* replica, TickType now)
 {
     (void)now;

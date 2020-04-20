@@ -83,6 +83,7 @@ public:
                         std::shared_ptr<CTransferManager> transferMgr,
                         const TickType tickFreq,
                         const TickType startTick=0 );
+    ~CCloudBufferTransferGen();
 
     void OnUpdate(const TickType now) final;
 };
