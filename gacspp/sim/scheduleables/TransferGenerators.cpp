@@ -338,7 +338,7 @@ void CJobIOTransferGen::OnUpdate(TickType now)
                 std::size_t numOutputReplicas = siteInfo.mNumOutputGen->GetValue(rngEngine);
                 for(;numOutputReplicas>0; --numOutputReplicas)
                 {
-                    SpaceType size = siteInfo.mOutputSizeGen->GetValue(rngEngine);
+                    SpaceType size = static_cast<SpaceType>(GiB_TO_BYTES(siteInfo.mOutputSizeGen->GetValue(rngEngine)));
                     SFile* outputFile = mSim->mRucio->CreateFile(size, now, SECONDS_PER_MONTH*6);
                     outputReplicas.emplace_back(outputSE->CreateReplica(outputFile, now));
                     cpuToOutputLink->mNumActiveTransfers += 1;

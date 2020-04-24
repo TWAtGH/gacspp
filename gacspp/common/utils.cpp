@@ -109,16 +109,20 @@ auto IValueGenerator::CreateFromJson(const json& cfg) -> std::unique_ptr<IValueG
 void IValueGenerator::SetMin(std::unique_ptr<IValueLimiter>&& min)
 {
     assert(min);
-    if(mMaxLimiter)
+    if (mMaxLimiter)
+    {
         assert(min->GetLimitValue() < mMaxLimiter->GetLimitValue());
+    }
     mMinLimiter = std::move(min);
 }
 
 void IValueGenerator::SetMax(std::unique_ptr<IValueLimiter>&& max)
 {
     assert(max);
-    if(mMinLimiter)
+    if (mMinLimiter)
+    {
         assert(max->GetLimitValue() > mMinLimiter->GetLimitValue());
+    }
     mMaxLimiter = std::move(max);
 }
 
