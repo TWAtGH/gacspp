@@ -65,13 +65,13 @@
         "manager": {
             "type": "bandwidth",
             "name": "Tape2DiskTransferMgr",
-            "tickFreq": 20,
+            "tickFreq": 10,
             "startTick": 5
         },
         "generator": {
             "type": "cloudBuffer",
             "name": "Tape2DiskTransferGen",
-            "tickFreq": 20,
+            "tickFreq": 10,
             "startTick": 0,
             "readNewSrcReplicas": true,
             "deleteSrcReplica": false,
@@ -105,13 +105,13 @@
         "manager": {
             "type": "bandwidth",
             "name": "JobIOTransferMgr",
-            "tickFreq": 20,
+            "tickFreq": 10,
             "startTick": 5
         },
         "generator": {
             "type": "jobIO",
             "name": "JobIOTransferGen",
-            "tickFreq": 20,
+            "tickFreq": 10,
             "startTick": 1814400,
             "infos": [
                 {

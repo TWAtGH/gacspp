@@ -199,9 +199,13 @@ void CCloudBufferTransferGen::OnUpdate(TickType now)
         CNetworkLink* networkLink = info->mPrimaryLink;
         CStorageElement* dstStorageElement = networkLink->GetDstStorageElement();
         std::forward_list<SReplica*>& replicas = info->mReplicas;
+        
+        assert(networkLink->mMaxNumActiveTransfers >= networkLink->mNumActiveTransfers);
+        std::size_t numToCreate = networkLink->mMaxNumActiveTransfers - networkLink->mNumActiveTransfers;
+
         auto prev = replicas.before_begin();
         auto cur = replicas.begin();
-        while(cur != replicas.end())
+        while((cur != replicas.end()) && (numToCreate > 0))
         {
             SReplica* srcReplica = (*cur);
             if(!srcReplica->IsComplete())
@@ -214,28 +218,29 @@ void CCloudBufferTransferGen::OnUpdate(TickType now)
                 continue;
             }
 
-            if(networkLink->mNumActiveTransfers < networkLink->mMaxNumActiveTransfers)
+            SFile* file = srcReplica->GetFile();
+            SReplica* newReplica = dstStorageElement->CreateReplica(file, now);
+            if(!newReplica && info->mSecondaryLink)
             {
-                SFile* file = srcReplica->GetFile();
-                SReplica* newReplica = dstStorageElement->CreateReplica(file, now);
-                if(!newReplica && info->mSecondaryLink)
-                {
-                    networkLink = info->mSecondaryLink;
-                    if(networkLink->mNumActiveTransfers < networkLink->mMaxNumActiveTransfers)
-                    {
-                        dstStorageElement = networkLink->GetDstStorageElement();
-                        newReplica = dstStorageElement->CreateReplica(file, now);
-                    }
-                }
+                networkLink = info->mSecondaryLink;
 
-                if(newReplica)
+                assert(networkLink->mMaxNumActiveTransfers >= networkLink->mNumActiveTransfers);
+                numToCreate = networkLink->mMaxNumActiveTransfers - networkLink->mNumActiveTransfers;
+
+                if(numToCreate > 0)
                 {
-                    mTransferMgr->CreateTransfer(srcReplica, newReplica, now, mDeleteSrcReplica);
-                    cur = replicas.erase_after(prev);
-                    continue; //same idx again
+                    dstStorageElement = networkLink->GetDstStorageElement();
+                    newReplica = dstStorageElement->CreateReplica(file, now);
                 }
             }
 
+            if(newReplica)
+            {
+                mTransferMgr->CreateTransfer(srcReplica, newReplica, now, mDeleteSrcReplica);
+                cur = replicas.erase_after(prev);
+                numToCreate -= 1;
+                continue; //same idx again
+            }
             break;
         }
     }
@@ -252,7 +257,8 @@ CJobIOTransferGen::CJobIOTransferGen(IBaseSim* sim,
     : CScheduleable(startTick),
       mSim(sim),
       mTransferMgr(transferMgr),
-      mTickFreq(tickFreq)
+      mTickFreq(tickFreq),
+      mLastUpdateTime(startTick)
 {
     mTraceInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Traces(id, jobId, storageElementId, fileId, replicaId, type, startedAt, finishedAt, traffic) FROM STDIN with(FORMAT csv);", 9, '?');
 }
@@ -287,18 +293,16 @@ void CJobIOTransferGen::OnUpdate(TickType now)
         {
             SFile* inputFile = jobInfoIt->mInputFile;
             std::vector<SReplica*>& outputReplicas = jobInfoIt->mOutputReplicas;
-            if(jobInfoIt->mCurInputFileSize < inputFile->GetSize())
+            if (jobInfoIt->mCurInputFileSize == 0)
+            {
+                //download just started
+                jobInfoIt->mCurInputFileSize += 1;
+                jobInfoIt->mStartedAt = now;
+                diskToCPULink->mNumActiveTransfers += 1;
+            }
+            else if(jobInfoIt->mCurInputFileSize < inputFile->GetSize())
             {
                 //still downloading input
-
-                //update download
-                if(jobInfoIt->mCurInputFileSize == 0)
-                {
-                    //download just started
-                    jobInfoIt->mCurInputFileSize += 1;
-                    jobInfoIt->mStartedAt = now;
-                    diskToCPULink->mNumActiveTransfers += 1;
-                }
 
                 SpaceType newSize = jobInfoIt->mCurInputFileSize + bytesDownloaded;
                 if(newSize >= inputFile->GetSize())

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <forward_list>
+#include <list>
+#include <unordered_map>
 
 #include "CScheduleable.hpp"
 #include "infrastructure/IActionListener.hpp"
@@ -116,7 +118,7 @@ private:
     };
 
     std::vector<std::unique_ptr<STransfer>> mActiveTransfers;
-    std::vector<std::unique_ptr<STransfer>> mQueuedTransfers;
+    std::unordered_map<CNetworkLink*, std::list<std::unique_ptr<STransfer>>> mQueuedTransfers;
 
 public:
     CTransferManager(TickType tickFreq, TickType startTick = 0);

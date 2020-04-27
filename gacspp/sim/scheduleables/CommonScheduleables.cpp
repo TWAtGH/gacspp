@@ -192,12 +192,11 @@ void CHeartbeat::OnUpdate(const TickType now)
     statusOutput << "Transfer stats:" << std::endl;
     for (std::shared_ptr<CBaseTransferManager>& transferManager : mTransferManagers)
     {
-        std::uint64_t sumNumTransfers = transferManager->GetNumActiveTransfers() + transferManager->mNumCompletedTransfers + transferManager->mNumFailedTransfers;
         statusOutput << transferManager->mName << std::endl;
 
         statusOutput << "  avg duration: ";
-        if (sumNumTransfers > 0)
-            statusOutput << transferManager->mSummedTransferDuration / sumNumTransfers;
+        if (transferManager->mNumCompletedTransfers > 0)
+            statusOutput << static_cast<TickType>(transferManager->mSummedTransferDuration / static_cast<double>(transferManager->mNumCompletedTransfers));
         else
             statusOutput << "-";
         statusOutput << std::endl;
