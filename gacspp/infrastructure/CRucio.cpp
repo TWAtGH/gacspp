@@ -179,6 +179,8 @@ auto CRucio::CreateFile(SpaceType size, TickType now, TickType lifetime) -> SFil
 
 void CRucio::RemoveFile(SFile* file, TickType now)
 {
+    file->mExpiresAt = now;
+
     for (IRucioActionListener* listener : mActionListener)
         listener->PreRemoveFile(file, now);
 
@@ -199,6 +201,8 @@ void CRucio::RemoveAllFiles(TickType now)
     while (mFiles.size() > 0)
     {
         SFile* file = mFiles.back().get();
+        
+        file->mExpiresAt = now;
 
         for (IRucioActionListener* listener : mActionListener)
             listener->PreRemoveFile(file, now);

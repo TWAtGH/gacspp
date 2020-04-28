@@ -48,8 +48,6 @@ void CBaseStorageElementDelegate::RemoveReplica(SReplica* replica, TickType now,
     if (needLock)
         lock.lock();
 
-    replica->mExpiresAt = now;
-
     if (replica->mRemoveListener)
     {
         if (replica->mRemoveListener->PreRemoveReplica(replica, now) == false)
@@ -134,6 +132,8 @@ auto CStorageElement::CreateReplica(SFile* file, TickType now) -> SReplica*
 void CStorageElement::RemoveReplica(SReplica* replica, TickType now, bool needLock)
 {
     assert(this == replica->GetStorageElement());
+    
+    replica->mExpiresAt = now;
 
     for (IStorageElementActionListener* listener : mActionListener)
         listener->PreRemoveReplica(replica, now);
