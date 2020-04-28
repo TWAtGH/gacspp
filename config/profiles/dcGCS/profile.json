@@ -71,7 +71,7 @@
         "generator": {
             "type": "cloudBuffer",
             "name": "Tape2DiskTransferGen",
-            "tickFreq": 10,
+            "tickFreq": 15,
             "startTick": 0,
             "readNewSrcReplicas": true,
             "deleteSrcReplica": false,
@@ -111,7 +111,7 @@
         "generator": {
             "type": "jobIO",
             "name": "JobIOTransferGen",
-            "tickFreq": 10,
+            "tickFreq": 15,
             "startTick": 1814400,
             "infos": [
                 {
@@ -120,13 +120,13 @@
                     "cpuStorageElement": "CERN-PROD_CPU",
                     "outputStorageElement": "CERN-PROD_OUTPUT",
                     "numCores": 30000,
-                    "coreFillRate": 250,
+                    "coreFillRate": 150,
                     "jobDurationCfg": {
                         "type": "normal",
-                        "mean": 5,
+                        "mean": 60,
                         "stddev": 0.25,
-                        "minCfg": {"type": "minClip", "limit": 1},
-                        "maxCfg": {"type": "maxClip", "limit": 30}
+                        "minCfg": {"type": "minAdd", "limit": 15},
+                        "maxCfg": {"type": "maxClip", "limit": 120}
                     },
                     "numOutputCfg": {
                         "type": "normal",
@@ -148,13 +148,13 @@
                     "cpuStorageElement": "UKI-NORTHGRID-MAN-HEP_CPU",
                     "outputStorageElement": "UKI-NORTHGRID-MAN-HEP_OUTPUT",
                     "numCores": 20000,
-                    "coreFillRate": 250,
+                    "coreFillRate": 100,
                     "jobDurationCfg": {
                         "type": "normal",
-                        "mean": 5,
+                        "mean": 60,
                         "stddev": 0.25,
-                        "minCfg": {"type": "minClip", "limit": 1},
-                        "maxCfg": {"type": "maxClip", "limit": 30}
+                        "minCfg": {"type": "minAdd", "limit": 15},
+                        "maxCfg": {"type": "maxClip", "limit": 120}
                     },
                     "numOutputCfg": {
                         "type": "normal",

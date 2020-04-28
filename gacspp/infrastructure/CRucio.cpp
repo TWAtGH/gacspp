@@ -161,6 +161,11 @@ CRucio::CRucio()
 
 CRucio::~CRucio() = default;
 
+void CRucio::ReserveFileSpace(std::size_t amount)
+{
+    mFiles.reserve(mFiles.capacity() + amount);
+}
+
 auto CRucio::CreateFile(SpaceType size, TickType now, TickType lifetime) -> SFile*
 {
     mFiles.emplace_back(std::make_unique<SFile>(size, now, lifetime, mFiles.size()));

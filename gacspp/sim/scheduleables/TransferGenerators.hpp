@@ -121,7 +121,9 @@ public:
         std::unique_ptr<IValueGenerator> mOutputSizeGen;
         std::size_t mNumCores;
         std::size_t mCoreFillRate;
-        std::list<SJobInfo> mJobInfos;
+        std::list<std::unique_ptr<SJobInfo>> mJobInfos;
+        std::list<std::pair<TickType, std::list<std::unique_ptr<SJobInfo>>>> mRunningJobs;
+        std::size_t mNumRunningJobs = 0;
     };
     std::vector<SSiteInfo> mSiteInfos;
 

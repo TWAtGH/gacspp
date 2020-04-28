@@ -46,6 +46,7 @@ void  CDataGenerator::CreateFilesAndReplicas(const std::uint32_t numFiles, const
 
     assert(numReplicasPerFile <= numStorageElements);
 
+    mSim->mRucio->ReserveFileSpace(numFiles);
     std::uniform_int_distribution<std::uint32_t> rngSampler(0, numStorageElements);
     for(std::uint32_t i = 0; i < numFiles; ++i)
     {

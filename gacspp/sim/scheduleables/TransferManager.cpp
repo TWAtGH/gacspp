@@ -300,6 +300,8 @@ void CTransferManager::OnUpdate(TickType now)
             continue; // handle same idx again
         }
 
+        assert(networkLink->mNumActiveTransfers > 0);
+
         const double sharedBandwidth = networkLink->mBandwidthBytesPerSecond / static_cast<double>(networkLink->mNumActiveTransfers);
         std::uint32_t amount = static_cast<std::uint32_t>(sharedBandwidth * timeDiff);
         amount = dstReplica->Increase(amount, now);
@@ -322,7 +324,7 @@ void CTransferManager::OnUpdate(TickType now)
             transferInsertQueries->AddValue(dstReplica->GetCurSize());
 
             ++mNumCompletedTransfers;
-            mSummedTransferDuration += now - transfer->mStartAt;
+            mSummedTransferDuration += 1 + now - transfer->mStartAt;
 
             networkLink->mNumDoneTransfers += 1;
             networkLink->mNumActiveTransfers -= 1;

@@ -45,6 +45,7 @@ public:
     CRucio();
     ~CRucio();
 
+    void ReserveFileSpace(std::size_t amount);
     auto CreateFile(SpaceType size, TickType now, TickType lifetime) -> SFile*;
     
     void RemoveFile(SFile* file, TickType now);
