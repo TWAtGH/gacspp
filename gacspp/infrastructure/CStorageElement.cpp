@@ -48,6 +48,8 @@ void CBaseStorageElementDelegate::RemoveReplica(SReplica* replica, TickType now,
     if (needLock)
         lock.lock();
 
+    replica->mExpiresAt = now;
+
     if (replica->mRemoveListener)
     {
         if (replica->mRemoveListener->PreRemoveReplica(replica, now) == false)
