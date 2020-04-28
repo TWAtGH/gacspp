@@ -201,9 +201,9 @@ CTransferManager::STransfer::STransfer( SReplica* srcReplica,
 
 CTransferManager::STransfer::~STransfer()
 {
-    if(mSrcReplica->mRemoveListener)
+    if(mSrcReplica && mSrcReplica->mRemoveListener)
         RemoveListener(mSrcReplica, this);
-    if(mDstReplica->mRemoveListener)
+    if(mDstReplica && mDstReplica->mRemoveListener)
         RemoveListener(mDstReplica, this);
 }
 
@@ -274,10 +274,6 @@ void CTransferManager::OnUpdate(TickType now)
         }
     }
 
-    //for(std::unique_ptr<ITransferStartListener>& listener: mStartListeners)
-        //for(idx=firstNewActiveIdx; idx<mActiveTransfers.size(); ++idx)
-            //listener->OnTransferStarted(mActiveTransfers[idx].mSrcReplica, mActiveTransfers[idx].mSrcReplica, mActiveTransfers[idx].mNetworkLink);
-
     std::size_t idx = 0;
     std::unique_ptr<IInsertValuesContainer> transferInsertQueries = mOutputTransferInsertQuery->CreateValuesContainer(6 + mActiveTransfers.size());
 
@@ -290,9 +286,6 @@ void CTransferManager::OnUpdate(TickType now)
 
         if(!srcReplica || !dstReplica)
         {
-            //for(std::unique_ptr<ITransferStopListener>& listener: mStopListeners)
-                //listener->OnTransferStopped(transfer.mSrcReplica, transfer.mDstReplica, transfer.mNetworkLink);
-            
             networkLink->mNumFailedTransfers += 1;
             networkLink->mNumActiveTransfers -= 1;
             transfer = std::move(mActiveTransfers.back());
@@ -309,9 +302,6 @@ void CTransferManager::OnUpdate(TickType now)
 
         if(dstReplica->IsComplete())
         {
-            //for(std::unique_ptr<ITransferStopListener>& listener: mStopListeners)
-                //listener->OnTransferStopped(transfer.mSrcReplica, transfer.mDstReplica, transfer.mNetworkLink);
-
             transferInsertQueries->AddValue(GetNewId());
             transferInsertQueries->AddValue(srcReplica->GetStorageElement()->GetId());
             transferInsertQueries->AddValue(dstReplica->GetStorageElement()->GetId());
@@ -328,14 +318,18 @@ void CTransferManager::OnUpdate(TickType now)
 
             networkLink->mNumDoneTransfers += 1;
             networkLink->mNumActiveTransfers -= 1;
-            //if(transfer->mDeleteSrcReplica)
-                //srcReplica->GetFile()->RemoveReplica(now, srcReplica);
 
             RemoveListener(srcReplica, transfer.get());
             RemoveListener(dstReplica, transfer.get());
 
+            bool deleteSrc = transfer->mDeleteSrcReplica;
+
             transfer = std::move(mActiveTransfers.back());
             mActiveTransfers.pop_back();
+
+            if (deleteSrc)
+                srcReplica->GetStorageElement()->RemoveReplica(srcReplica, now, false);
+
             continue; // handle same idx again
         }
         ++idx;
