@@ -54,6 +54,7 @@ CReaper::~CReaper()
 
 void CReaper::ReaperWorker(const std::size_t threadIdx)
 {
+    (void)threadIdx;
     TickType lastNow = 0;
     auto waitFunc = [&]{return (lastNow < mReaperWorkerNow) || !mAreThreadsRunning;};
     while(mAreThreadsRunning)

@@ -209,6 +209,7 @@ CTransferManager::STransfer::~STransfer()
 
 bool CTransferManager::STransfer::PreRemoveReplica(SReplica* replica, TickType now)
 {
+    (void)now;
     if (replica == mSrcReplica)
     {
         mSrcReplica = nullptr;
@@ -366,6 +367,7 @@ CFixedTimeTransferManager::STransfer::~STransfer()
 
 bool CFixedTimeTransferManager::STransfer::PreRemoveReplica(SReplica* replica, TickType now)
 {
+    (void)now;
     if (replica == mSrcReplica)
     {
         mSrcReplica = nullptr;

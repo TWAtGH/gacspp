@@ -305,7 +305,6 @@ void CJobIOTransferGen::OnUpdate(TickType now)
         CNetworkLink* cloudToDiskLink = siteInfo.mCloudToDiskLink;
 
         CStorageElement* diskSE = diskToCPULink->GetSrcStorageElement();
-        CStorageElement* cpuSE = diskToCPULink->GetDstStorageElement();
         CStorageElement* outputSE = cpuToOutputLink->GetDstStorageElement();
 
         //should firstly update all mNumActiveTransfers and then calculate bytesDownloaded/uploaded
