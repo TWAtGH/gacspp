@@ -162,3 +162,6 @@ auto CStorageElement::GetUsedStorage() const -> SpaceType
 
 auto CStorageElement::GetUsedStorageQuotaRatio() const -> double
 {return mDelegate->GetUsedStorageQuotaRatio();}
+
+bool CStorageElement::CanStoreVolume(SpaceType volume) const
+{return mDelegate->CanStoreVolume(volume);}

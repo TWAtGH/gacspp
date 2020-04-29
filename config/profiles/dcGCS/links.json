@@ -16,7 +16,7 @@
             "maxActiveTransfers": 50
         },
         "google_eu": {
-            "bandwidth": 10737418240,
+            "bandwidth": 1073741824,
             "maxActiveTransfers": 30
         }
     },
@@ -39,7 +39,7 @@
             "maxActiveTransfers": 50
         },
         "google_eu": {
-            "bandwidth": 10737418240,
+            "bandwidth": 1073741824,
             "maxActiveTransfers": 30
         }
     },

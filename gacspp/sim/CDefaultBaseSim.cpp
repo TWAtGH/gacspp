@@ -489,6 +489,7 @@ auto CDefaultBaseSim::CreateTransferGenerator(const json& transferGenCfg, const 
                 
                 info.mNumCores = infoJson.at("numCores").get<std::size_t>();
                 info.mCoreFillRate = infoJson.at("coreFillRate").get<std::size_t>();
+                info.mDiskQuotaThreshold = infoJson.at("diskQuotaThreshold").get<double>();
                 info.mJobDurationGen = IValueGenerator::CreateFromJson(infoJson.at("jobDurationCfg"));
                 info.mNumOutputGen = IValueGenerator::CreateFromJson(infoJson.at("numOutputCfg"));
                 info.mOutputSizeGen = IValueGenerator::CreateFromJson(infoJson.at("outputSizeCfg"));

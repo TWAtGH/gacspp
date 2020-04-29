@@ -119,6 +119,7 @@
                     "diskStorageElement": "CERN-PROD_DATADISK",
                     "cpuStorageElement": "CERN-PROD_CPU",
                     "outputStorageElement": "CERN-PROD_OUTPUT",
+					"diskQuotaThreshold": 0.75,
                     "numCores": 30000,
                     "coreFillRate": 150,
                     "jobDurationCfg": {
@@ -147,6 +148,7 @@
                     "diskStorageElement": "UKI-NORTHGRID-MAN-HEP_DATADISK",
                     "cpuStorageElement": "UKI-NORTHGRID-MAN-HEP_CPU",
                     "outputStorageElement": "UKI-NORTHGRID-MAN-HEP_OUTPUT",
+					"diskQuotaThreshold": 0.75,
                     "numCores": 20000,
                     "coreFillRate": 100,
                     "jobDurationCfg": {

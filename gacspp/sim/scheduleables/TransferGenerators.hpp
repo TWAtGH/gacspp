@@ -124,6 +124,7 @@ public:
         std::list<std::unique_ptr<SJobInfo>> mJobInfos;
         std::list<std::pair<TickType, std::list<std::unique_ptr<SJobInfo>>>> mRunningJobs;
         std::size_t mNumRunningJobs = 0;
+        double mDiskQuotaThreshold = 0.0;
     };
     std::vector<SSiteInfo> mSiteInfos;
 

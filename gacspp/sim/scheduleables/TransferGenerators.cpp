@@ -197,12 +197,17 @@ void CCloudBufferTransferGen::OnUpdate(TickType now)
     for(std::unique_ptr<STransferGenInfo>& info : mTransferGenInfo)
     {
         CNetworkLink* networkLink = info->mPrimaryLink;
-        CStorageElement* dstStorageElement = networkLink->GetDstStorageElement();
+        CNetworkLink* secondNetworkLink = info->mSecondaryLink;
         std::forward_list<SReplica*>& replicas = info->mReplicas;
-        
+
         assert(networkLink->mMaxNumActiveTransfers >= networkLink->mNumActiveTransfers);
         std::size_t numToCreate = networkLink->mMaxNumActiveTransfers - networkLink->mNumActiveTransfers;
 
+        assert(secondNetworkLink->mMaxNumActiveTransfers >= secondNetworkLink->mNumActiveTransfers);
+        std::size_t numToCreateSecondary = secondNetworkLink->mMaxNumActiveTransfers - secondNetworkLink->mNumActiveTransfers;
+        
+        SpaceType volumeSum = 0;
+        
         auto prev = replicas.before_begin();
         auto cur = replicas.begin();
         while((cur != replicas.end()) && (numToCreate > 0))
@@ -218,30 +223,30 @@ void CCloudBufferTransferGen::OnUpdate(TickType now)
                 continue;
             }
 
+            SReplica* newReplica = nullptr;
             SFile* file = srcReplica->GetFile();
-            SReplica* newReplica = dstStorageElement->CreateReplica(file, now);
-            if(!newReplica && info->mSecondaryLink)
+            volumeSum += file->GetSize();
+
+            if (networkLink->GetDstStorageElement()->CanStoreVolume(volumeSum))
             {
-                networkLink = info->mSecondaryLink;
+                newReplica = networkLink->GetDstStorageElement()->CreateReplica(file, now);
+                assert(newReplica);
 
-                assert(networkLink->mMaxNumActiveTransfers >= networkLink->mNumActiveTransfers);
-                numToCreate = networkLink->mMaxNumActiveTransfers - networkLink->mNumActiveTransfers;
-
-                if(numToCreate > 0)
-                {
-                    dstStorageElement = networkLink->GetDstStorageElement();
-                    newReplica = dstStorageElement->CreateReplica(file, now);
-                }
-            }
-
-            if(newReplica)
-            {
-                mTransferMgr->CreateTransfer(srcReplica, newReplica, now, mDeleteSrcReplica);
-                cur = replicas.erase_after(prev);
                 numToCreate -= 1;
-                continue; //same idx again
             }
-            break;
+            else if (numToCreateSecondary > 0)
+            {
+                newReplica = secondNetworkLink->GetDstStorageElement()->CreateReplica(file, now);
+                if (!newReplica)
+                    break;
+
+                numToCreateSecondary -= 1;
+            }
+            else
+                break;
+
+            mTransferMgr->CreateTransfer(srcReplica, newReplica, now, mDeleteSrcReplica);
+            cur = replicas.erase_after(prev);
         }
     }
 
@@ -348,6 +353,7 @@ void CJobIOTransferGen::OnUpdate(TickType now)
                     TickType finishTime = now + (static_cast<TickType>(siteInfo.mJobDurationGen->GetValue(rngEngine)) * 60);
                     jobInfo->mFinishedAt = finishTime;
 
+                    //move job from jobInfos list to mRunningJobs while it is 'idling'
                     runningJobsIt = siteInfo.mRunningJobs.begin();
                     while (runningJobsIt != siteInfo.mRunningJobs.end())
                     {
@@ -438,7 +444,6 @@ void CJobIOTransferGen::OnUpdate(TickType now)
                     assert(inputSrcReplica);
                     if (inputSrcReplica->mNumStagedIn >= inputFile->mPopularity)
                         diskSE->RemoveReplica(inputSrcReplica, now);
-                        //inputFile->RemoveReplica(now, inputSrcReplica); //inputSrcReplica could still be in use by disk -> CPU
                     
                     jobInfoIt = jobInfos.erase(jobInfoIt);
                     continue;
@@ -468,23 +473,29 @@ void CJobIOTransferGen::OnUpdate(TickType now)
             numJobsToCreate -= 1;
         }
 
-        if(diskSE->GetUsedStorageQuotaRatio() <= 0.5)
+        if(diskSE->GetUsedStorageQuotaRatio() <= siteInfo.mDiskQuotaThreshold)
         {
             //if storage on diskSE available create transfers from cloudSE to diskSE
             assert(cloudToDiskLink->mMaxNumActiveTransfers >= cloudToDiskLink->mNumActiveTransfers);
             std::size_t numTransfers = (cloudToDiskLink->mMaxNumActiveTransfers - cloudToDiskLink->mNumActiveTransfers) / 2.0;
+            SpaceType volumeSum = 0;
             for(const std::unique_ptr<SReplica>& replica : cloudToDiskLink->GetSrcStorageElement()->GetReplicas())
             {
-                if(numTransfers == 0)
-                    break;
-                if(!replica->IsComplete())
+                if (!replica->IsComplete())
                     continue;
+
+                volumeSum += replica->GetFile()->GetSize();
+                if(numTransfers == 0 || !diskSE->CanStoreVolume(volumeSum))
+                    break;
 
                 SReplica* newReplica = diskSE->CreateReplica(replica->GetFile(), now);
                 if (!newReplica)
+                {
+                    volumeSum -= replica->GetFile()->GetSize();
                     continue;
+                }
 
-                mTransferMgr->CreateTransfer(replica.get(), newReplica, now, true);
+                mTransferMgr->CreateTransfer(replica.get(), newReplica, now, false);
                 numTransfers -= 1;
             }
         }

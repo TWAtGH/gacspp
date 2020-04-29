@@ -296,7 +296,7 @@ void CTransferManager::OnUpdate(TickType now)
         assert(networkLink->mNumActiveTransfers > 0);
 
         const double sharedBandwidth = networkLink->mBandwidthBytesPerSecond / static_cast<double>(networkLink->mNumActiveTransfers);
-        std::uint32_t amount = static_cast<std::uint32_t>(sharedBandwidth * timeDiff);
+        SpaceType amount = static_cast<SpaceType>(sharedBandwidth * timeDiff);
         amount = dstReplica->Increase(amount, now);
         networkLink->mUsedTraffic += amount;
 

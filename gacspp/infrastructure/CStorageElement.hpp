@@ -55,6 +55,7 @@ public:
 
     auto GetUsedStorage() const->SpaceType;
     auto GetUsedStorageQuotaRatio() const -> double;
+    bool CanStoreVolume(SpaceType volume) const;
 
     std::vector<IStorageElementActionListener*> mActionListener;
 
@@ -97,10 +98,13 @@ public:
     {return mReplicas;}
     inline auto GetStorageElement() const -> CStorageElement*
     {return mStorageElement;}
+
     inline auto GetUsedStorage() const -> SpaceType
     {return mUsedStorage;}
     inline auto GetUsedStorageQuotaRatio() const -> double
     {return (mQuota > 0) ? static_cast<double>(mUsedStorage) / mQuota : 0;}
+    inline bool CanStoreVolume(SpaceType volume) const
+    {return (mQuota > 0) ? ((mUsedStorage + volume) <= mQuota) : true;}
 
 protected:
     std::vector<std::unique_ptr<SReplica>> mReplicas;
