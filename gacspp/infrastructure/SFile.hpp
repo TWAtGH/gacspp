@@ -74,7 +74,7 @@ public:
     std::size_t mIndexAtStorageElement;
     TickType mExpiresAt;
 
-    std::uint32_t mNumStagedIn = 0;
+    std::uint32_t mUsageCounter = 0;
 
 private:
     IdType mId;

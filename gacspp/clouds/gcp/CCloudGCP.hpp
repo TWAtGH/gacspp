@@ -40,7 +40,7 @@ namespace gcp
 
         virtual void OnOperation(OPERATION op) final;
 
-        virtual void OnIncreaseReplica(SpaceType amount, TickType now) final;
+        virtual void OnIncreaseReplica(SReplica* replica, SpaceType amount, TickType now) final;
         virtual void RemoveReplica(SReplica* replica, TickType now, bool needLock = true) final;
 
         auto CalculateStorageCosts(TickType now) -> double;

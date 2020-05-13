@@ -21,6 +21,7 @@ class IStorageElementActionListener
 {
 public:
     virtual ~IStorageElementActionListener() = default;
+    virtual void PostCompleteReplica(SReplica* replica, TickType now) = 0;
     virtual void PostCreateReplica(SReplica* replica, TickType now) = 0;
     virtual void PreRemoveReplica(SReplica* replica, TickType now) = 0;
 };

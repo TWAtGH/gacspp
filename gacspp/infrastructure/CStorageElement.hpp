@@ -38,7 +38,7 @@ public:
 
     virtual auto CreateReplica(SFile* file, TickType now) -> SReplica*;
     virtual void RemoveReplica(SReplica* replica, TickType now, bool needLock = true);
-    virtual void OnIncreaseReplica(SpaceType amount, TickType now);
+    virtual void OnIncreaseReplica(SReplica* replica, SpaceType amount, TickType now);
 
     inline auto GetId() const -> IdType
     {return mId;}
@@ -54,6 +54,7 @@ public:
     auto GetNetworkLink(const CStorageElement* dstStorageElement) const -> CNetworkLink*;
 
     auto GetUsedStorage() const->SpaceType;
+    auto GetAllocatedStorage() const->SpaceType;
     auto GetUsedStorageQuotaRatio() const -> double;
     bool CanStoreVolume(SpaceType volume) const;
 
@@ -92,7 +93,7 @@ public:
 
     virtual auto CreateReplica(SFile* file, TickType now)->SReplica* = 0;
     virtual void RemoveReplica(SReplica* replica, TickType now, bool needLock = true) = 0;
-    virtual void OnIncreaseReplica(SpaceType amount, TickType now) = 0;
+    virtual void OnIncreaseReplica(SReplica* replica, SpaceType amount, TickType now) = 0;
 
     inline auto GetReplicas() const -> const std::vector<std::unique_ptr<SReplica>>&
     {return mReplicas;}
@@ -101,15 +102,18 @@ public:
 
     inline auto GetUsedStorage() const -> SpaceType
     {return mUsedStorage;}
+    inline auto GetAllocatedStorage() const -> SpaceType
+    {return mAllocatedStorage;}
     inline auto GetUsedStorageQuotaRatio() const -> double
     {return (mQuota > 0) ? static_cast<double>(mUsedStorage) / mQuota : 0;}
     inline bool CanStoreVolume(SpaceType volume) const
-    {return (mQuota > 0) ? ((mUsedStorage + volume) <= mQuota) : true;}
+    {return (mQuota > 0) ? ((mUsedStorage + mAllocatedStorage + volume) <= mQuota) : true;}
 
 protected:
     std::vector<std::unique_ptr<SReplica>> mReplicas;
     CStorageElement *mStorageElement;
     SpaceType mUsedStorage = 0;
+    SpaceType mAllocatedStorage = 0;
     SpaceType mQuota;
 };
 
@@ -125,7 +129,7 @@ public:
 
     auto CreateReplica(SFile* file, TickType now)->SReplica* override;
     void RemoveReplica(SReplica* replica, TickType now, bool needLock = true) override;
-    void OnIncreaseReplica(SpaceType amount, TickType now) override;
+    void OnIncreaseReplica(SReplica* replica, SpaceType amount, TickType now) override;
 
 protected:
     std::mutex mReplicaRemoveMutex;

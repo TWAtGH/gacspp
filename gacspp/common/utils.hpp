@@ -34,11 +34,12 @@ class IValueLimiter
 {
 protected:
     double mLimit;
+    bool mInvert;
 
 public:
     static auto CreateFromJson(const json& cfg) -> std::unique_ptr<IValueLimiter>;
 
-    IValueLimiter(double limit);
+    IValueLimiter(double limit, bool invert = false);
 
     virtual auto GetLimited(double value) const -> double = 0;
 
@@ -126,6 +127,17 @@ private:
 
 public:
     CExponentialRandomValueGenerator(const double lambda);
+
+    virtual auto GetValue(RNGEngineType& rngEngine) -> double override;
+};
+
+class CGeometricRandomValueGenerator : public IValueGenerator
+{
+private:
+    std::geometric_distribution<std::uint64_t> mGeometricRNGDistribution;
+
+public:
+    CGeometricRandomValueGenerator(const double p);
 
     virtual auto GetValue(RNGEngineType& rngEngine) -> double override;
 };

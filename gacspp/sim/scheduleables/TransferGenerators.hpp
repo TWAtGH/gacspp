@@ -35,6 +35,8 @@ public:
 
     void PostCreateFile(SFile* file, TickType now) override;
     void PreRemoveFile(SFile* file, TickType now) override;
+
+    void PostCompleteReplica(SReplica* replica, TickType now) override;
     void PostCreateReplica(SReplica* replica, TickType now) override;
     void PreRemoveReplica(SReplica* replica, TickType now) override;
 };
@@ -52,6 +54,96 @@ public:
 
     void PreRemoveFile(SFile* file, TickType now) override;
     void PreRemoveReplica(SReplica* replica, TickType now) override;
+};
+
+
+
+class CHotColdStorageTransferGen : public CScheduleable, public IStorageElementActionListener
+{
+private:
+    IBaseSim* mSim;
+    std::shared_ptr<CTransferManager> mTransferMgr;
+
+    TickType mTickFreq;
+    TickType mLastUpdateTime = 0;
+
+    std::shared_ptr<IPreparedInsert> mInputTraceInsertQuery;
+    std::shared_ptr<IPreparedInsert> mJobTraceInsertQuery;
+    std::shared_ptr<IPreparedInsert> mOutputTraceInsertQuery;
+
+public:
+    struct SJobInfo
+    {
+        IdType mJobId;
+        
+        TickType mCreatedAt = 0;
+        TickType mQueuedAt = 0;
+        TickType mLastTime = 0;
+
+        SpaceType mCurInputFileSize = 0;
+        SFile* mInputFile = nullptr;
+        SReplica* mInputReplica = nullptr;
+        std::vector<SReplica*> mOutputReplicas;
+    };
+
+    struct SSiteInfo
+    {
+        CNetworkLink* mArchiveToHotLink;
+        CNetworkLink* mArchiveToColdLink;
+
+        CNetworkLink* mColdToHotLink;
+
+        CNetworkLink* mHotToCPULink;
+        CNetworkLink* mCPUToOutputLink;
+
+        std::vector<std::vector<SFile*>> mFilesPerPopularity;
+        std::vector<std::pair<std::unordered_map<SReplica*, std::size_t>, std::vector<SReplica*>>> mHotStorageReplicas;
+
+        TickType mProductionStartTime = 0;
+
+        std::unique_ptr<IValueGenerator> mReusageNumGen;
+        std::unique_ptr<IValueGenerator> mJobDurationGen;
+        std::unique_ptr<IValueGenerator> mNumOutputGen;
+        std::unique_ptr<IValueGenerator> mOutputSizeGen;
+
+        std::size_t mNumCores = 0;
+        std::size_t mCoreFillRate = 0;
+
+        std::list<std::unique_ptr<SJobInfo>> mWaitingForStorageJobs;
+        std::list<std::unique_ptr<SJobInfo>> mQueuedJobs;
+        std::list<std::unique_ptr<SJobInfo>> mActiveJobs;
+        std::list<std::pair<TickType, std::list<std::unique_ptr<SJobInfo>>>> mRunningJobs;
+        std::size_t mNumRunningJobs = 0;
+    };
+
+private:
+    std::discrete_distribution<std::size_t> GetRNGPopularityBucketSampler(SSiteInfo& siteInfo);
+
+    void CreateJobInputTransfer(CStorageElement* archiveStorageElement, CStorageElement* coldStorageElement, CStorageElement* hotStorageElement, SJobInfo* job, TickType now);
+
+    void UpdateProductionCampaign(SSiteInfo& siteInfo, TickType now);
+    void UpdateWaitingJobs(SSiteInfo& siteInfo, TickType now);
+    void UpdateActiveJobs(SSiteInfo& siteInfo, TickType now);
+    void UpdateQueuedJobs(SSiteInfo& siteInfo, TickType now);
+    void SubmitNewJobs(SSiteInfo& siteInfo, TickType now);
+
+    void PrepareProductionCampaign(SSiteInfo& siteInfo, TickType now);
+
+public:
+    std::vector<SSiteInfo> mSiteInfos;
+
+    void PostCompleteReplica(SReplica* replica, TickType now) override;
+    void PostCreateReplica(SReplica* replica, TickType now) override;
+    void PreRemoveReplica(SReplica* replica, TickType now) override;
+
+    CHotColdStorageTransferGen(IBaseSim* sim,
+        std::shared_ptr<CTransferManager> transferMgr,
+        TickType tickFreq,
+        TickType startTick = 0);
+    
+    ~CHotColdStorageTransferGen();
+
+    void OnUpdate(TickType now) final;
 };
 
 
@@ -75,6 +167,7 @@ public:
 
     bool mDeleteSrcReplica = false;
 
+    void PostCompleteReplica(SReplica* replica, TickType now) override;
     void PostCreateReplica(SReplica* replica, TickType now) override;
     void PreRemoveReplica(SReplica* replica, TickType now) override;
 
@@ -99,7 +192,9 @@ private:
     TickType mTickFreq;
     TickType mLastUpdateTime = 0;
 
-    std::shared_ptr<IPreparedInsert> mTraceInsertQuery;
+    std::shared_ptr<IPreparedInsert> mInputTraceInsertQuery;
+    std::shared_ptr<IPreparedInsert> mJobTraceInsertQuery;
+    std::shared_ptr<IPreparedInsert> mOutputTraceInsertQuery;
 
 public:
     struct SJobInfo
@@ -121,7 +216,7 @@ public:
         std::unique_ptr<IValueGenerator> mOutputSizeGen;
         std::size_t mNumCores;
         std::size_t mCoreFillRate;
-        std::list<std::unique_ptr<SJobInfo>> mJobInfos;
+        std::list<std::unique_ptr<SJobInfo>> mActiveJobs;
         std::list<std::pair<TickType, std::list<std::unique_ptr<SJobInfo>>>> mRunningJobs;
         std::size_t mNumRunningJobs = 0;
         double mDiskQuotaThreshold = 0.0;

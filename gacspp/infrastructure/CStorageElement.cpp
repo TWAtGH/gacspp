@@ -28,9 +28,10 @@ void CBaseStorageElementDelegate::OnOperation(CStorageElement::OPERATION op)
 
 auto CBaseStorageElementDelegate::CreateReplica(SFile* file, TickType now) -> SReplica*
 {
-    if(mQuota > 0 && (mUsedStorage + file->GetSize()) > mQuota)
+    if(mQuota > 0 && (mUsedStorage + mAllocatedStorage + file->GetSize()) > mQuota)
         return nullptr;
 
+    mAllocatedStorage += file->GetSize();
     mReplicas.emplace_back(std::make_unique<SReplica>(file, mStorageElement, now, mReplicas.size()));
     SReplica* newReplica = mReplicas.back().get();
     file->PostCreateReplica(newReplica);
@@ -57,14 +58,18 @@ void CBaseStorageElementDelegate::RemoveReplica(SReplica* replica, TickType now,
         }
     }
 
+    const SpaceType fileSize = replica->GetFile()->GetSize();
+
     replica->GetFile()->PreRemoveReplica(replica);
 
     const SpaceType curSize = replica->GetCurSize();
     const std::size_t idxToDelete = replica->mIndexAtStorageElement;
 
+    assert(fileSize <= mAllocatedStorage);
     assert(curSize <= mUsedStorage);
     assert(idxToDelete < mReplicas.size());
 
+    mAllocatedStorage -= fileSize;
     mUsedStorage -= curSize;
 
     mReplicas[idxToDelete] = std::move(mReplicas.back());
@@ -74,10 +79,14 @@ void CBaseStorageElementDelegate::RemoveReplica(SReplica* replica, TickType now,
     OnOperation(CStorageElement::DELETE);
 }
 
-void CBaseStorageElementDelegate::OnIncreaseReplica(SpaceType amount, TickType now)
+void CBaseStorageElementDelegate::OnIncreaseReplica(SReplica* replica, SpaceType amount, TickType now)
 {
+    (void)replica;
     (void)now;
     mUsedStorage += amount;
+
+    assert(mAllocatedStorage >= amount);
+    mAllocatedStorage -= amount;
 }
 
 
@@ -141,9 +150,13 @@ void CStorageElement::RemoveReplica(SReplica* replica, TickType now, bool needLo
     mDelegate->RemoveReplica(replica, now, needLock);
 }
 
-void CStorageElement::OnIncreaseReplica(SpaceType amount, TickType now)
+void CStorageElement::OnIncreaseReplica(SReplica* replica, SpaceType amount, TickType now)
 {
-    mDelegate->OnIncreaseReplica(amount, now);
+    mDelegate->OnIncreaseReplica(replica, amount, now);
+
+    if (replica->IsComplete() && (amount > 0))
+        for (IStorageElementActionListener* listener : mActionListener)
+            listener->PostCompleteReplica(replica, now);
 }
 
 auto CStorageElement::GetNetworkLink(const CStorageElement* dstStorageElement) const -> CNetworkLink*
@@ -159,6 +172,9 @@ auto CStorageElement::GetReplicas() const -> const std::vector<std::unique_ptr<S
 
 auto CStorageElement::GetUsedStorage() const -> SpaceType
 {return mDelegate->GetUsedStorage();}
+
+auto CStorageElement::GetAllocatedStorage() const->SpaceType
+{return mDelegate->GetAllocatedStorage();}
 
 auto CStorageElement::GetUsedStorageQuotaRatio() const -> double
 {return mDelegate->GetUsedStorageQuotaRatio();}

@@ -67,7 +67,7 @@ auto SReplica::Increase(SpaceType amount, TickType now) -> SpaceType
 {
     SpaceType increment = std::min(amount, mFile->GetSize() - mCurSize);
     mCurSize += increment;
-    mStorageElement->OnIncreaseReplica(increment, now);
+    mStorageElement->OnIncreaseReplica(this, increment, now);
     return increment;
 }
 

@@ -7,7 +7,9 @@
     "CREATE TABLE Files (id BIGINT, createdAt BIGINT, expiredAt BIGINT, filesize BIGINT, popularity INTEGER);",
     "CREATE TABLE Replicas (id BIGINT, fileId BIGINT, storageElementId BIGINT, createdAt BIGINT, expiredAt BIGINT);",
     "CREATE TABLE Transfers (id BIGINT, srcStorageElementId BIGINT, dstStorageElementId BIGINT, fileId BIGINT, srcReplicaId BIGINT, dstReplicaId BIGINT, queuedAt BIGINT, startedAt BIGINT, finishedAt BIGINT, traffic BIGINT);",
-    "CREATE TABLE Traces (id BIGINT, jobId BIGINT, storageElementId BIGINT, fileId BIGINT, replicaId BIGINT, type INTEGER, startedAt BIGINT, finishedAt BIGINT, traffic BIGINT);",
+    "CREATE TABLE InputTraces (id BIGINT, jobId BIGINT, siteId BIGINT, storageElementId BIGINT, fileId BIGINT, replicaId BIGINT, startedAt BIGINT, finishedAt BIGINT, traffic BIGINT);",
+	"CREATE TABLE OutputTraces (id BIGINT, jobId BIGINT, siteId BIGINT, storageElementId BIGINT, fileId BIGINT, replicaId BIGINT, startedAt BIGINT, finishedAt BIGINT, traffic BIGINT);",
+	"CREATE TABLE JobTraces (id BIGINT, siteId BIGINT, createdAt BIGINT, queuedAt BIGINT, startedAt BIGINT, finishedAt BIGINT);",
     "CREATE TABLE Bills (cloudName VARCHAR, month INTEGER, bill VARCHAR);"
 ],
 
@@ -18,6 +20,8 @@
     "ALTER TABLE Files ADD PRIMARY KEY(id);",
     "ALTER TABLE Replicas ADD PRIMARY KEY(id), ADD FOREIGN KEY(fileId) REFERENCES Files(id), ADD FOREIGN KEY(storageElementId) REFERENCES StorageElements(id);",
     "ALTER TABLE Transfers ADD PRIMARY KEY(id), ADD FOREIGN KEY(srcStorageElementId) REFERENCES StorageElements(id), ADD FOREIGN KEY(dstStorageElementId) REFERENCES StorageElements(id), ADD FOREIGN KEY(fileId) REFERENCES Files(id), ADD FOREIGN KEY(srcReplicaId) REFERENCES Replicas(id), ADD FOREIGN KEY(dstReplicaId) REFERENCES Replicas(id);",
-    "ALTER TABLE Traces ADD PRIMARY KEY(id), ADD FOREIGN KEY(storageElementId) REFERENCES StorageElements(id), ADD FOREIGN KEY(fileId) REFERENCES Files(id), ADD FOREIGN KEY(replicaId) REFERENCES Replicas(id);"
+    "ALTER TABLE InputTraces ADD PRIMARY KEY(id), ADD FOREIGN KEY(jobId) REFERENCES JobTraces(id), ADD FOREIGN KEY(siteId) REFERENCES Sites(id), ADD FOREIGN KEY(storageElementId) REFERENCES StorageElements(id), ADD FOREIGN KEY(fileId) REFERENCES Files(id), ADD FOREIGN KEY(replicaId) REFERENCES Replicas(id);",
+	"ALTER TABLE OutputTraces ADD PRIMARY KEY(id), ADD FOREIGN KEY(jobId) REFERENCES JobTraces(id), ADD FOREIGN KEY(siteId) REFERENCES Sites(id), ADD FOREIGN KEY(storageElementId) REFERENCES StorageElements(id), ADD FOREIGN KEY(fileId) REFERENCES Files(id), ADD FOREIGN KEY(replicaId) REFERENCES Replicas(id);",
+	"ALTER TABLE JobTraces ADD PRIMARY KEY(id), ADD FOREIGN KEY(siteId) REFERENCES Sites(id);"
 ]
 }

@@ -27,22 +27,27 @@ auto IValueLimiter::CreateFromJson(const json& cfg) -> std::unique_ptr<IValueLim
     std::unique_ptr<IValueLimiter> valueLimiter;
     const std::string type = cfg.at("type").get<std::string>();
     double limit = cfg.at("limit").get<double>();
+    bool invert = false;
+    if (cfg.contains("invert"))
+        cfg.at("invert").get_to(invert);
+
     if(type == "minAdd")
         valueLimiter = std::make_unique<CMinAddLimiter>(limit);
     if(type == "minClip")
         valueLimiter = std::make_unique<CMinClipLimiter>(limit);
     else if(type == "maxModulo")
-        valueLimiter = std::make_unique<CMaxModuloLimiter>(limit);
+        valueLimiter = std::make_unique<CMaxModuloLimiter>(limit, invert);
     else if(type == "maxClip")
-        valueLimiter = std::make_unique<CMaxClipLimiter>(limit);
+        valueLimiter = std::make_unique<CMaxClipLimiter>(limit, invert);
 
     assert(valueLimiter);
 
     return valueLimiter;
 }
 
-IValueLimiter::IValueLimiter(double limit)
-    : mLimit(limit)
+IValueLimiter::IValueLimiter(double limit, bool invert)
+    : mLimit(limit),
+      mInvert(invert)
 {}
 
 auto IValueLimiter::GetLimitValue() const -> double
@@ -63,14 +68,22 @@ auto CMinClipLimiter::GetLimited(double value) const -> double
 
 auto CMaxModuloLimiter::GetLimited(double value) const -> double
 {
-    if(value <= mLimit)
-        return value;
-    return static_cast<double>(static_cast<std::uint64_t>(value) % static_cast<std::uint64_t>(mLimit));
+    if(value > mLimit)
+        value = static_cast<double>(static_cast<std::uint64_t>(value) % static_cast<std::uint64_t>(mLimit));
+
+    if (mInvert)
+        return mLimit - value;
+    return value;
 }
 
 auto CMaxClipLimiter::GetLimited(double value) const -> double
 {
-    return ((value > mLimit) ? mLimit : value);
+    if (value > mLimit)
+        value = mLimit;
+
+    if (mInvert)
+        return mLimit - value;
+    return value;
 }
 
 
@@ -85,10 +98,15 @@ auto IValueGenerator::CreateFromJson(const json& cfg) -> std::unique_ptr<IValueG
         const double stddev = cfg.at("stddev");
         valueGenerator = std::make_unique<CNormalRandomValueGenerator>(mean, stddev);
     }
-    if(type == "exponential")
+    else if(type == "exponential")
     {
         const double lambda = cfg.at("lambda");
         valueGenerator = std::make_unique<CExponentialRandomValueGenerator>(lambda);
+    }
+    else if (type == "geometric")
+    {
+        const double p = cfg.at("p");
+        valueGenerator = std::make_unique<CExponentialRandomValueGenerator>(p);
     }
     else if(type == "fixed")
     {
@@ -160,7 +178,7 @@ CNormalRandomValueGenerator::CNormalRandomValueGenerator(const double mean, cons
 
 auto CNormalRandomValueGenerator::GetValue(RNGEngineType& rngEngine) -> double
 {
-    return GetBetweenMinMax(mNormalRNGDistribution(rngEngine));
+    return GetBetweenMaxMin(mNormalRNGDistribution(rngEngine));
 }
 
 CExponentialRandomValueGenerator::CExponentialRandomValueGenerator(const double lambda)
@@ -171,5 +189,16 @@ CExponentialRandomValueGenerator::CExponentialRandomValueGenerator(const double 
 
 auto CExponentialRandomValueGenerator::GetValue(RNGEngineType& rngEngine) -> double
 {
-    return GetBetweenMinMax(mExponentialRNGDistribution(rngEngine));
+    return GetBetweenMaxMin(mExponentialRNGDistribution(rngEngine));
+}
+
+CGeometricRandomValueGenerator::CGeometricRandomValueGenerator(const double p)
+    : mGeometricRNGDistribution(p)
+{
+    assert((0 < p) && (p < 1));
+}
+
+auto CGeometricRandomValueGenerator::GetValue(RNGEngineType& rngEngine) -> double
+{
+    return GetBetweenMaxMin(mGeometricRNGDistribution(rngEngine));
 }

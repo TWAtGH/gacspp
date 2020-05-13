@@ -70,14 +70,14 @@ namespace gcp
         }
     }
 
-    void CBucket::OnIncreaseReplica(SpaceType amount, TickType now)
+    void CBucket::OnIncreaseReplica(SReplica* replica, SpaceType amount, TickType now)
     {
         if (now > mTimeLastCostUpdate)
         {
             mCostTracking->mStorageCosts += (BYTES_TO_GiB(mDelegate->GetUsedStorage()) * GetCurStoragePrice() * (now - mTimeLastCostUpdate)) / 1000000000.0;
             mTimeLastCostUpdate = now;
         }
-        CStorageElement::OnIncreaseReplica(amount, now);
+        CStorageElement::OnIncreaseReplica(replica, amount, now);
     }
 
     void CBucket::RemoveReplica(SReplica* replica, TickType now, bool needLock)
