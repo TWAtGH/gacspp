@@ -58,18 +58,19 @@ void CBaseStorageElementDelegate::RemoveReplica(SReplica* replica, TickType now,
         }
     }
 
-    const SpaceType fileSize = replica->GetFile()->GetSize();
+    
 
     replica->GetFile()->PreRemoveReplica(replica);
 
     const SpaceType curSize = replica->GetCurSize();
+    const SpaceType allocationLeft = replica->GetFile()->GetSize() - curSize;
     const std::size_t idxToDelete = replica->mIndexAtStorageElement;
 
-    assert(fileSize <= mAllocatedStorage);
+    assert(allocationLeft <= mAllocatedStorage);
     assert(curSize <= mUsedStorage);
     assert(idxToDelete < mReplicas.size());
 
-    mAllocatedStorage -= fileSize;
+    mAllocatedStorage -= allocationLeft;
     mUsedStorage -= curSize;
 
     mReplicas[idxToDelete] = std::move(mReplicas.back());

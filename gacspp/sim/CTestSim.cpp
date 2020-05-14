@@ -58,23 +58,14 @@ bool CTestSim::SetupDefaults(const json& profileJson)
         }
         heartbeat->mProccessDurations.push_back(transferManager);
 
-        auto transferGen = std::dynamic_pointer_cast<CCloudBufferTransferGen>(CreateTransferGenerator(transferGenCfg, transferManager));
-        if (!transferGen)
+        auto transferGen = std::dynamic_pointer_cast<CHotColdStorageTransferGen>(CreateTransferGenerator(transferGenCfg, transferManager));
+        if(!transferGen)
         {
-            auto transferGen2 = std::dynamic_pointer_cast<CJobIOTransferGen>(CreateTransferGenerator(transferGenCfg, transferManager));
-            if(!transferGen2)
-            {
-                std::cout << "Failed creating transfer generator" << std::endl;
-                return false;
-            }
-            heartbeat->mProccessDurations.push_back(transferGen2);
-            mSchedule.push(transferGen2);
+            std::cout << "Failed creating transfer generator" << std::endl;
+            return false;
         }
-        else
-        {
-            heartbeat->mProccessDurations.push_back(transferGen);
-            mSchedule.push(transferGen);
-        }
+        heartbeat->mProccessDurations.push_back(transferGen);
+        mSchedule.push(transferGen);
 
         heartbeat->mTransferManagers.push_back(transferManager);
 

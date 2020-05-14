@@ -210,6 +210,10 @@ CTransferManager::STransfer::~STransfer()
 bool CTransferManager::STransfer::PreRemoveReplica(SReplica* replica, TickType now)
 {
     (void)now;
+    assert(mSrcReplica->mUsageCounter > 0);
+    mSrcReplica->mUsageCounter -= 1;
+    assert(mDstReplica->mUsageCounter > 0);
+    mDstReplica->mUsageCounter -= 1;
     if (replica == mSrcReplica)
     {
         mSrcReplica = nullptr;
@@ -232,6 +236,9 @@ CTransferManager::CTransferManager(TickType tickFreq, TickType startTick)
 
 void CTransferManager::CreateTransfer(SReplica* srcReplica, SReplica* dstReplica, TickType now, bool deleteSrcReplica)
 {
+    srcReplica->mUsageCounter += 1;
+    dstReplica->mUsageCounter += 1;
+
     CStorageElement* srcStorageElement = srcReplica->GetStorageElement();
     CNetworkLink* networkLink = srcStorageElement->GetNetworkLink( dstReplica->GetStorageElement() );
 
@@ -323,13 +330,21 @@ void CTransferManager::OnUpdate(TickType now)
             RemoveListener(srcReplica, transfer.get());
             RemoveListener(dstReplica, transfer.get());
 
+            assert(srcReplica->mUsageCounter > 0);
+            srcReplica->mUsageCounter -= 1;
+            assert(dstReplica->mUsageCounter > 0);
+            dstReplica->mUsageCounter -= 1;
+
             bool deleteSrc = transfer->mDeleteSrcReplica;
 
             transfer = std::move(mActiveTransfers.back());
             mActiveTransfers.pop_back();
 
             if (deleteSrc)
+            {
+                assert(srcReplica->mUsageCounter == 0);
                 srcReplica->GetStorageElement()->RemoveReplica(srcReplica, now, false);
+            }
 
             continue; // handle same idx again
         }
@@ -368,6 +383,10 @@ CFixedTimeTransferManager::STransfer::~STransfer()
 bool CFixedTimeTransferManager::STransfer::PreRemoveReplica(SReplica* replica, TickType now)
 {
     (void)now;
+    assert(mSrcReplica->mUsageCounter > 0);
+    mSrcReplica->mUsageCounter -= 1;
+    assert(mDstReplica->mUsageCounter > 0);
+    mDstReplica->mUsageCounter -= 1;
     if (replica == mSrcReplica)
     {
         mSrcReplica = nullptr;
@@ -390,6 +409,9 @@ CFixedTimeTransferManager::CFixedTimeTransferManager(TickType tickFreq, TickType
 
 void CFixedTimeTransferManager::CreateTransfer(SReplica* srcReplica, SReplica* dstReplica, TickType now, TickType startDelay, TickType duration)
 {
+    srcReplica->mUsageCounter += 1;
+    dstReplica->mUsageCounter += 1;
+
     CStorageElement* srcStorageElement = srcReplica->GetStorageElement();
     CNetworkLink* networkLink = srcStorageElement->GetNetworkLink(dstReplica->GetStorageElement());
 
@@ -468,6 +490,11 @@ void CFixedTimeTransferManager::OnUpdate(TickType now)
 
             RemoveListener(srcReplica, transfer.get());
             RemoveListener(dstReplica, transfer.get());
+
+            assert(srcReplica->mUsageCounter > 0);
+            srcReplica->mUsageCounter -= 1;
+            assert(dstReplica->mUsageCounter > 0);
+            dstReplica->mUsageCounter -= 1;
 
             transfer = std::move(mActiveTransfers.back());
             mActiveTransfers.pop_back();

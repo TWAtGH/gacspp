@@ -168,10 +168,10 @@ void CHotColdStorageTransferGen::PostCompleteReplica(SReplica* replica, TickType
         if (replicaStorageElement == siteInfo.mArchiveToHotLink->GetSrcStorageElement())
         {
             //this case only works as long as replicas are only created once at archive storage
-
+            auto& archiveFilesPerPopularity = siteInfo.mArchiveFilesPerPopularity;
             popularity = siteInfo.mReusageNumGen->GetValue(mSim->mRNGEngine);
 
-            for (std::vector<SFile*>& files : siteInfo.mFilesPerPopularity)
+            for (std::vector<SFile*>& files : archiveFilesPerPopularity)
             {
                 if (files.empty() || (files.front()->mPopularity == popularity))
                 {
@@ -179,8 +179,8 @@ void CHotColdStorageTransferGen::PostCompleteReplica(SReplica* replica, TickType
                     return;
                 }
             }
-            siteInfo.mFilesPerPopularity.emplace_back();
-            siteInfo.mFilesPerPopularity.back().push_back(file);
+            archiveFilesPerPopularity.emplace_back();
+            archiveFilesPerPopularity.back().push_back(file);
             break;
         }
         else if(replicaStorageElement == siteInfo.mArchiveToHotLink->GetDstStorageElement())
@@ -220,6 +220,9 @@ void CHotColdStorageTransferGen::PreRemoveReplica(SReplica* replica, TickType no
 
     for (SSiteInfo& siteInfo : mSiteInfos)
     {
+        if (siteInfo.mHotReplicaDeletions.erase(replica) > 0)
+            return;
+
         if (replicaStorageElement == siteInfo.mArchiveToHotLink->GetDstStorageElement())
         {
             auto& hotStorageReplicas = siteInfo.mHotStorageReplicas;
@@ -237,8 +240,13 @@ void CHotColdStorageTransferGen::PreRemoveReplica(SReplica* replica, TickType no
                     std::size_t idx = searchResult->second;
                     assert((idx < replicas.size()) && (replicas[searchResult->second] == replica));
 
-                    map[replicas.back()] = idx;
-                    replicas[idx] = replicas.back();
+                    SReplica* backReplica = replicas.back();
+                    if (replica != backReplica)
+                    {
+                        map[backReplica] = idx;
+                        replicas[idx] = backReplica;
+                    }
+                    map.erase(replica);
                     replicas.pop_back();
 
                     if (replicas.empty())
@@ -259,6 +267,7 @@ void CHotColdStorageTransferGen::PreRemoveReplica(SReplica* replica, TickType no
 
 void CHotColdStorageTransferGen::OnUpdate(TickType now)
 {
+    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
     for (SSiteInfo& siteInfo : mSiteInfos)
     {
         if (siteInfo.mProductionStartTime > now)
@@ -280,9 +289,10 @@ void CHotColdStorageTransferGen::OnUpdate(TickType now)
 
 std::discrete_distribution<std::size_t> CHotColdStorageTransferGen::GetRNGPopularityBucketSampler(SSiteInfo& siteInfo)
 {
+    auto& archiveFilesPerPopularity = siteInfo.mArchiveFilesPerPopularity;
     std::vector<std::uint32_t> weights;
-    weights.reserve(siteInfo.mFilesPerPopularity.size());
-    for (std::vector<SFile*>& files : siteInfo.mFilesPerPopularity)
+    weights.reserve(archiveFilesPerPopularity.size());
+    for (std::vector<SFile*>& files : archiveFilesPerPopularity)
         weights.push_back(files.front()->mPopularity);
     return std::discrete_distribution<std::size_t>(weights.begin(), weights.end());
 
@@ -475,8 +485,9 @@ void CHotColdStorageTransferGen::UpdateActiveJobs(SSiteInfo& siteInfo, TickType 
             for (; numOutputReplicas > 0; --numOutputReplicas)
             {
                 SpaceType size = static_cast<SpaceType>(GiB_TO_BYTES(siteInfo.mOutputSizeGen->GetValue(mSim->mRNGEngine)));
-                SFile* outputFile = mSim->mRucio->CreateFile(size, now, SECONDS_PER_MONTH * 6);
+                SFile* outputFile = mSim->mRucio->CreateFile(size, now, SECONDS_PER_MONTH * 12);
                 outputReplicas.emplace_back(cpuToOutputLink->GetDstStorageElement()->CreateReplica(outputFile, now));
+                outputReplicas.back()->mUsageCounter += 1;
                 cpuToOutputLink->mNumActiveTransfers += 1;
                 assert(outputReplicas.back());
             }
@@ -495,6 +506,7 @@ void CHotColdStorageTransferGen::UpdateActiveJobs(SSiteInfo& siteInfo, TickType 
 
                 if (outputReplica->IsComplete())
                 {
+                    outputReplica->mUsageCounter -= 1;
                     cpuToOutputLink->mNumActiveTransfers -= 1;
                     cpuToOutputLink->mNumDoneTransfers += 1;
 
@@ -556,18 +568,22 @@ void CHotColdStorageTransferGen::SubmitNewJobs(SSiteInfo& siteInfo, TickType now
 {
     std::list<std::unique_ptr<SJobInfo>>& activeJobs = siteInfo.mActiveJobs;
 
-    std::vector<std::vector<SFile*>>& filesPerPopularity = siteInfo.mFilesPerPopularity;
+    auto& archiveFilesPerPopularity = siteInfo.mArchiveFilesPerPopularity;
 
     CStorageElement* archiveStorageElement = siteInfo.mArchiveToColdLink->GetSrcStorageElement();
     CStorageElement* coldStorageElement = siteInfo.mColdToHotLink->GetSrcStorageElement();
     CStorageElement* hotStorageElement = siteInfo.mColdToHotLink->GetDstStorageElement();
     SpaceType hotStorageNeeded = 0;
 
+    std::unordered_set<SReplica*>& hotReplicaDeletions = siteInfo.mHotReplicaDeletions;
+
+    std::list<std::unique_ptr<SJobInfo>>& queuedJobs = siteInfo.mQueuedJobs;
+    std::list<std::unique_ptr<SJobInfo>>& waitingJobs = siteInfo.mWaitingForStorageJobs;
     std::list<std::unique_ptr<SJobInfo>> newJobs;
 
     assert(siteInfo.mNumCores >= (activeJobs.size() + siteInfo.mNumRunningJobs));
     std::size_t numJobsToCreate = std::min(siteInfo.mNumCores - (activeJobs.size() + siteInfo.mNumRunningJobs), siteInfo.mCoreFillRate);
-    if (siteInfo.mQueuedJobs.size() >= numJobsToCreate)
+    if (queuedJobs.size() >= numJobsToCreate)
         numJobsToCreate = 2; // only create 2 new jobs if there are already more jobs queued
 
     std::discrete_distribution<std::size_t> rngBucketSampler = GetRNGPopularityBucketSampler(siteInfo);
@@ -575,7 +591,7 @@ void CHotColdStorageTransferGen::SubmitNewJobs(SSiteInfo& siteInfo, TickType now
     for (; numJobsToCreate > 0; --numJobsToCreate)
     {
         const std::size_t bucketIdx = rngBucketSampler(mSim->mRNGEngine);
-        std::vector<SFile*>& files = filesPerPopularity[bucketIdx];
+        std::vector<SFile*>& files = archiveFilesPerPopularity[bucketIdx];
         std::uniform_int_distribution<std::size_t> rngFileSampler(0, files.size() - 1);
 
         std::unique_ptr<SJobInfo> newJob = std::make_unique<SJobInfo>();
@@ -584,12 +600,12 @@ void CHotColdStorageTransferGen::SubmitNewJobs(SSiteInfo& siteInfo, TickType now
         newJob->mCreatedAt = now;
         newJob->mInputFile = files[rngFileSampler(mSim->mRNGEngine)];
         newJob->mInputReplica = newJob->mInputFile->GetReplicaByStorageElement(hotStorageElement);
-        if (newJob->mInputReplica)
+        if (newJob->mInputReplica && (hotReplicaDeletions.count(newJob->mInputReplica) == 0))
         {
             //input replica exists already -> put job into queue
-            //newJob->mInputReplica->mUsageCounter += 1;
+            newJob->mInputReplica->mUsageCounter += 1;
             newJob->mQueuedAt = now;
-            siteInfo.mQueuedJobs.emplace_back(std::move(newJob));
+            queuedJobs.emplace_back(std::move(newJob));
         }
         else
         {
@@ -602,11 +618,15 @@ void CHotColdStorageTransferGen::SubmitNewJobs(SSiteInfo& siteInfo, TickType now
     if (!hotStorageElement->CanStoreVolume(hotStorageNeeded))
     {
         //not enough storage for all new jobs -> try to free storage and put jobs into waitForStorage list
-        for (std::pair<std::unordered_map<SReplica*, std::size_t>, std::vector<SReplica*>>& replicasPair : siteInfo.mHotStorageReplicas)
+        auto& hotStorageReplicas = siteInfo.mHotStorageReplicas;
+        for (std::size_t replicasPairIdx = 0; replicasPairIdx < hotStorageReplicas.size(); ++replicasPairIdx)
         {
+            auto& replicasPair = hotStorageReplicas[replicasPairIdx];
+
             if (hotStorageNeeded == 0)
                 break;
 
+            auto& map = replicasPair.first;
             std::vector<SReplica*>& replicas = replicasPair.second;
             assert(!replicas.empty());
 
@@ -614,7 +634,6 @@ void CHotColdStorageTransferGen::SubmitNewJobs(SSiteInfo& siteInfo, TickType now
             while ((hotStorageNeeded > 0) && (replicaIdx < replicas.size()))
             {
                 SReplica* replica = replicas[replicaIdx];
-                SFile* file = replica->GetFile();
 
                 assert(replica->IsComplete() || (replica->mUsageCounter > 0));
 
@@ -624,18 +643,36 @@ void CHotColdStorageTransferGen::SubmitNewJobs(SSiteInfo& siteInfo, TickType now
                     continue;
                 }
 
+                //create transfer to remove replicas or remove replica instantly
+                SFile* file = replica->GetFile();
                 if (!file->GetReplicaByStorageElement(coldStorageElement))
                 {
                     SReplica* dstReplica = coldStorageElement->CreateReplica(file, now);
+                    assert(dstReplica);
                     mTransferMgr->CreateTransfer(replica, dstReplica, now, true);
+
+                    SReplica* backReplica = replicas.back();
+                    if (replica != backReplica)
+                    {
+                        map[backReplica] = replicaIdx;
+                        replicas[replicaIdx] = backReplica;
+                    }
+                    map.erase(replica);
+                    replicas.pop_back();
+                    hotReplicaDeletions.insert(replica);
                 }
                 else
                     hotStorageElement->RemoveReplica(replica, now);
 
-                hotStorageNeeded = (replica->GetCurSize() <= hotStorageNeeded) ? (hotStorageNeeded - replica->GetCurSize()) : 0;
+                //no need to decrease usage counter it's already 0
 
-                replicas[replicaIdx] = std::move(replicas.back());
-                replicas.pop_back();
+                hotStorageNeeded = (replica->GetCurSize() <= hotStorageNeeded) ? (hotStorageNeeded - replica->GetCurSize()) : 0;
+            }
+            
+            if (replicas.empty())
+            {
+                hotStorageReplicas[replicasPairIdx] = std::move(hotStorageReplicas.back());
+                hotStorageReplicas.pop_back();
             }
         }
         siteInfo.mWaitingForStorageJobs.splice(siteInfo.mWaitingForStorageJobs.end(), newJobs);
@@ -646,13 +683,13 @@ void CHotColdStorageTransferGen::SubmitNewJobs(SSiteInfo& siteInfo, TickType now
         for (std::unique_ptr<SJobInfo>& job : newJobs)
             CreateJobInputTransfer(archiveStorageElement, coldStorageElement, hotStorageElement, job.get(), now);
 
-        siteInfo.mQueuedJobs.splice(siteInfo.mQueuedJobs.end(), newJobs);
+        queuedJobs.splice(queuedJobs.end(), newJobs);
     }
 }
 
 void CHotColdStorageTransferGen::PrepareProductionCampaign(SSiteInfo& siteInfo, TickType now)
 {
-    std::vector<std::vector<SFile*>>& filesPerPopularity = siteInfo.mFilesPerPopularity;
+    auto& archiveFilesPerPopularity = siteInfo.mArchiveFilesPerPopularity;
     std::discrete_distribution<std::size_t> rngBucketSampler = GetRNGPopularityBucketSampler(siteInfo);
 
     CNetworkLink* archiveToCold = siteInfo.mArchiveToColdLink;
@@ -671,11 +708,13 @@ void CHotColdStorageTransferGen::PrepareProductionCampaign(SSiteInfo& siteInfo, 
     SpaceType volumeSum = 0;
     std::uint32_t maxRetries = 100;
 
-    while ((numToCreate > 0) && (maxRetries > 0))
+    while ((numToCreate > 0) && (maxRetries > 0) && !archiveFilesPerPopularity.empty())
     {
         const std::size_t bucketIdx = rngBucketSampler(mSim->mRNGEngine);
-        std::vector<SFile*>& files = filesPerPopularity[bucketIdx];
+        std::vector<SFile*>& files = archiveFilesPerPopularity[bucketIdx];
         std::uniform_int_distribution<std::size_t> rngFileSampler(0, files.size() - 1);
+
+        assert(!files.empty());
 
         SFile* srcFile = files[rngFileSampler(mSim->mRNGEngine)];
 

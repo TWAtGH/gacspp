@@ -1,0 +1,159 @@
+{
+"maxTick": 12960000,
+"clouds": [
+		{
+			"id": "gcp",
+			"name": "gcp_default",
+			"config": {"_file_": "gcp.json"}
+		}
+	],
+"rucio": {
+	"config": {"_file_": "rucio.json"}
+	},
+"links": {
+	"config": {"_file_": "links.json"}
+    },
+"dataGens": [
+        {
+            "name": "CERNTapeDataGen",
+            "storageElements": ["CERN-PROD_DATATAPE"],
+            "numReplicaRatios": [],
+            "selectStorageElementsRandomly": false,
+            "numFilesCfg": {
+                "type": "fixed",
+                "value": 3000000
+            },
+            "fileSizeCfg": {
+                "type": "normal",
+                "mean": 2.02,
+                "stddev": 0.25,
+                "minCfg": {"type": "minAdd", "limit": 0.05}
+            },
+            "lifetimeCfg": {
+                "type": "fixed",
+                "value": 157680000
+            }
+        },
+        {
+            "name": "UKITapeDataGen",
+            "storageElements": ["UKI-NORTHGRID-MAN-HEP_DATATAPE"],
+            "numReplicaRatios": [],
+            "selectStorageElementsRandomly": false,
+            "numFilesCfg": {
+                "type": "fixed",
+                "value": 2000000
+            },
+            "fileSizeCfg": {
+                "type": "normal",
+                "mean": 2.02,
+                "stddev": 0.25,
+                "minCfg": {"type": "minAdd", "limit": 0.05}
+            },
+            "lifetimeCfg": {
+                "type": "fixed",
+                "value": 157680000
+            }
+        }
+    ],
+"reaper": {
+        "name": "Reaper",
+        "tickFreq": 300,
+        "startTick": 300
+    },
+"transferCfgs": [
+    {
+        "manager": {
+            "type": "bandwidth",
+            "name": "HotColdTransferMgr",
+            "tickFreq": 10,
+            "startTick": 5
+        },
+        "generator": {
+            "type": "hotCold",
+            "name": "HotColdTransferGen",
+            "tickFreq": 15,
+            "startTick": 0,
+            "infos": [
+                {
+					"archiveStorageElement": "CERN-PROD_DATATAPE",
+                    "coldStorageElement": "google_eu",
+                    "hotStorageElement": "CERN-PROD_DATADISK",
+                    "cpuStorageElement": "CERN-PROD_CPU",
+                    "outputStorageElement": "CERN-PROD_OUTPUT",
+					
+					"productionStartTime": 1814400,
+					
+                    "numCores": 30000,
+                    "coreFillRate": 150,
+					
+                    "jobDurationCfg": {
+                        "type": "normal",
+                        "mean": 60,
+                        "stddev": 0.25,
+                        "minCfg": {"type": "minAdd", "limit": 15},
+                        "maxCfg": {"type": "maxClip", "limit": 120}
+                    },
+                    "numOutputCfg": {
+                        "type": "normal",
+                        "mean": 3,
+                        "stddev": 0.3,
+                        "minCfg": {"type": "minAdd", "limit": 1},
+                        "maxCfg": {"type": "maxModulo", "limit": 8}
+                    },
+                    "outputSizeCfg": {
+                        "type": "normal",
+                        "mean": 0.1,
+                        "stddev": 0.4,
+                        "minCfg": {"type": "minAdd", "limit": 0.01}
+                    },
+                    "reusageNumCfg": {
+                        "type": "geometric",
+                        "p": 0.35,
+                        "minCfg": {"type": "minClip", "limit": 1},
+                        "maxCfg": {"type": "maxModulo", "limit": 25, "invert": true}
+                    }
+                },
+                {
+					"archiveStorageElement": "UKI-NORTHGRID-MAN-HEP_DATATAPE",
+                    "coldStorageElement": "google_eu",
+                    "hotStorageElement": "UKI-NORTHGRID-MAN-HEP_DATADISK",
+                    "cpuStorageElement": "UKI-NORTHGRID-MAN-HEP_CPU",
+                    "outputStorageElement": "UKI-NORTHGRID-MAN-HEP_OUTPUT",
+					
+					"productionStartTime": 1814400,
+					
+                    "numCores": 20000,
+                    "coreFillRate": 100,
+					
+                    "jobDurationCfg": {
+                        "type": "normal",
+                        "mean": 60,
+                        "stddev": 0.25,
+                        "minCfg": {"type": "minAdd", "limit": 15},
+                        "maxCfg": {"type": "maxClip", "limit": 120}
+                    },
+                    "numOutputCfg": {
+                        "type": "normal",
+                        "mean": 3,
+                        "stddev": 0.3,
+                        "minCfg": {"type": "minAdd", "limit": 1},
+                        "maxCfg": {"type": "maxModulo", "limit": 8}
+                    },
+                    "outputSizeCfg": {
+                        "type": "normal",
+                        "mean": 0.1,
+                        "stddev": 0.4,
+                        "minCfg": {"type": "minAdd", "limit": 0.01}
+                    },
+                    "reusageNumCfg": {
+                        "type": "geometric",
+                        "p": 0.35,
+                        "minCfg": {"type": "minClip", "limit": 1},
+                        "maxCfg": {"type": "maxModulo", "limit": 25, "invert": true}
+                    }
+                }
+            ]
+        }
+    }
+]
+}

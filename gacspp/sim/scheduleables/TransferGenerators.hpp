@@ -1,8 +1,10 @@
 #pragma once
 
+//#include <deque>
 #include <forward_list>
 #include <list>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "CScheduleable.hpp"
 
@@ -88,31 +90,35 @@ public:
 
     struct SSiteInfo
     {
-        CNetworkLink* mArchiveToHotLink;
-        CNetworkLink* mArchiveToColdLink;
+        // configuration data / initialised by config
+        CNetworkLink* mArchiveToHotLink = nullptr;
+        CNetworkLink* mArchiveToColdLink = nullptr;
 
-        CNetworkLink* mColdToHotLink;
+        CNetworkLink* mColdToHotLink = nullptr;
 
-        CNetworkLink* mHotToCPULink;
-        CNetworkLink* mCPUToOutputLink;
-
-        std::vector<std::vector<SFile*>> mFilesPerPopularity;
-        std::vector<std::pair<std::unordered_map<SReplica*, std::size_t>, std::vector<SReplica*>>> mHotStorageReplicas;
+        CNetworkLink* mHotToCPULink = nullptr;
+        CNetworkLink* mCPUToOutputLink = nullptr;
 
         TickType mProductionStartTime = 0;
+
+        std::size_t mNumCores = 0;
+        std::size_t mCoreFillRate = 0;
 
         std::unique_ptr<IValueGenerator> mReusageNumGen;
         std::unique_ptr<IValueGenerator> mJobDurationGen;
         std::unique_ptr<IValueGenerator> mNumOutputGen;
         std::unique_ptr<IValueGenerator> mOutputSizeGen;
 
-        std::size_t mNumCores = 0;
-        std::size_t mCoreFillRate = 0;
+        // runtime data / initialised automatically
+        std::vector<std::vector<SFile*>> mArchiveFilesPerPopularity;
+        std::vector<std::pair<std::unordered_map<SReplica*, std::size_t>, std::vector<SReplica*>>> mHotStorageReplicas;
+        std::unordered_set<SReplica*> mHotReplicaDeletions;
 
         std::list<std::unique_ptr<SJobInfo>> mWaitingForStorageJobs;
         std::list<std::unique_ptr<SJobInfo>> mQueuedJobs;
         std::list<std::unique_ptr<SJobInfo>> mActiveJobs;
         std::list<std::pair<TickType, std::list<std::unique_ptr<SJobInfo>>>> mRunningJobs;
+
         std::size_t mNumRunningJobs = 0;
     };
 
