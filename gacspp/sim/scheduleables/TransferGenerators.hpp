@@ -109,7 +109,7 @@ public:
         std::unique_ptr<IValueGenerator> mNumOutputGen;
         std::unique_ptr<IValueGenerator> mOutputSizeGen;
 
-        // runtime data / initialised automatically
+        // runtime data / initialised automatically / book keeping
         std::vector<std::vector<SFile*>> mArchiveFilesPerPopularity;
         std::vector<std::pair<std::unordered_map<SReplica*, std::size_t>, std::vector<SReplica*>>> mHotStorageReplicas;
         std::unordered_set<SReplica*> mHotReplicaDeletions;
@@ -118,6 +118,8 @@ public:
         std::list<std::unique_ptr<SJobInfo>> mQueuedJobs;
         std::list<std::unique_ptr<SJobInfo>> mActiveJobs;
         std::list<std::pair<TickType, std::list<std::unique_ptr<SJobInfo>>>> mRunningJobs;
+
+        std::unordered_map <SFile*, std::vector<std::list<std::unique_ptr<SJobInfo>>::iterator>> mWaitingForSameFile;
 
         std::size_t mNumRunningJobs = 0;
     };

@@ -337,6 +337,7 @@ void CHotColdStorageTransferGen::UpdateWaitingJobs(SSiteInfo& siteInfo, TickType
 {
     std::list<std::unique_ptr<SJobInfo>>& waitingForStorageJobs = siteInfo.mWaitingForStorageJobs;
     std::list<std::unique_ptr<SJobInfo>>& queuedJobs = siteInfo.mQueuedJobs;
+    auto& waitingForSameFile = siteInfo.mWaitingForSameFile;
 
     CStorageElement* archiveStorageElement = siteInfo.mArchiveToColdLink->GetSrcStorageElement();
     CStorageElement* coldStorageElement = siteInfo.mColdToHotLink->GetSrcStorageElement();
@@ -345,10 +346,30 @@ void CHotColdStorageTransferGen::UpdateWaitingJobs(SSiteInfo& siteInfo, TickType
     auto jobIt = waitingForStorageJobs.begin();
     while (jobIt != waitingForStorageJobs.end())
     {
-        if (!hotStorageElement->CanStoreVolume((*jobIt)->mInputFile->GetSize()))
+        SFile* file = (*jobIt)->mInputFile;
+        SReplica*& newReplica = (*jobIt)->mInputReplica;
+        if (!hotStorageElement->CanStoreVolume(file->GetSize()))
             break;
 
         CreateJobInputTransfer(archiveStorageElement, coldStorageElement, hotStorageElement, jobIt->get(), now);
+
+        // queue all other jobs that have been waiting for this replica
+        auto findResult = waitingForSameFile.find(file);
+        if (findResult != waitingForSameFile.end())
+        {
+            for (auto it : findResult->second)
+            {
+                if (it == jobIt)
+                    continue;
+
+                newReplica->mUsageCounter += 1;
+                (*it)->mInputReplica = newReplica;
+                (*it)->mQueuedAt = now;
+                queuedJobs.splice(queuedJobs.end(), waitingForStorageJobs, it);
+            }
+
+            waitingForSameFile.erase(findResult);
+        }
 
         auto tmpIt = jobIt++;
         queuedJobs.splice(queuedJobs.end(), waitingForStorageJobs, tmpIt);
@@ -579,16 +600,18 @@ void CHotColdStorageTransferGen::SubmitNewJobs(SSiteInfo& siteInfo, TickType now
 
     std::list<std::unique_ptr<SJobInfo>>& queuedJobs = siteInfo.mQueuedJobs;
     std::list<std::unique_ptr<SJobInfo>>& waitingJobs = siteInfo.mWaitingForStorageJobs;
+    auto& waitingForSameFile = siteInfo.mWaitingForSameFile;
     std::list<std::unique_ptr<SJobInfo>> newJobs;
 
     assert(siteInfo.mNumCores >= (activeJobs.size() + siteInfo.mNumRunningJobs));
-    std::size_t numJobsToCreate = std::min(siteInfo.mNumCores - (activeJobs.size() + siteInfo.mNumRunningJobs), siteInfo.mCoreFillRate);
-    if (queuedJobs.size() >= numJobsToCreate)
-        numJobsToCreate = 2; // only create 2 new jobs if there are already more jobs queued
+    const std::size_t numFreeCores = siteInfo.mNumCores - (activeJobs.size() + siteInfo.mNumRunningJobs);
+    std::size_t maxJobsToCreate = std::min(numFreeCores, siteInfo.mCoreFillRate);
+    if (waitingJobs.size() > siteInfo.mCoreFillRate)
+        maxJobsToCreate = std::min(maxJobsToCreate, (std::size_t)2);
 
     std::discrete_distribution<std::size_t> rngBucketSampler = GetRNGPopularityBucketSampler(siteInfo);
 
-    for (; numJobsToCreate > 0; --numJobsToCreate)
+    for (; maxJobsToCreate > 0; --maxJobsToCreate)
     {
         const std::size_t bucketIdx = rngBucketSampler(mSim->mRNGEngine);
         std::vector<SFile*>& files = archiveFilesPerPopularity[bucketIdx];
@@ -675,14 +698,35 @@ void CHotColdStorageTransferGen::SubmitNewJobs(SSiteInfo& siteInfo, TickType now
                 hotStorageReplicas.pop_back();
             }
         }
-        siteInfo.mWaitingForStorageJobs.splice(siteInfo.mWaitingForStorageJobs.end(), newJobs);
+        for (auto it = newJobs.begin(); it != newJobs.end(); ++it)
+            waitingForSameFile[(*it)->mInputFile].push_back(it);
+        waitingJobs.splice(waitingJobs.end(), newJobs);
     }
     else
     {
         //enough storage available -> create replicas + transfers and put jobs into queue
         for (std::unique_ptr<SJobInfo>& job : newJobs)
+        {
             CreateJobInputTransfer(archiveStorageElement, coldStorageElement, hotStorageElement, job.get(), now);
 
+            SReplica* newReplica = job->mInputReplica;
+            SFile* file = job->mInputFile;
+
+            //also queue all jobs that have been waiting for the same file
+            auto findResult = waitingForSameFile.find(file);
+            if (findResult != waitingForSameFile.end())
+            {
+                for (auto it : findResult->second)
+                {
+                    newReplica->mUsageCounter += 1;
+                    (*it)->mInputReplica = newReplica;
+                    (*it)->mQueuedAt = now;
+                    queuedJobs.splice(queuedJobs.end(), waitingJobs, it);
+                }
+
+                waitingForSameFile.erase(findResult);
+            }
+        }
         queuedJobs.splice(queuedJobs.end(), newJobs);
     }
 }
