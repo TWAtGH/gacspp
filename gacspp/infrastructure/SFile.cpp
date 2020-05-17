@@ -80,3 +80,49 @@ void SReplica::ExtendExpirationTime(TickType newExpiresAt)
         mFile->ExtendExpirationTime(newExpiresAt);
     }
 }
+
+
+
+bool SIndexedReplicas::AddReplica(SReplica* replica)
+{
+    auto res = mReplicaToIdx.insert({replica, mReplicas.size()});
+    if(res.second)
+    {
+        mReplicas.push_back(replica);
+        return true;
+    }
+    return false;
+}
+
+bool SIndexedReplicas::RemoveReplica(SReplica* replica)
+{
+    auto res = mReplicaToIdx.find(replica);
+    if(res == mReplicaToIdx.end())
+        return false;
+
+    const std::size_t idx = res->second;
+    
+    SReplica* backReplica = mReplicas.back();
+    mReplicas[idx] = backReplica;
+
+    mReplicaToIdx.erase(res);
+    mReplicas.pop_back();
+
+    if (replica != backReplica)
+        mReplicaToIdx[backReplica] = idx;
+
+    return true;
+}
+
+bool SIndexedReplicas::RemoveReplica(std::size_t idx)
+{
+    return RemoveReplica(mReplicas[idx]);
+}
+
+auto SIndexedReplicas::ExtractBack() -> SReplica*
+{
+    assert(!mReplicas.empty());
+    SReplica* back = mReplicas.back();
+    RemoveReplica(back);
+    return back;
+}

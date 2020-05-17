@@ -3,12 +3,14 @@
 //#include <deque>
 #include <forward_list>
 #include <list>
+#include <map>
 #include <unordered_map>
 #include <unordered_set>
 
 #include "CScheduleable.hpp"
 
 #include "infrastructure/IActionListener.hpp"
+#include "infrastructure/SFile.hpp"
 
 class IBaseSim;
 class CNetworkLink;
@@ -111,10 +113,13 @@ public:
 
         // runtime data / initialised automatically / book keeping
         std::vector<std::vector<SFile*>> mArchiveFilesPerPopularity;
-        std::vector<std::pair<std::unordered_map<SReplica*, std::size_t>, std::vector<SReplica*>>> mHotStorageReplicas;
+        std::map<std::uint32_t, SIndexedReplicas> mHotReplicasByPopularity;
+        std::map<std::uint32_t, SIndexedReplicas> mUnusedHotReplicasByPopularity;
+
+        //hot replicas that will be deleted after their transfer to cold storage is done
         std::unordered_set<SReplica*> mHotReplicaDeletions;
 
-        std::list<std::unique_ptr<SJobInfo>> mWaitingForStorageJobs;
+        std::list<std::unique_ptr<SJobInfo>> mWaitingJobs;
         std::list<std::unique_ptr<SJobInfo>> mQueuedJobs;
         std::list<std::unique_ptr<SJobInfo>> mActiveJobs;
         std::list<std::pair<TickType, std::list<std::unique_ptr<SJobInfo>>>> mRunningJobs;
@@ -125,7 +130,7 @@ public:
     };
 
 private:
-    std::discrete_distribution<std::size_t> GetRNGPopularityBucketSampler(SSiteInfo& siteInfo);
+    std::discrete_distribution<std::size_t> GetPopularityIdxRNG(const SSiteInfo& siteInfo);
 
     void CreateJobInputTransfer(CStorageElement* archiveStorageElement, CStorageElement* coldStorageElement, CStorageElement* hotStorageElement, SJobInfo* job, TickType now);
 

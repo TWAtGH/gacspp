@@ -1,6 +1,6 @@
 {
 "init":[
-    "DROP TABLE IF EXISTS Sites, StorageElements, NetworkLinks, Files, Replicas, Transfers, Traces, Bills CASCADE;",
+    "DROP TABLE IF EXISTS Sites, StorageElements, NetworkLinks, Files, Replicas, Transfers, InputTraces, OutputTraces, JobTraces, Bills CASCADE;",
     "CREATE TABLE Sites (id BIGINT, name VARCHAR, locationName VARCHAR, cloudName VARCHAR);",
     "CREATE TABLE StorageElements (id BIGINT, siteId BIGINT, name VARCHAR);",
     "CREATE TABLE NetworkLinks (id BIGINT, srcStorageElementId BIGINT, dstStorageElementId BIGINT);",

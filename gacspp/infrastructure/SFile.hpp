@@ -83,3 +83,29 @@ private:
     CStorageElement* mStorageElement;
     SpaceType mCurSize = 0;
 };
+
+
+struct SIndexedReplicas
+{
+private:
+    std::unordered_map<SReplica*, std::size_t> mReplicaToIdx;
+    std::vector<SReplica*> mReplicas;
+
+public:
+    inline auto IsEmpty() const -> std::size_t
+    {return mReplicas.empty();}
+
+    inline auto NumReplicas() const -> std::size_t
+    {return mReplicas.size();}
+    
+    inline auto GetReplica(std::size_t idx) const -> SReplica*
+    {return mReplicas[idx];}
+    
+    inline bool HasReplica(SReplica* replica) const
+    {return (mReplicaToIdx.count(replica) > 0);}
+
+    bool AddReplica(SReplica* replica);
+    bool RemoveReplica(SReplica* replica);
+    bool RemoveReplica(std::size_t idx);
+    auto ExtractBack() -> SReplica*;
+};
