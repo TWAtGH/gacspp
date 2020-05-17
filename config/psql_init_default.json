@@ -20,8 +20,8 @@
     "ALTER TABLE Files ADD PRIMARY KEY(id);",
     "ALTER TABLE Replicas ADD PRIMARY KEY(id), ADD FOREIGN KEY(fileId) REFERENCES Files(id), ADD FOREIGN KEY(storageElementId) REFERENCES StorageElements(id);",
     "ALTER TABLE Transfers ADD PRIMARY KEY(id), ADD FOREIGN KEY(srcStorageElementId) REFERENCES StorageElements(id), ADD FOREIGN KEY(dstStorageElementId) REFERENCES StorageElements(id), ADD FOREIGN KEY(fileId) REFERENCES Files(id), ADD FOREIGN KEY(srcReplicaId) REFERENCES Replicas(id), ADD FOREIGN KEY(dstReplicaId) REFERENCES Replicas(id);",
+	"ALTER TABLE JobTraces ADD PRIMARY KEY(id), ADD FOREIGN KEY(siteId) REFERENCES Sites(id);",
     "ALTER TABLE InputTraces ADD PRIMARY KEY(id), ADD FOREIGN KEY(jobId) REFERENCES JobTraces(id), ADD FOREIGN KEY(siteId) REFERENCES Sites(id), ADD FOREIGN KEY(storageElementId) REFERENCES StorageElements(id), ADD FOREIGN KEY(fileId) REFERENCES Files(id), ADD FOREIGN KEY(replicaId) REFERENCES Replicas(id);",
-	"ALTER TABLE OutputTraces ADD PRIMARY KEY(id), ADD FOREIGN KEY(jobId) REFERENCES JobTraces(id), ADD FOREIGN KEY(siteId) REFERENCES Sites(id), ADD FOREIGN KEY(storageElementId) REFERENCES StorageElements(id), ADD FOREIGN KEY(fileId) REFERENCES Files(id), ADD FOREIGN KEY(replicaId) REFERENCES Replicas(id);",
-	"ALTER TABLE JobTraces ADD PRIMARY KEY(id), ADD FOREIGN KEY(siteId) REFERENCES Sites(id);"
+	"ALTER TABLE OutputTraces ADD PRIMARY KEY(id), ADD FOREIGN KEY(jobId) REFERENCES JobTraces(id), ADD FOREIGN KEY(siteId) REFERENCES Sites(id), ADD FOREIGN KEY(storageElementId) REFERENCES StorageElements(id), ADD FOREIGN KEY(fileId) REFERENCES Files(id), ADD FOREIGN KEY(replicaId) REFERENCES Replicas(id);"
 ]
 }
