@@ -167,29 +167,32 @@ void CHotColdStorageTransferGen::PostCompleteReplica(SReplica* replica, TickType
             archiveFilesPerPopularity.back().push_back(file);
             break;
         }
-        else if(replicaStorageElement == siteInfo.mArchiveToHotLink->GetDstStorageElement())
-        {
-            std::map<std::uint32_t, SIndexedReplicas>& hotReplicas = siteInfo.mHotReplicasByPopularity;
-            std::map<std::uint32_t, SIndexedReplicas>& unusedHotReplicas = siteInfo.mUnusedHotReplicasByPopularity;
-            auto res = hotReplicas.insert({popularity, SIndexedReplicas()});
-            bool wasAdded = res.first->second.AddReplica(replica);
-            assert(wasAdded);
-            
-            if(replica->mUsageCounter <= 1)
-            {
-                res = unusedHotReplicas.insert({popularity, SIndexedReplicas()});
-                wasAdded = res.first->second.AddReplica(replica);
-                assert(wasAdded);
-            }
-            break;
-        }
     }
 }
 
 void CHotColdStorageTransferGen::PostCreateReplica(SReplica* replica, TickType now)
 {
-    (void)replica;
     (void)now;
+    CStorageElement* replicaStorageElement = replica->GetStorageElement();
+    std::uint32_t& popularity = replica->GetFile()->mPopularity;
+    SFile* file = replica->GetFile();
+
+    for (SSiteInfo& siteInfo : mSiteInfos)
+    {
+        if (replicaStorageElement == siteInfo.mArchiveToHotLink->GetDstStorageElement())
+        {
+            std::map<std::uint32_t, SIndexedReplicas>& hotReplicas = siteInfo.mHotReplicasByPopularity;
+            std::map<std::uint32_t, SIndexedReplicas>& unusedHotReplicas = siteInfo.mUnusedHotReplicasByPopularity;
+
+            assert(replica->mUsageCounter == 0);
+
+            auto res = hotReplicas.insert({ popularity, SIndexedReplicas() });
+            bool wasAdded = res.first->second.AddReplica(replica);
+            assert(wasAdded);
+
+            break;
+        }
+    }
 }
 
 void CHotColdStorageTransferGen::PreRemoveReplica(SReplica* replica, TickType now)
@@ -201,10 +204,11 @@ void CHotColdStorageTransferGen::PreRemoveReplica(SReplica* replica, TickType no
 
     for (SSiteInfo& siteInfo : mSiteInfos)
     {
-        siteInfo.mHotReplicaDeletions.erase(replica);
         if (replicaStorageElement == siteInfo.mArchiveToHotLink->GetDstStorageElement())
         {
+            siteInfo.mHotReplicaDeletions.erase(replica);
             std::map<std::uint32_t, SIndexedReplicas>& hotReplicasByPopularity = siteInfo.mHotReplicasByPopularity;
+            std::map<std::uint32_t, SIndexedReplicas>& unusedHotReplicasByPopularity = siteInfo.mUnusedHotReplicasByPopularity;
             
             auto res = hotReplicasByPopularity.find(popularity);
             assert(res != hotReplicasByPopularity.end());
@@ -214,7 +218,16 @@ void CHotColdStorageTransferGen::PreRemoveReplica(SReplica* replica, TickType no
 
             if(res->second.IsEmpty())
                 hotReplicasByPopularity.erase(res);
-            
+
+
+            res = unusedHotReplicasByPopularity.find(popularity);
+            if (res != unusedHotReplicasByPopularity.end())
+            {
+                res->second.RemoveReplica(replica);
+                if (res->second.IsEmpty())
+                    unusedHotReplicasByPopularity.erase(res);
+            }
+
             break;
         }
     }
@@ -312,7 +325,8 @@ void CHotColdStorageTransferGen::CreateJobInputTransfer(CStorageElement* archive
 void CHotColdStorageTransferGen::PrepareProductionCampaign(SSiteInfo& siteInfo, TickType now)
 {
     std::discrete_distribution<std::size_t> popularityIdxRNG = GetPopularityIdxRNG(siteInfo);
-    auto& archiveFilesPerPopularity = siteInfo.mArchiveFilesPerPopularity;
+    std::vector<std::vector<SFile*>>& archiveFilesPerPopularity = siteInfo.mArchiveFilesPerPopularity;
+    std::map<std::uint32_t, SIndexedReplicas>& unusedHotReplicas = siteInfo.mUnusedHotReplicasByPopularity;
 
     CNetworkLink* archiveToCold = siteInfo.mArchiveToColdLink;
     CNetworkLink* archiveToHot = siteInfo.mArchiveToHotLink;
@@ -355,6 +369,11 @@ void CHotColdStorageTransferGen::PrepareProductionCampaign(SSiteInfo& siteInfo, 
                 --maxRetries;
                 continue;
             }
+
+            auto res = unusedHotReplicas.insert({ srcFile->mPopularity, SIndexedReplicas() });
+            bool wasAdded = res.first->second.AddReplica(newReplica);
+            assert(wasAdded);
+
             maxRetries = 100;
             hotReplicasCreationLimit -= 1;
         }
