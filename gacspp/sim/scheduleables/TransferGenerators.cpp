@@ -314,6 +314,7 @@ void CHotColdStorageTransferGen::PrepareProductionCampaign(SSiteInfo& siteInfo, 
     std::size_t coldReplicaCreationLimit = archiveToCold->mMaxNumActiveTransfers - archiveToCold->mNumActiveTransfers;
 
     std::uint32_t maxRetries = 100;
+    bool hotStorageFull = false;
 
     while ((hotReplicasCreationLimit > 0) && (maxRetries > 0) && !archiveFilesPerPopularity.empty())
     {
@@ -327,35 +328,33 @@ void CHotColdStorageTransferGen::PrepareProductionCampaign(SSiteInfo& siteInfo, 
 
         //get a random file
         SFile* srcFile = files[fileIdxRNG(mSim->mRNGEngine)];
-        SReplica* newReplica = hotStorageElement->CreateReplica(srcFile, now);
 
-        //either not enough storage at hot storage or replica already exists there
-        if(!newReplica)
+        if (!hotStorageFull)
+            hotStorageFull = hotStorageElement->CanStoreVolume(srcFile->GetSize());
+
+        SReplica* newReplica;
+        if (!hotStorageFull)
         {
-            //if replica already exists there try another one
-            if (srcFile->GetReplicaByStorageElement(hotStorageElement))
+            newReplica = hotStorageElement->CreateReplica(srcFile, now);
+            if (!newReplica)
             {
                 --maxRetries;
                 continue;
             }
-            
+            maxRetries = 100;
+            hotReplicasCreationLimit -= 1;
+        }
+        else if (coldReplicaCreationLimit > 0)
+        {
             //not enough storage at hot storage so try cold storage
-            if (coldReplicaCreationLimit > 0)
-            {
-                newReplica = coldStorageElement->CreateReplica(srcFile, now);
-                if (!newReplica)
-                    break;
-
-                coldReplicaCreationLimit -= 1;
-            }
-            else
+            newReplica = coldStorageElement->CreateReplica(srcFile, now);
+            if (!newReplica)
                 break;
+
+            coldReplicaCreationLimit -= 1;
         }
         else
-            hotReplicasCreationLimit -= 1;
-
-        maxRetries = 100;
-        assert(newReplica);
+            break;
 
         SReplica* srcReplica = srcFile->GetReplicaByStorageElement(archiveStorageElement);
         assert(srcReplica && srcReplica->IsComplete());
@@ -635,25 +634,27 @@ void CHotColdStorageTransferGen::UpdateQueuedJobs(SSiteInfo& siteInfo, TickType 
 
 void CHotColdStorageTransferGen::SubmitNewJobs(SSiteInfo& siteInfo, TickType now)
 {
-    std::list<std::unique_ptr<SJobInfo>>& activeJobs = siteInfo.mActiveJobs;
-
-    auto& archiveFilesPerPopularity = siteInfo.mArchiveFilesPerPopularity;
-
     CStorageElement* archiveStorageElement = siteInfo.mArchiveToColdLink->GetSrcStorageElement();
     CStorageElement* coldStorageElement = siteInfo.mColdToHotLink->GetSrcStorageElement();
     CStorageElement* hotStorageElement = siteInfo.mColdToHotLink->GetDstStorageElement();
     SpaceType hotStorageNeeded = 0;
 
+    std::vector<std::vector<SFile*>>& archiveFilesPerPopularity = siteInfo.mArchiveFilesPerPopularity;
     std::unordered_set<SReplica*>& hotReplicaDeletions = siteInfo.mHotReplicaDeletions;
 
+    std::list<std::unique_ptr<SJobInfo>>& activeJobs = siteInfo.mActiveJobs;
     std::list<std::unique_ptr<SJobInfo>>& queuedJobs = siteInfo.mQueuedJobs;
     std::list<std::unique_ptr<SJobInfo>>& waitingJobs = siteInfo.mWaitingJobs;
     auto& waitingForSameFile = siteInfo.mWaitingForSameFile;
     std::list<std::unique_ptr<SJobInfo>> newJobs;
 
-    assert(siteInfo.mNumCores >= (activeJobs.size() + siteInfo.mNumRunningJobs));
-    const std::size_t numFreeCores = siteInfo.mNumCores - (activeJobs.size() + siteInfo.mNumRunningJobs);
-    std::size_t jobCreationLimit = std::min(numFreeCores, siteInfo.mCoreFillRate);
+    const std::size_t numCoresInUse = activeJobs.size() + siteInfo.mNumRunningJobs;
+    if ((waitingJobs.size() + numCoresInUse) > (2 * siteInfo.mNumCores))
+        return;
+
+    assert(siteInfo.mNumCores >= numCoresInUse);
+
+    std::size_t jobCreationLimit = std::min(siteInfo.mNumCores - numCoresInUse, siteInfo.mCoreFillRate);
     if (waitingJobs.size() > siteInfo.mCoreFillRate)
         jobCreationLimit = std::min(jobCreationLimit, (std::size_t)2);
 
