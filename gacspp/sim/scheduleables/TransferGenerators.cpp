@@ -144,15 +144,31 @@ CHotColdStorageTransferGen::~CHotColdStorageTransferGen()
 {
     for (SSiteInfo& siteInfo : mSiteInfos)
     {
-        auto listenerIt = siteInfo.mArchiveToColdLink->GetSrcStorageElement()->mActionListener.begin();
-        auto listenerEnd = siteInfo.mArchiveToColdLink->GetSrcStorageElement()->mActionListener.end();
+        //remove this as archive storage element listener
+        std::vector<IStorageElementActionListener*> listeners = siteInfo.mArchiveToHotLink->GetSrcStorageElement()->mActionListener;
+        auto listenerIt = listeners.begin();
+        auto listenerEnd = listeners.end();
         for (; listenerIt != listenerEnd; ++listenerIt)
         {
             if ((*listenerIt) == this)
+            {
+                listeners.erase(listenerIt);
                 break;
+            }
         }
-        if (listenerIt != listenerEnd)
-            siteInfo.mArchiveToColdLink->GetSrcStorageElement()->mActionListener.erase(listenerIt);
+
+        //remove this as hot storage element listener
+        listeners = siteInfo.mArchiveToHotLink->GetDstStorageElement()->mActionListener;
+        listenerIt = listeners.begin();
+        listenerEnd = listeners.end();
+        for (; listenerIt != listenerEnd; ++listenerIt)
+        {
+            if ((*listenerIt) == this)
+            {
+                listeners.erase(listenerIt);
+                break;
+            }
+        }
     }
 }
 
