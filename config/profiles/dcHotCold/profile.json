@@ -83,15 +83,15 @@
 					
 					"productionStartTime": 1814400,
 					
-                    "numCores": 30000,
+                    "numCores": 10000,
                     "coreFillRate": 150,
 					
                     "jobDurationCfg": {
                         "type": "normal",
-                        "mean": 60,
+                        "mean": 240,
                         "stddev": 0.25,
                         "minCfg": {"type": "minAdd", "limit": 15},
-                        "maxCfg": {"type": "maxClip", "limit": 120}
+                        "maxCfg": {"type": "maxClip", "limit": 360}
                     },
                     "numOutputCfg": {
                         "type": "normal",
@@ -122,15 +122,15 @@
 					
 					"productionStartTime": 1814400,
 					
-                    "numCores": 20000,
+                    "numCores": 7500,
                     "coreFillRate": 100,
 					
                     "jobDurationCfg": {
                         "type": "normal",
-                        "mean": 60,
+                        "mean": 240,
                         "stddev": 0.25,
                         "minCfg": {"type": "minAdd", "limit": 15},
-                        "maxCfg": {"type": "maxClip", "limit": 120}
+                        "maxCfg": {"type": "maxClip", "limit": 360}
                     },
                     "numOutputCfg": {
                         "type": "normal",
