@@ -175,16 +175,12 @@ void CHotColdStorageTransferGen::PostCreateReplica(SReplica* replica, TickType n
     (void)now;
     CStorageElement* replicaStorageElement = replica->GetStorageElement();
     std::uint32_t& popularity = replica->GetFile()->mPopularity;
-    SFile* file = replica->GetFile();
 
     for (SSiteInfo& siteInfo : mSiteInfos)
     {
         if (replicaStorageElement == siteInfo.mArchiveToHotLink->GetDstStorageElement())
         {
             std::map<std::uint32_t, SIndexedReplicas>& hotReplicas = siteInfo.mHotReplicasByPopularity;
-            std::map<std::uint32_t, SIndexedReplicas>& unusedHotReplicas = siteInfo.mUnusedHotReplicasByPopularity;
-
-            assert(replica->mUsageCounter == 0);
 
             auto res = hotReplicas.insert({ popularity, SIndexedReplicas() });
             bool wasAdded = res.first->second.AddReplica(replica);
@@ -257,30 +253,31 @@ void CHotColdStorageTransferGen::OnUpdate(TickType now)
 
 void CHotColdStorageTransferGen::Shutdown(const TickType now)
 {
+    (void)now;
     for (SSiteInfo& siteInfo : mSiteInfos)
     {
         //remove this as archive storage element listener
-        std::vector<IStorageElementActionListener*>& listeners = siteInfo.mArchiveToHotLink->GetSrcStorageElement()->mActionListener;
-        auto listenerIt = listeners.begin();
-        auto listenerEnd = listeners.end();
+        std::vector<IStorageElementActionListener*>& listeners1 = siteInfo.mArchiveToHotLink->GetSrcStorageElement()->mActionListener;
+        auto listenerIt = listeners1.begin();
+        auto listenerEnd = listeners1.end();
         for (; listenerIt != listenerEnd; ++listenerIt)
         {
             if ((*listenerIt) == this)
             {
-                listeners.erase(listenerIt);
+                listeners1.erase(listenerIt);
                 break;
             }
         }
 
         //remove this as hot storage element listener
-        listeners = siteInfo.mArchiveToHotLink->GetDstStorageElement()->mActionListener;
-        listenerIt = listeners.begin();
-        listenerEnd = listeners.end();
+        std::vector<IStorageElementActionListener*>& listeners2 = siteInfo.mArchiveToHotLink->GetDstStorageElement()->mActionListener;
+        listenerIt = listeners2.begin();
+        listenerEnd = listeners2.end();
         for (; listenerIt != listenerEnd; ++listenerIt)
         {
-            if ((*listenerIt) == this)
+            if ((*listenerIt) == this) 
             {
-                listeners.erase(listenerIt);
+                listeners2.erase(listenerIt);
                 break;
             }
         }

@@ -21,7 +21,7 @@
             "selectStorageElementsRandomly": false,
             "numFilesCfg": {
                 "type": "fixed",
-                "value": 3000000
+                "value": 300000
             },
             "fileSizeCfg": {
                 "type": "normal",
@@ -41,7 +41,7 @@
             "selectStorageElementsRandomly": false,
             "numFilesCfg": {
                 "type": "fixed",
-                "value": 2000000
+                "value": 200000
             },
             "fileSizeCfg": {
                 "type": "normal",
