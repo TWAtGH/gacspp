@@ -140,38 +140,6 @@ CHotColdStorageTransferGen::CHotColdStorageTransferGen(IBaseSim* sim, std::share
     mOutputTraceInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY OutputTraces(id, jobId, siteId, storageElementId, fileId, replicaId, startedAt, finishedAt, traffic) FROM STDIN with(FORMAT csv);", 9, '?');
 }
 
-CHotColdStorageTransferGen::~CHotColdStorageTransferGen()
-{
-    for (SSiteInfo& siteInfo : mSiteInfos)
-    {
-        //remove this as archive storage element listener
-        std::vector<IStorageElementActionListener*> listeners = siteInfo.mArchiveToHotLink->GetSrcStorageElement()->mActionListener;
-        auto listenerIt = listeners.begin();
-        auto listenerEnd = listeners.end();
-        for (; listenerIt != listenerEnd; ++listenerIt)
-        {
-            if ((*listenerIt) == this)
-            {
-                listeners.erase(listenerIt);
-                break;
-            }
-        }
-
-        //remove this as hot storage element listener
-        listeners = siteInfo.mArchiveToHotLink->GetDstStorageElement()->mActionListener;
-        listenerIt = listeners.begin();
-        listenerEnd = listeners.end();
-        for (; listenerIt != listenerEnd; ++listenerIt)
-        {
-            if ((*listenerIt) == this)
-            {
-                listeners.erase(listenerIt);
-                break;
-            }
-        }
-    }
-}
-
 void CHotColdStorageTransferGen::PostCompleteReplica(SReplica* replica, TickType now)
 {
     (void)now;
@@ -249,8 +217,6 @@ void CHotColdStorageTransferGen::PreRemoveReplica(SReplica* replica, TickType no
             
             break;
         }
-        else
-            assert(replicaStorageElement != siteInfo.mArchiveToHotLink->GetSrcStorageElement()); //archive replicas must not be deleted
     }
 }
 
@@ -274,6 +240,38 @@ void CHotColdStorageTransferGen::OnUpdate(TickType now)
     }
 
     mNextCallTick = now + mTickFreq;
+}
+
+void CHotColdStorageTransferGen::Shutdown(const TickType now)
+{
+    for (SSiteInfo& siteInfo : mSiteInfos)
+    {
+        //remove this as archive storage element listener
+        std::vector<IStorageElementActionListener*> listeners = siteInfo.mArchiveToHotLink->GetSrcStorageElement()->mActionListener;
+        auto listenerIt = listeners.begin();
+        auto listenerEnd = listeners.end();
+        for (; listenerIt != listenerEnd; ++listenerIt)
+        {
+            if ((*listenerIt) == this)
+            {
+                listeners.erase(listenerIt);
+                break;
+            }
+        }
+
+        //remove this as hot storage element listener
+        listeners = siteInfo.mArchiveToHotLink->GetDstStorageElement()->mActionListener;
+        listenerIt = listeners.begin();
+        listenerEnd = listeners.end();
+        for (; listenerIt != listenerEnd; ++listenerIt)
+        {
+            if ((*listenerIt) == this)
+            {
+                listeners.erase(listenerIt);
+                break;
+            }
+        }
+    }
 }
 
 std::discrete_distribution<std::size_t> CHotColdStorageTransferGen::GetPopularityIdxRNG(const SSiteInfo& siteInfo)

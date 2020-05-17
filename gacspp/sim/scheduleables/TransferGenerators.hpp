@@ -153,10 +153,9 @@ public:
         std::shared_ptr<CTransferManager> transferMgr,
         TickType tickFreq,
         TickType startTick = 0);
-    
-    ~CHotColdStorageTransferGen();
 
     void OnUpdate(TickType now) final;
+    void Shutdown(const TickType now) final;
 };
 
 
