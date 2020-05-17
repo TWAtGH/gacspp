@@ -247,7 +247,7 @@ void CHotColdStorageTransferGen::Shutdown(const TickType now)
     for (SSiteInfo& siteInfo : mSiteInfos)
     {
         //remove this as archive storage element listener
-        std::vector<IStorageElementActionListener*> listeners = siteInfo.mArchiveToHotLink->GetSrcStorageElement()->mActionListener;
+        std::vector<IStorageElementActionListener*>& listeners = siteInfo.mArchiveToHotLink->GetSrcStorageElement()->mActionListener;
         auto listenerIt = listeners.begin();
         auto listenerEnd = listeners.end();
         for (; listenerIt != listenerEnd; ++listenerIt)

@@ -124,6 +124,7 @@ public:
     CTransferManager(TickType tickFreq, TickType startTick = 0);
 
     void OnUpdate(TickType now) final;
+    void Shutdown(const TickType now) final;
 
     void CreateTransfer(SReplica* srcReplica, SReplica* dstReplica, TickType now, bool deleteSrcReplica = false);
 

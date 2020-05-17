@@ -356,6 +356,12 @@ void CTransferManager::OnUpdate(TickType now)
     mNextCallTick = now + mTickFreq;
 }
 
+void CTransferManager::Shutdown(const TickType now)
+{
+    mQueuedTransfers.clear();
+    mActiveTransfers.clear();
+}
+
 
 
 CFixedTimeTransferManager::STransfer::STransfer( SReplica* srcReplica,
