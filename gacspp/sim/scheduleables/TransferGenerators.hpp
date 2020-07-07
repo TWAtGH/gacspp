@@ -2,6 +2,7 @@
 
 //#include <deque>
 #include <forward_list>
+#include <limits>
 #include <list>
 #include <map>
 #include <unordered_map>
@@ -127,6 +128,7 @@ public:
         std::unordered_map <SFile*, std::vector<std::list<std::unique_ptr<SJobInfo>>::iterator>> mWaitingForSameFile;
 
         std::size_t mNumRunningJobs = 0;
+        SpaceType mMinFileSize = std::numeric_limits<SpaceType>::max();
     };
 
 private:

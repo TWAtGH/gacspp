@@ -15,17 +15,28 @@ inline IdType GetNewId()
     return ++id;
 }
 
-class CScopedTimeDiff
+class CScopedTimeDiffSet
 {
 private:
     TimePointType mStartTime;
     DurationType& mOutVal;
-    bool mWillAdd;
 
 public:
-    CScopedTimeDiff(DurationType& outVal, bool willAdd=false);
+    CScopedTimeDiffSet(DurationType& outVal);
 
-    ~CScopedTimeDiff();
+    ~CScopedTimeDiffSet();
+};
+
+class CScopedTimeDiffAdd
+{
+private:
+    TimePointType mStartTime;
+    DurationType& mOutVal;
+
+public:
+    CScopedTimeDiffAdd(DurationType& outVal);
+
+    ~CScopedTimeDiffAdd();
 };
 
 

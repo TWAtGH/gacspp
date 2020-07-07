@@ -96,7 +96,7 @@ void CDataGenerator::CreateFilesAndReplicas(const TickType now)
 
 void CDataGenerator::OnUpdate(const TickType now)
  {
-    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
+    CScopedTimeDiffAdd durationUpdate(mUpdateDurationSummed);
 
     CreateFilesAndReplicas(now);
 
@@ -113,7 +113,7 @@ CReaperCaller::CReaperCaller(CRucio *rucio, const TickType tickFreq, const TickT
 
 void CReaperCaller::OnUpdate(const TickType now)
 {
-    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
+    CScopedTimeDiffAdd durationUpdate(mUpdateDurationSummed);
 
     mRucio->RunReaper(now);
 

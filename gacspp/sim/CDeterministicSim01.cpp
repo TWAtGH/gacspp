@@ -414,7 +414,7 @@ public:
 
     void OnUpdate(TickType now)
     {
-        CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
+        CScopedTimeDiffAdd durationUpdate(mUpdateDurationSummed);
 
         if (mTmpReplicas.empty() && mJobBatchList.empty() && (mCurJobBatch == mJobBatchList.end()))
         {
@@ -426,17 +426,17 @@ public:
             mNextCallTick = std::numeric_limits<TickType>::max();
 
         {
-            CScopedTimeDiff subDurationUpdate(mUpdateCleanDurationSummed, true);
+            CScopedTimeDiffAdd subDurationUpdate(mUpdateCleanDurationSummed);
             CleanupTmpReplicas(now);
         }
 
         {
-            CScopedTimeDiff subDurationUpdate(mUpdateOutDurationSummed, true);
+            CScopedTimeDiffAdd subDurationUpdate(mUpdateOutDurationSummed);
             StageOut(now);
         }
 
         {
-            CScopedTimeDiff subDurationUpdate(mUpdateInDurationSummed, true);
+            CScopedTimeDiffAdd subDurationUpdate(mUpdateInDurationSummed);
             StageIn(now);
         }
     }

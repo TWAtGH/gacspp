@@ -231,7 +231,7 @@ void CHotColdStorageTransferGen::PreRemoveReplica(SReplica* replica, TickType no
 
 void CHotColdStorageTransferGen::OnUpdate(TickType now)
 {
-    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
+    CScopedTimeDiffAdd durationUpdate(mUpdateDurationSummed);
     for (SSiteInfo& siteInfo : mSiteInfos)
     {
         if (siteInfo.mProductionStartTime > now)
@@ -332,6 +332,8 @@ void CHotColdStorageTransferGen::PrepareProductionCampaign(SSiteInfo& siteInfo, 
     CStorageElement* coldStorageElement = archiveToCold->GetDstStorageElement();
     CStorageElement* hotStorageElement = archiveToHot->GetDstStorageElement();
 
+    bool hotStorageFree = hotStorageElement->CanStoreVolume(siteInfo.mMinFileSize);
+
     assert(archiveToHot->mMaxNumActiveTransfers >= archiveToHot->mNumActiveTransfers);
     std::size_t hotReplicasCreationLimit = archiveToHot->mMaxNumActiveTransfers - archiveToHot->mNumActiveTransfers;
 
@@ -339,7 +341,6 @@ void CHotColdStorageTransferGen::PrepareProductionCampaign(SSiteInfo& siteInfo, 
     std::size_t coldReplicaCreationLimit = archiveToCold->mMaxNumActiveTransfers - archiveToCold->mNumActiveTransfers;
 
     std::uint32_t maxRetries = 100;
-    bool hotStorageFull = false;
 
     while ((hotReplicasCreationLimit > 0) && (maxRetries > 0) && !archiveFilesPerPopularity.empty())
     {
@@ -354,11 +355,11 @@ void CHotColdStorageTransferGen::PrepareProductionCampaign(SSiteInfo& siteInfo, 
         //get a random file
         SFile* srcFile = files[fileIdxRNG(mSim->mRNGEngine)];
 
-        if (!hotStorageFull)
-            hotStorageFull = hotStorageElement->CanStoreVolume(srcFile->GetSize());
+        if (hotStorageFree)
+            hotStorageFree = hotStorageElement->CanStoreVolume(srcFile->GetSize());
 
         SReplica* newReplica;
-        if (!hotStorageFull)
+        if (hotStorageFree)
         {
             newReplica = hotStorageElement->CreateReplica(srcFile, now);
             if (!newReplica)
@@ -636,6 +637,10 @@ void CHotColdStorageTransferGen::UpdateActiveJobs(SSiteInfo& siteInfo, TickType 
         }
         activeJobIt++;
     }
+    
+    COutput::GetRef().QueueInserts(std::move(inputTraceInsertQueries));
+    COutput::GetRef().QueueInserts(std::move(jobTraceInsertQueries));
+    COutput::GetRef().QueueInserts(std::move(outputTraceInsertQueries));
 }
 
 void CHotColdStorageTransferGen::UpdateQueuedJobs(SSiteInfo& siteInfo, TickType now)
@@ -888,7 +893,7 @@ void CCloudBufferTransferGen::PreRemoveReplica(SReplica* replica, TickType now)
 
 void CCloudBufferTransferGen::OnUpdate(TickType now)
 {
-    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
+    CScopedTimeDiffAdd durationUpdate(mUpdateDurationSummed);
 
     assert(!mTransferGenInfo.empty());
 
@@ -965,7 +970,7 @@ void CJobIOTransferGen::OnUpdate(TickType now)
 {
     assert(now >= mLastUpdateTime);
 
-    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
+    CScopedTimeDiffAdd durationUpdate(mUpdateDurationSummed);
 
     const TickType tDelta = now - mLastUpdateTime;
     mLastUpdateTime = now;
@@ -1225,7 +1230,7 @@ CJobSlotTransferGen::CJobSlotTransferGen(IBaseSim* sim,
 
 void CJobSlotTransferGen::OnUpdate(TickType now)
 {
-    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
+    CScopedTimeDiffAdd durationUpdate(mUpdateDurationSummed);
 
     const std::vector<std::unique_ptr<SFile>>& allFiles = mSim->mRucio->GetFiles();
     assert(allFiles.size() > 0);
@@ -1402,7 +1407,7 @@ void CCachedSrcTransferGen::ExpireReplica(CStorageElement* storageElement, const
 
 void CCachedSrcTransferGen::OnUpdate(const TickType now)
 {
-    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
+    CScopedTimeDiffAdd durationUpdate(mUpdateDurationSummed);
 
     RNGEngineType& rngEngine = mSim->mRNGEngine;
 

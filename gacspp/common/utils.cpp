@@ -5,19 +5,24 @@
 #include "third_party/nlohmann/json.hpp"
 
 
-CScopedTimeDiff::CScopedTimeDiff(DurationType& outVal, bool willAdd)
+CScopedTimeDiffSet::CScopedTimeDiffSet(DurationType& outVal)
     : mStartTime(std::chrono::high_resolution_clock::now()),
-        mOutVal(outVal),
-        mWillAdd(willAdd)
+      mOutVal(outVal)
 {}
 
-CScopedTimeDiff::~CScopedTimeDiff()
+CScopedTimeDiffSet::~CScopedTimeDiffSet()
 {
-    const auto duration = std::chrono::high_resolution_clock::now() - mStartTime;
-    if (mWillAdd)
-        mOutVal += duration;
-    else
-        mOutVal = duration;
+    mOutVal = std::chrono::high_resolution_clock::now() - mStartTime;
+}
+
+CScopedTimeDiffAdd::CScopedTimeDiffAdd(DurationType& outVal)
+    : mStartTime(std::chrono::high_resolution_clock::now()),
+      mOutVal(outVal)
+{}
+
+CScopedTimeDiffAdd::~CScopedTimeDiffAdd()
+{
+    mOutVal += std::chrono::high_resolution_clock::now() - mStartTime;
 }
 
 

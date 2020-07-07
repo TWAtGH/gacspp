@@ -74,7 +74,7 @@ CTransferBatchManager::CTransferBatchManager(TickType tickFreq, TickType startTi
 
 void CTransferBatchManager::OnUpdate(TickType now)
 {
-    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
+    CScopedTimeDiffAdd durationUpdate(mUpdateDurationSummed);
 
     std::size_t i = 0;
     while(i < mQueuedTransferBatches.size())
@@ -253,7 +253,7 @@ void CTransferManager::CreateTransfer(SReplica* srcReplica, SReplica* dstReplica
 
 void CTransferManager::OnUpdate(TickType now)
 {
-    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
+    CScopedTimeDiffAdd durationUpdate(mUpdateDurationSummed);
 
     const std::uint32_t timeDiff = static_cast<std::uint32_t>(now - mLastUpdated);
     mLastUpdated = now;
@@ -358,6 +358,7 @@ void CTransferManager::OnUpdate(TickType now)
 
 void CTransferManager::Shutdown(const TickType now)
 {
+    (void)now;
     mQueuedTransfers.clear();
     mActiveTransfers.clear();
 }
@@ -434,7 +435,7 @@ void CFixedTimeTransferManager::CreateTransfer(SReplica* srcReplica, SReplica* d
 
 void CFixedTimeTransferManager::OnUpdate(TickType now)
 {
-    CScopedTimeDiff durationUpdate(mUpdateDurationSummed, true);
+    CScopedTimeDiffAdd durationUpdate(mUpdateDurationSummed);
 
     std::size_t i = 0;
     while(i < mQueuedTransfers.size())
