@@ -152,7 +152,7 @@ void CHotColdStorageTransferGen::PostCompleteReplica(SReplica* replica, TickType
         if (replicaStorageElement == siteInfo.mArchiveToHotLink->GetSrcStorageElement())
         {
             //this case only works as long as replicas are only created once at archive storage
-            auto& archiveFilesPerPopularity = siteInfo.mArchiveFilesPerPopularity;
+            std::vector<std::vector<SFile*>>& archiveFilesPerPopularity = siteInfo.mArchiveFilesPerPopularity;
             popularity = siteInfo.mReusageNumGen->GetValue(mSim->mRNGEngine);
 
             for (std::vector<SFile*>& files : archiveFilesPerPopularity)
@@ -180,9 +180,7 @@ void CHotColdStorageTransferGen::PostCreateReplica(SReplica* replica, TickType n
     {
         if (replicaStorageElement == siteInfo.mArchiveToHotLink->GetDstStorageElement())
         {
-            std::map<std::uint32_t, SIndexedReplicas>& hotReplicas = siteInfo.mHotReplicasByPopularity;
-
-            auto res = hotReplicas.insert({ popularity, SIndexedReplicas() });
+            auto res = siteInfo.mHotReplicasByPopularity.insert({ popularity, SIndexedReplicas() });
             bool wasAdded = res.first->second.AddReplica(replica);
             assert(wasAdded);
 
@@ -286,10 +284,9 @@ void CHotColdStorageTransferGen::Shutdown(const TickType now)
 
 std::discrete_distribution<std::size_t> CHotColdStorageTransferGen::GetPopularityIdxRNG(const SSiteInfo& siteInfo)
 {
-    const auto& archiveFilesPerPopularity = siteInfo.mArchiveFilesPerPopularity;
     std::vector<std::uint32_t> weights;
-    weights.reserve(archiveFilesPerPopularity.size());
-    for (const std::vector<SFile*>& files : archiveFilesPerPopularity)
+    weights.reserve(siteInfo.mArchiveFilesPerPopularity.size());
+    for (const std::vector<SFile*>& files : siteInfo.mArchiveFilesPerPopularity)
         weights.push_back(files.front()->mPopularity);
     return std::discrete_distribution<std::size_t>(weights.begin(), weights.end());
 
@@ -407,15 +404,15 @@ void CHotColdStorageTransferGen::UpdateProductionCampaign(SSiteInfo& siteInfo, T
 
 void CHotColdStorageTransferGen::UpdateWaitingJobs(SSiteInfo& siteInfo, TickType now)
 {
-    std::list<std::unique_ptr<SJobInfo>>& waitingJobs = siteInfo.mWaitingJobs;
-    std::list<std::unique_ptr<SJobInfo>>& queuedJobs = siteInfo.mQueuedJobs;
-    auto& waitingForSameFile = siteInfo.mWaitingForSameFile;
+    JobInfoList& waitingJobs = siteInfo.mWaitingJobs;
+    JobInfoList& queuedJobs = siteInfo.mQueuedJobs;
+    std::unordered_map <SFile*, std::vector<JobInfoList::iterator>>& waitingForSameFile = siteInfo.mWaitingForSameFile;
 
     CStorageElement* archiveStorageElement = siteInfo.mArchiveToColdLink->GetSrcStorageElement();
     CStorageElement* coldStorageElement = siteInfo.mColdToHotLink->GetSrcStorageElement();
     CStorageElement* hotStorageElement = siteInfo.mColdToHotLink->GetDstStorageElement();
 
-    auto jobIt = waitingJobs.begin();
+    JobInfoList::iterator jobIt = waitingJobs.begin();
     while (jobIt != waitingJobs.end())
     {
         SFile* file = (*jobIt)->mInputFile;
@@ -429,7 +426,7 @@ void CHotColdStorageTransferGen::UpdateWaitingJobs(SSiteInfo& siteInfo, TickType
         auto findResult = waitingForSameFile.find(file);
         if (findResult != waitingForSameFile.end())
         {
-            for (auto& it : findResult->second)
+            for (JobInfoList::iterator& it : findResult->second)
             {
                 if (it == jobIt)
                     continue;
@@ -443,7 +440,7 @@ void CHotColdStorageTransferGen::UpdateWaitingJobs(SSiteInfo& siteInfo, TickType
             waitingForSameFile.erase(findResult);
         }
 
-        auto tmpIt = jobIt++;
+        JobInfoList::iterator tmpIt = jobIt++;
         queuedJobs.splice(queuedJobs.end(), waitingJobs, tmpIt);
     }
 }
@@ -453,9 +450,9 @@ void CHotColdStorageTransferGen::UpdateActiveJobs(SSiteInfo& siteInfo, TickType 
     const TickType tDelta = now - mLastUpdateTime;
 
     std::size_t& numRunningJobs = siteInfo.mNumRunningJobs;
-    auto& runningJobs = siteInfo.mRunningJobs;
+    std::list<std::pair<TickType, JobInfoList>>& runningJobs = siteInfo.mRunningJobs;
 
-    std::list<std::unique_ptr<SJobInfo>>& activeJobs = siteInfo.mActiveJobs;
+    JobInfoList& activeJobs = siteInfo.mActiveJobs;
 
     CNetworkLink* hotToCPULink = siteInfo.mHotToCPULink;
     CNetworkLink* cpuToOutputLink = siteInfo.mCPUToOutputLink;
@@ -484,7 +481,7 @@ void CHotColdStorageTransferGen::UpdateActiveJobs(SSiteInfo& siteInfo, TickType 
     //should firstly update all mNumActiveTransfers and then calculate bytesDownloaded/uploaded
     const SpaceType bytesDownloaded = (hotToCPULink->mBandwidthBytesPerSecond / (double)(hotToCPULink->mNumActiveTransfers + 1)) * tDelta;
 
-    auto activeJobIt = activeJobs.begin();
+    JobInfoList::iterator activeJobIt = activeJobs.begin();
     while (activeJobIt != activeJobs.end())
     {
         std::unique_ptr<SJobInfo>& job = *activeJobIt;
@@ -552,7 +549,7 @@ void CHotColdStorageTransferGen::UpdateActiveJobs(SSiteInfo& siteInfo, TickType 
                     }
                     else if (runningJobsIt->first > finishTime)
                     {
-                        runningJobs.emplace(runningJobsIt, finishTime, std::list<std::unique_ptr<SJobInfo>>())->second.emplace_back(std::move(job));
+                        runningJobs.emplace(runningJobsIt, finishTime, JobInfoList())->second.emplace_back(std::move(job));
                         break;
                     }
 
@@ -560,7 +557,7 @@ void CHotColdStorageTransferGen::UpdateActiveJobs(SSiteInfo& siteInfo, TickType 
                 }
 
                 if (runningJobsIt == runningJobs.end())
-                    runningJobs.emplace_back(finishTime, std::list<std::unique_ptr<SJobInfo>>()).second.emplace_back(std::move(job));
+                    runningJobs.emplace_back(finishTime, JobInfoList()).second.emplace_back(std::move(job));
 
                 activeJobIt = activeJobs.erase(activeJobIt);
                 numRunningJobs += 1;
@@ -646,11 +643,11 @@ void CHotColdStorageTransferGen::UpdateActiveJobs(SSiteInfo& siteInfo, TickType 
 void CHotColdStorageTransferGen::UpdateQueuedJobs(SSiteInfo& siteInfo, TickType now)
 {
     (void)now;
-    std::list<std::unique_ptr<SJobInfo>>& queuedJobs = siteInfo.mQueuedJobs;
-    std::list<std::unique_ptr<SJobInfo>>& activeJobs = siteInfo.mActiveJobs;
+    JobInfoList& queuedJobs = siteInfo.mQueuedJobs;
+    JobInfoList& activeJobs = siteInfo.mActiveJobs;
     std::size_t numTotalJobs = activeJobs.size() + siteInfo.mNumRunningJobs;
 
-    auto jobIt = queuedJobs.begin();
+    JobInfoList::iterator jobIt = queuedJobs.begin();
     while (jobIt != queuedJobs.end())
     {
         if (numTotalJobs >= siteInfo.mNumCores)
@@ -658,7 +655,7 @@ void CHotColdStorageTransferGen::UpdateQueuedJobs(SSiteInfo& siteInfo, TickType 
 
         if ((*jobIt)->mInputReplica->IsComplete())
         {
-            auto tmpIt = jobIt++;
+            JobInfoList::iterator tmpIt = jobIt++;
             activeJobs.splice(activeJobs.end(), queuedJobs, tmpIt);
             ++numTotalJobs;
         }
@@ -677,11 +674,11 @@ void CHotColdStorageTransferGen::SubmitNewJobs(SSiteInfo& siteInfo, TickType now
     std::vector<std::vector<SFile*>>& archiveFilesPerPopularity = siteInfo.mArchiveFilesPerPopularity;
     std::unordered_set<SReplica*>& hotReplicaDeletions = siteInfo.mHotReplicaDeletions;
 
-    std::list<std::unique_ptr<SJobInfo>>& activeJobs = siteInfo.mActiveJobs;
-    std::list<std::unique_ptr<SJobInfo>>& queuedJobs = siteInfo.mQueuedJobs;
-    std::list<std::unique_ptr<SJobInfo>>& waitingJobs = siteInfo.mWaitingJobs;
-    auto& waitingForSameFile = siteInfo.mWaitingForSameFile;
-    std::list<std::unique_ptr<SJobInfo>> newJobs;
+    JobInfoList& activeJobs = siteInfo.mActiveJobs;
+    JobInfoList& queuedJobs = siteInfo.mQueuedJobs;
+    JobInfoList& waitingJobs = siteInfo.mWaitingJobs;
+    std::unordered_map <SFile*, std::vector<JobInfoList::iterator>>& waitingForSameFile = siteInfo.mWaitingForSameFile;
+    JobInfoList newJobs;
 
     const std::size_t numCoresInUse = activeJobs.size() + siteInfo.mNumRunningJobs;
     if ((waitingJobs.size() + numCoresInUse) > (2 * siteInfo.mNumCores))
@@ -717,6 +714,7 @@ void CHotColdStorageTransferGen::SubmitNewJobs(SSiteInfo& siteInfo, TickType now
         std::unique_ptr<SJobInfo> newJob = std::make_unique<SJobInfo>();
 
         newJob->mJobId = GetNewId();
+        newJob->mCreatedAt = now;
         newJob->mCreatedAt = now;
         newJob->mInputFile = inputFile;
         newJob->mInputReplica = inputReplica;
@@ -784,7 +782,7 @@ void CHotColdStorageTransferGen::SubmitNewJobs(SSiteInfo& siteInfo, TickType now
             //no need to decrease usage counter it's already 0
         }
 
-        for (auto it = newJobs.begin(); it != newJobs.end(); ++it)
+        for (JobInfoList::iterator it = newJobs.begin(); it != newJobs.end(); ++it)
             waitingForSameFile[(*it)->mInputFile].push_back(it);
         waitingJobs.splice(waitingJobs.end(), newJobs);
     }
@@ -802,7 +800,7 @@ void CHotColdStorageTransferGen::SubmitNewJobs(SSiteInfo& siteInfo, TickType now
             auto findResult = waitingForSameFile.find(file);
             if (findResult != waitingForSameFile.end())
             {
-                for (auto it : findResult->second)
+                for (JobInfoList::iterator& it : findResult->second)
                 {
                     newReplica->mUsageCounter += 1;
                     (*it)->mInputReplica = newReplica;
@@ -982,7 +980,7 @@ void CJobIOTransferGen::OnUpdate(TickType now)
     
     for(SSiteInfo& siteInfo : mSiteInfos)
     {
-        std::list<std::unique_ptr<SJobInfo>>& activeJobs = siteInfo.mActiveJobs;
+        JobInfoList& activeJobs = siteInfo.mActiveJobs;
 
         auto& runningJobs = siteInfo.mRunningJobs;
         std::size_t& numRunningJobs = siteInfo.mNumRunningJobs;
@@ -1074,7 +1072,7 @@ void CJobIOTransferGen::OnUpdate(TickType now)
                         }
                         else if(runningJobsIt->first > finishTime)
                         {
-                            runningJobs.emplace(runningJobsIt, finishTime, std::list<std::unique_ptr<SJobInfo>>())->second.emplace_back(std::move(job));
+                            runningJobs.emplace(runningJobsIt, finishTime, JobInfoList())->second.emplace_back(std::move(job));
                             break;
                         }
 
@@ -1082,7 +1080,7 @@ void CJobIOTransferGen::OnUpdate(TickType now)
                     }
 
                     if (runningJobsIt == runningJobs.end())
-                        runningJobs.emplace_back(finishTime, std::list<std::unique_ptr<SJobInfo>>()).second.emplace_back(std::move(job));
+                        runningJobs.emplace_back(finishTime, JobInfoList()).second.emplace_back(std::move(job));
 
                     activeJobIt = activeJobs.erase(activeJobIt);
                     numRunningJobs += 1;

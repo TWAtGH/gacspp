@@ -90,6 +90,8 @@ public:
         SReplica* mInputReplica = nullptr;
         std::vector<SReplica*> mOutputReplicas;
     };
+    
+    typedef std::list<std::unique_ptr<SJobInfo>> JobInfoList;
 
     struct SSiteInfo
     {
@@ -118,14 +120,15 @@ public:
         std::map<std::uint32_t, SIndexedReplicas> mUnusedHotReplicasByPopularity;
 
         //hot replicas that will be deleted after their transfer to cold storage is done
+
         std::unordered_set<SReplica*> mHotReplicaDeletions;
 
-        std::list<std::unique_ptr<SJobInfo>> mWaitingJobs;
-        std::list<std::unique_ptr<SJobInfo>> mQueuedJobs;
-        std::list<std::unique_ptr<SJobInfo>> mActiveJobs;
-        std::list<std::pair<TickType, std::list<std::unique_ptr<SJobInfo>>>> mRunningJobs;
+        JobInfoList mWaitingJobs;
+        JobInfoList mQueuedJobs;
+        JobInfoList mActiveJobs;
+        std::list<std::pair<TickType, JobInfoList>> mRunningJobs;
 
-        std::unordered_map <SFile*, std::vector<std::list<std::unique_ptr<SJobInfo>>::iterator>> mWaitingForSameFile;
+        std::unordered_map <SFile*, std::vector<JobInfoList::iterator>> mWaitingForSameFile;
 
         std::size_t mNumRunningJobs = 0;
         SpaceType mMinFileSize = std::numeric_limits<SpaceType>::max();
@@ -220,6 +223,9 @@ public:
         SFile* mInputFile;
         std::vector<SReplica*> mOutputReplicas;
     };
+    
+    typedef std::list<std::unique_ptr<SJobInfo>> JobInfoList;
+
     struct SSiteInfo
     {
         CNetworkLink* mCloudToDiskLink;
