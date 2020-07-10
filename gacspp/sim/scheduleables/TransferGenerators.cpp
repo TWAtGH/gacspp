@@ -329,8 +329,6 @@ void CHotColdStorageTransferGen::PrepareProductionCampaign(SSiteInfo& siteInfo, 
     CStorageElement* coldStorageElement = archiveToCold->GetDstStorageElement();
     CStorageElement* hotStorageElement = archiveToHot->GetDstStorageElement();
 
-    bool hotStorageFree = hotStorageElement->CanStoreVolume(siteInfo.mMinFileSize);
-
     assert(archiveToHot->mMaxNumActiveTransfers >= archiveToHot->mNumActiveTransfers);
     std::size_t hotReplicasCreationLimit = archiveToHot->mMaxNumActiveTransfers - archiveToHot->mNumActiveTransfers;
 
@@ -352,11 +350,8 @@ void CHotColdStorageTransferGen::PrepareProductionCampaign(SSiteInfo& siteInfo, 
         //get a random file
         SFile* srcFile = files[fileIdxRNG(mSim->mRNGEngine)];
 
-        if (hotStorageFree)
-            hotStorageFree = hotStorageElement->CanStoreVolume(srcFile->GetSize());
-
         SReplica* newReplica;
-        if (hotStorageFree)
+        if (hotStorageElement->CanStoreVolume(srcFile->GetSize()))
         {
             newReplica = hotStorageElement->CreateReplica(srcFile, now);
             if (!newReplica)
