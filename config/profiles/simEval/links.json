@@ -1,0 +1,30 @@
+{
+    "BNL-OSG2_DATADISK": {
+        "CERN-PROD_DATADISK": {
+            "throughput": 8167754,
+            "maxActiveTransfers": 30,
+            "receivingLink": {
+                "throughput": 8167754,
+                "maxActiveTransfers": 30
+            }
+        },
+        "NDGF-T1_DATADISK": {
+            "throughput": 8167754,
+            "maxActiveTransfers": 30,
+            "receivingLink": {
+                "throughput": 8167754,
+                "maxActiveTransfers": 30
+            }
+        }
+    },
+    "CERN-PROD_DATADISK": {
+        "NDGF-T1_DATADISK": {
+            "throughput": 8167754,
+            "maxActiveTransfers": 30,
+            "receivingLink": {
+                "throughput": 8167754,
+                "maxActiveTransfers": 30
+            }
+        }
+    }
+}

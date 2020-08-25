@@ -142,6 +142,41 @@ public:
     virtual auto GetValue(RNGEngineType& rngEngine) -> double override;
 };
 
+class CPoissonRandomValueGenerator : public IValueGenerator
+{
+private:
+    std::poisson_distribution<int> mWeibullRNGDistribution;
+
+public:
+    CPoissonRandomValueGenerator(const double mean);
+
+    virtual auto GetValue(RNGEngineType& rngEngine) -> double override;
+};
+
+class CWeibullRandomValueGenerator : public IValueGenerator
+{
+private:
+    std::weibull_distribution<double> mWeibullRNGDistribution;
+
+public:
+    CWeibullRandomValueGenerator(const double k, const double lambda = 1.0);
+
+    virtual auto GetValue(RNGEngineType& rngEngine) -> double override;
+};
+
+class CExponentiatedWeibullRandomValueGenerator : public IValueGenerator
+{
+private:
+    double mA = 1;
+    double mC = 1;
+    double mL = 1;
+
+public:
+    CExponentiatedWeibullRandomValueGenerator(const double a, const double c, const double l);
+
+    virtual auto GetValue(RNGEngineType& rngEngine) -> double override;
+};
+
 class CGeometricRandomValueGenerator : public IValueGenerator
 {
 private:

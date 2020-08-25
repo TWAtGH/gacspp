@@ -170,6 +170,34 @@ bool CDefaultBaseSim::AddCloudsToOutput()
     return success;
 }
 
+static CNetworkLink* MakeLinkFromJson(const json& json, CStorageElement* srcStorageElement, CStorageElement* dstStorageElement)
+{
+    SpaceType datarate;
+    bool isThroughput = false;
+    
+    if(json.contains("bandwidth") && json.contains("throughput"))
+    {
+        std::cout<<"Warning: both bandwidth and throughput configured for link ";
+        std::cout<<srcStorageElement->GetName()<<" - "<<dstStorageElement->GetName()<<std::endl;
+        datarate = json.at("bandwidth").get<SpaceType>();
+    }
+    else if(json.contains("throughput"))
+    {
+        datarate = json.at("throughput").get<SpaceType>();
+        isThroughput = true;
+    }
+    else
+        datarate = json.at("bandwidth").get<SpaceType>();
+    
+    CNetworkLink* link = srcStorageElement->CreateNetworkLink(dstStorageElement, datarate);
+
+    link->mIsThroughput = isThroughput;
+    if(json.contains("maxActiveTransfers"))
+        link->mMaxNumActiveTransfers = json["maxActiveTransfers"].get<std::uint32_t>();
+
+    return link;
+}
+
 bool CDefaultBaseSim::SetupLinks(const json& profileJson)
 {
     CConfigManager& configManager = CConfigManager::GetRef();
@@ -252,14 +280,8 @@ bool CDefaultBaseSim::SetupLinks(const json& profileJson)
                 }
 
                 try
-                {
-                    SpaceType bandwidth = dstLinkCfgJson.at("bandwidth").get<SpaceType>();
-                    CNetworkLink* link = srcStorageElement->CreateNetworkLink(dstStorageElement, bandwidth);
-
-                    if(dstLinkCfgJson.contains("maxActiveTransfers"))
-                        link->mMaxNumActiveTransfers = dstLinkCfgJson["maxActiveTransfers"].get<std::uint32_t>();
-                    else
-                        std::cout<<"no max active transfers: "<<srcStorageElementName<<" - "<<dstStorageElementName<<std::endl; //todo remove
+                {                    
+                    CNetworkLink* link = MakeLinkFromJson(dstLinkCfgJson, srcStorageElement, dstStorageElement);
 
                     row = std::to_string(link->GetId()) + ",";
                     row += std::to_string(link->GetSrcStorageElement()->GetId()) + ",";
@@ -272,13 +294,7 @@ bool CDefaultBaseSim::SetupLinks(const json& profileJson)
                     if(dstLinkCfgJson["receivingLink"].empty())
                         continue;
 
-                    bandwidth = dstLinkCfgJson["receivingLink"].at("bandwidth").get<SpaceType>();
-                    link = dstStorageElement->CreateNetworkLink(srcStorageElement, bandwidth);
-
-                    if(dstLinkCfgJson["receivingLink"].contains("maxActiveTransfers"))
-                        link->mMaxNumActiveTransfers = dstLinkCfgJson["receivingLink"]["maxActiveTransfers"].get<std::uint32_t>();
-                    else
-                        std::cout<<"no max active transfers: "<<dstStorageElementName<<" - "<<srcStorageElementName<<std::endl; //todo remove
+                    link = MakeLinkFromJson(dstLinkCfgJson["receivingLink"], dstStorageElement, srcStorageElement);
 
                     row = std::to_string(link->GetId()) + ",";
                     row += std::to_string(link->GetSrcStorageElement()->GetId()) + ",";
@@ -371,8 +387,46 @@ auto CDefaultBaseSim::CreateTransferGenerator(const json& transferGenCfg, const 
         const TickType tickFreq = transferGenCfg.at("tickFreq").get<TickType>();
         const TickType startTick = transferGenCfg.at("startTick").get<TickType>();
 
-        if (typeStr == "simple")
-        { }
+        if (typeStr == "fixed")
+        {
+            auto mgr = std::dynamic_pointer_cast<CTransferManager>(transferManager);
+            if (!mgr)
+            {
+                std::cout << "Wrong manager given for generator: " << name << std::endl;
+                return transferGen;
+            }
+
+            auto specTransferGen = std::make_shared<CFixedTransferGen>(this, mgr, tickFreq, startTick);
+            for (const json& infoJson : transferGenCfg.at("infos"))
+            {
+                std::string name = infoJson.at("storageElement").get<std::string>();
+                CStorageElement* srcStorageElement = GetStorageElementByName(name);
+                if (!srcStorageElement)
+                {
+                    std::cout << "Failed to find storage element by name: " << name << std::endl;
+                    continue;
+                }
+
+                std::vector<CFixedTransferGen::STransferGenInfo> transferGenInfo;
+                for(const auto& [dstStorageElementName, dstCfg] : infoJson.at("destinations").items())
+                {
+                    CStorageElement* curStorageElement = GetStorageElementByName(dstStorageElementName);
+                    if (!curStorageElement)
+                    {
+                        std::cout << "Failed to find storage element by name: " << dstStorageElementName << std::endl;
+                        continue;
+                    }
+                    transferGenInfo.emplace_back();
+                    transferGenInfo.back().mDstStorageElement = curStorageElement;
+                    transferGenInfo.back().mNumTransferGen = std::move(IValueGenerator::CreateFromJson(dstCfg));
+                }
+
+                srcStorageElement->mActionListener.push_back(specTransferGen.get()); //ToDo: should add dst storage element instead. But only ONCE!
+                specTransferGen->mConfig.emplace_back(srcStorageElement, std::move(transferGenInfo));
+            }
+
+            transferGen = specTransferGen;
+        }
         else if (typeStr == "hotCold")
         {
             auto mgr = std::dynamic_pointer_cast<CTransferManager>(transferManager);

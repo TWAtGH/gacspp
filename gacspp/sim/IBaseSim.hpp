@@ -30,8 +30,7 @@ public:
 
     virtual ~IBaseSim();
 
-    //std::random_device rngDevice;
-    RNGEngineType mRNGEngine {42};
+    RNGEngineType mRNGEngine;
 
     //rucio and clouds
     std::unique_ptr<CRucio> mRucio;

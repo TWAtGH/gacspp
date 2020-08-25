@@ -632,7 +632,7 @@ void CHotColdStorageTransferGen::UpdateActiveJobs(SSiteInfo& siteInfo, TickType 
     
     COutput::GetRef().QueueInserts(std::move(inputTraceInsertQueries));
     COutput::GetRef().QueueInserts(std::move(jobTraceInsertQueries));
-    COutput::GetRef().QueueInserts(std::move(outputTraceInsertQueries));
+    //COutput::GetRef().QueueInserts(std::move(outputTraceInsertQueries)); //dont write output traces to DB for now
 }
 
 void CHotColdStorageTransferGen::UpdateQueuedJobs(SSiteInfo& siteInfo, TickType now)
@@ -709,7 +709,6 @@ void CHotColdStorageTransferGen::SubmitNewJobs(SSiteInfo& siteInfo, TickType now
         std::unique_ptr<SJobInfo> newJob = std::make_unique<SJobInfo>();
 
         newJob->mJobId = GetNewId();
-        newJob->mCreatedAt = now;
         newJob->mCreatedAt = now;
         newJob->mInputFile = inputFile;
         newJob->mInputReplica = inputReplica;
@@ -1524,4 +1523,97 @@ void CCachedSrcTransferGen::OnUpdate(const TickType now)
     }
 
     mNextCallTick = now + mTickFreq;
+}
+
+
+
+CFixedTransferGen::CFixedTransferGen(IBaseSim* sim,
+                    std::shared_ptr<CTransferManager> transferMgr,
+                    TickType tickFreq,
+                    TickType startTick)
+    : CScheduleable(startTick),
+      mSim(sim),
+      mTransferMgr(transferMgr),
+      mTickFreq(tickFreq)
+{}
+
+void CFixedTransferGen::PostCompleteReplica(SReplica* replica, TickType now)
+{
+    if(now>0)
+        mCompleteReplicas.push_back(replica);
+}
+void CFixedTransferGen::PostCreateReplica(SReplica* replica, TickType now)
+{}
+void CFixedTransferGen::PreRemoveReplica(SReplica* replica, TickType now)
+{}
+
+void CFixedTransferGen::OnUpdate(TickType now)
+{
+    CScopedTimeDiffAdd durationUpdate(mUpdateDurationSummed);
+
+    while(!mCompleteReplicas.empty())
+    {
+        mCompleteReplicas.back()->GetStorageElement()->RemoveReplica(mCompleteReplicas.back(), now);
+        mCompleteReplicas.pop_back();
+    }
+
+    auto& rngEngine = mSim->mRNGEngine;
+    for(std::pair<CStorageElement*, std::vector<STransferGenInfo>>& cfg : mConfig)
+    {
+        const CStorageElement* srcStorageElement = cfg.first;
+        const std::vector<std::unique_ptr<SReplica>>& srcReplicas = srcStorageElement->GetReplicas();
+        assert(srcReplicas.size() > 0);
+        for(STransferGenInfo& info : cfg.second)
+        {
+            CStorageElement* dstStorageElement = info.mDstStorageElement;
+            
+            const double val = info.mNumTransferGen->GetValue(rngEngine) + info.mDecimalAccu;
+            std::uint64_t numToCreate = val;
+            info.mDecimalAccu = val - numToCreate;
+
+            std::uint32_t loopLimit = 100;
+
+            std::uniform_int_distribution<std::size_t> replicaIdxRNG(0, srcReplicas.size() - 1);
+            while(numToCreate > 0 && loopLimit > 0)
+            {
+                SReplica* srcReplica = srcReplicas[replicaIdxRNG(rngEngine)].get();
+                SFile* srcFile = srcReplica->GetFile();
+                if(!srcReplica->IsComplete() || srcFile->GetReplicaByStorageElement(dstStorageElement))
+                {
+                    --loopLimit;
+                    continue;
+                }
+                else
+                    loopLimit = 100;
+
+                SReplica* dstReplica = dstStorageElement->CreateReplica(srcFile, now);
+                assert(dstReplica);
+                mTransferMgr->CreateTransfer(srcReplica, dstReplica, now);
+                --numToCreate;
+            }
+        }
+    }
+
+    mNextCallTick = now + mTickFreq;
+}
+
+void CFixedTransferGen::Shutdown(const TickType now)
+{
+    for(const std::pair<CStorageElement*, std::vector<STransferGenInfo>>& cfg : mConfig)
+    {
+        for(const STransferGenInfo& info : cfg.second)
+        {
+            std::vector<IStorageElementActionListener*>& listeners1 = info.mDstStorageElement->mActionListener;
+            auto listenerIt = listeners1.begin();
+            auto listenerEnd = listeners1.end();
+            for (; listenerIt != listenerEnd; ++listenerIt)
+            {
+                if ((*listenerIt) == this)
+                {
+                    listeners1.erase(listenerIt);
+                    break;
+                }
+            }
+        }
+    }
 }

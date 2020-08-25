@@ -103,6 +103,26 @@ auto IValueGenerator::CreateFromJson(const json& cfg) -> std::unique_ptr<IValueG
         const double stddev = cfg.at("stddev");
         valueGenerator = std::make_unique<CNormalRandomValueGenerator>(mean, stddev);
     }
+    else if (type == "poisson")
+    {
+        const double mean = cfg.at("mean");
+        valueGenerator = std::make_unique<CPoissonRandomValueGenerator>(mean);
+    }
+    else if(type == "expoweibull")
+    {
+        const double a = cfg.at("a");
+        const double c = cfg.at("c");
+        const double l = cfg.at("l");
+        valueGenerator = std::make_unique<CExponentiatedWeibullRandomValueGenerator>(a, c, l);
+    }
+    else if(type == "weibull")
+    {
+        const double k = cfg.at("k");
+        if(cfg.contains("lambda"))
+            valueGenerator = std::make_unique<CWeibullRandomValueGenerator>(k, cfg["lambda"].get<double>());
+        else
+            valueGenerator = std::make_unique<CWeibullRandomValueGenerator>(k);
+    }
     else if(type == "exponential")
     {
         const double lambda = cfg.at("lambda");
@@ -195,6 +215,38 @@ CExponentialRandomValueGenerator::CExponentialRandomValueGenerator(const double 
 auto CExponentialRandomValueGenerator::GetValue(RNGEngineType& rngEngine) -> double
 {
     return GetBetweenMaxMin(mExponentialRNGDistribution(rngEngine));
+}
+
+CPoissonRandomValueGenerator::CPoissonRandomValueGenerator(const double mean)
+    : mWeibullRNGDistribution(mean)
+{}
+
+auto CPoissonRandomValueGenerator::GetValue(RNGEngineType& rngEngine) -> double
+{
+    return GetBetweenMaxMin(mWeibullRNGDistribution(rngEngine));
+}
+    
+CWeibullRandomValueGenerator::CWeibullRandomValueGenerator(const double k, const double lambda)
+    : mWeibullRNGDistribution(k, lambda)
+{}
+
+auto CWeibullRandomValueGenerator::GetValue(RNGEngineType& rngEngine) -> double
+{
+    return GetBetweenMaxMin(mWeibullRNGDistribution(rngEngine));
+}
+
+CExponentiatedWeibullRandomValueGenerator::CExponentiatedWeibullRandomValueGenerator(const double a, const double c, const double l)
+    : mA(a), mC(c), mL(l)
+{
+    assert(mA > 0);
+    assert(mC > 0);
+    assert(mL > 0);
+}
+
+auto CExponentiatedWeibullRandomValueGenerator::GetValue(RNGEngineType& rngEngine) -> double
+{
+    const double x = std::generate_canonical<double, std::numeric_limits<double>::digits>(rngEngine);
+    return std::pow(1.0 - exp(-std::pow(x/mL, mC)), mA);
 }
 
 CGeometricRandomValueGenerator::CGeometricRandomValueGenerator(const double p)

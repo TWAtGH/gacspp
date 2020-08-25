@@ -58,7 +58,7 @@ bool CTestSim::SetupDefaults(const json& profileJson)
         }
         heartbeat->mProccessDurations.push_back(transferManager);
 
-        auto transferGen = std::dynamic_pointer_cast<CHotColdStorageTransferGen>(CreateTransferGenerator(transferGenCfg, transferManager));
+        auto transferGen = CreateTransferGenerator(transferGenCfg, transferManager);
         if(!transferGen)
         {
             std::cout << "Failed creating transfer generator" << std::endl;

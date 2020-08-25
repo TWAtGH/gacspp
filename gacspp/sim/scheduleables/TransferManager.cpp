@@ -254,8 +254,10 @@ void CTransferManager::CreateTransfer(SReplica* srcReplica, SReplica* dstReplica
 void CTransferManager::OnUpdate(TickType now)
 {
     CScopedTimeDiffAdd durationUpdate(mUpdateDurationSummed);
+    
+    assert(now >= mLastUpdated);
 
-    const std::uint32_t timeDiff = static_cast<std::uint32_t>(now - mLastUpdated);
+    const TickType timeDiff = now - mLastUpdated;
     mLastUpdated = now;
 
     for (auto& queue : mQueuedTransfers)
@@ -301,10 +303,15 @@ void CTransferManager::OnUpdate(TickType now)
             continue; // handle same idx again
         }
 
-        assert(networkLink->mNumActiveTransfers > 0);
-
-        const double sharedBandwidth = networkLink->mBandwidthBytesPerSecond / static_cast<double>(networkLink->mNumActiveTransfers);
-        SpaceType amount = static_cast<SpaceType>(sharedBandwidth * timeDiff);
+        SpaceType amount;
+        if(!networkLink->mIsThroughput)
+        {
+            assert(networkLink->mNumActiveTransfers > 0);
+            amount = (networkLink->mBandwidthBytesPerSecond / static_cast<double>(networkLink->mNumActiveTransfers)) * timeDiff;
+        }
+        else
+            amount = networkLink->mBandwidthBytesPerSecond * timeDiff;
+            
         amount = dstReplica->Increase(amount, now);
         networkLink->mUsedTraffic += amount;
 

@@ -32,4 +32,5 @@ public:
 
     SpaceType mUsedTraffic = 0;
     SpaceType mBandwidthBytesPerSecond;
+    bool mIsThroughput = false;
 };

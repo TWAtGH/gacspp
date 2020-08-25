@@ -1,0 +1,44 @@
+{
+"rucio":
+{
+    "sites":
+    [
+        {
+            "multiLocationIdx": 3,
+            "name": "BNL",
+            "location": "us",
+            "storageElements":
+            [
+                {
+                    "name": "BNL-OSG2_DATADISK",
+                    "allowDuplicateReplicas": false
+                }
+            ]
+        },
+        {
+            "multiLocationIdx": 2,
+            "name": "CERN-PROD",
+            "location": "eu",
+            "storageElements":
+            [
+                {
+                    "name": "CERN-PROD_DATADISK",
+                    "allowDuplicateReplicas": false
+                }
+            ]
+        },
+        {
+            "multiLocationIdx": 2,
+            "name": "NDGF",
+            "location": "eu",
+            "storageElements":
+            [
+                {
+                    "name": "NDGF-T1_DATADISK",
+                    "allowDuplicateReplicas": false
+                }
+            ]
+        }
+    ]
+}
+}

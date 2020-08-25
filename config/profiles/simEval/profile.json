@@ -1,0 +1,134 @@
+{
+"maxTick": 5137200,
+"clouds": [],
+"rucio": {
+	"config": {"_file_": "rucio.json"}
+	},
+"links": {
+	"config": {"_file_": "links.json"}
+    },
+"dataGens": [
+        {
+            "name": "BNLTapeDataGen",
+            "storageElements": ["BNL-OSG2_DATADISK"],
+            "numReplicaRatios": [],
+            "selectStorageElementsRandomly": false,
+            "numFilesCfg": {
+                "type": "fixed",
+                "value": 1000000
+            },
+            "fileSizeCfg": {
+                "type": "exponential",
+                "lambda": 0.6163650120418,
+                "minCfg": {"type": "minClip", "limit": 0.009765625},
+                "maxCfg": {"type": "maxClip", "limit": 12.79106355}
+            },
+            "lifetimeCfg": {
+                "type": "fixed",
+                "value": 157680000
+            }
+        },
+        {
+            "name": "CERNTapeDataGen",
+            "storageElements": ["CERN-PROD_DATADISK"],
+            "numReplicaRatios": [],
+            "selectStorageElementsRandomly": false,
+            "numFilesCfg": {
+                "type": "fixed",
+                "value": 800000
+            },
+            "fileSizeCfg": {
+                "type": "exponential",
+                "lambda": 0.6163650120418,
+                "minCfg": {"type": "minClip", "limit": 0.009765625},
+                "maxCfg": {"type": "maxClip", "limit": 12.79106355}
+            },
+            "lifetimeCfg": {
+                "type": "fixed",
+                "value": 157680000
+            }
+        },
+        {
+            "name": "NDGFTapeDataGen",
+            "storageElements": ["NDGF-T1_DATADISK"],
+            "numReplicaRatios": [],
+            "selectStorageElementsRandomly": false,
+            "numFilesCfg": {
+                "type": "fixed",
+                "value": 800000
+            },
+            "fileSizeCfg": {
+                "type": "exponential",
+                "lambda": 0.6163650120418,
+                "minCfg": {"type": "minClip", "limit": 0.009765625},
+                "maxCfg": {"type": "maxClip", "limit": 12.79106355}
+            },
+            "lifetimeCfg": {
+                "type": "fixed",
+                "value": 157680000
+            }
+        }
+    ],
+"reaper": {
+        "name": "Reaper",
+        "tickFreq": 300,
+        "startTick": 300
+    },
+"transferCfgs": [
+    {
+        "manager": {
+            "type": "bandwidth",
+            "name": "DefaultTransferMgr",
+            "tickFreq": 5,
+            "startTick": 5
+        },
+        "generator": {
+            "type": "fixed",
+            "name": "FixedTransferGen",
+            "tickFreq": 15,
+            "startTick": 5,
+            "infos": [
+                {
+                    "storageElement": "BNL-OSG2_DATADISK",
+                    "destinations": {
+                        "CERN-PROD_DATADISK": {
+                            "type": "exponential",
+                            "lambda": 2.209294199
+                        },
+                        "NDGF-T1_DATADISK": {
+                            "type": "exponential",
+                            "lambda": 2.209294199
+                        }
+                    }
+                },
+                {
+                    "storageElement": "CERN-PROD_DATADISK",
+                    "destinations": {
+                        "BNL-OSG2_DATADISK": {
+                            "type": "exponential",
+                            "lambda": 2.209294199
+                        },
+                        "NDGF-T1_DATADISK": {
+                            "type": "exponential",
+                            "lambda": 2.209294199
+                        }
+                    }
+                },
+                {
+                    "storageElement": "NDGF-T1_DATADISK",
+                    "destinations": {
+                        "BNL-OSG2_DATADISK": {
+                            "type": "exponential",
+                            "lambda": 2.209294199
+                        },
+                        "CERN-PROD_DATADISK": {
+                            "type": "exponential",
+                            "lambda": 2.209294199
+                        }
+                    }
+                }
+            ]
+        }
+    }
+]
+}

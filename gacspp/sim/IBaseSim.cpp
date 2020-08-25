@@ -1,4 +1,5 @@
 #include <cassert>
+#include <iostream>
 
 #include "IBaseSim.hpp"
 
@@ -8,7 +9,13 @@
 #include "infrastructure/CStorageElement.hpp"
 
 
-IBaseSim::IBaseSim() = default;
+IBaseSim::IBaseSim()
+{
+    std::random_device rd;
+    auto seed = rd();
+    std::cout<<"Using seed: "<<seed<<std::endl;
+    mRNGEngine = RNGEngineType(seed);
+}
 IBaseSim::~IBaseSim() = default;
 
 void IBaseSim::Run(TickType maxTick)

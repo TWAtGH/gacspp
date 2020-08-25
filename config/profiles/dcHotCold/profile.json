@@ -1,5 +1,5 @@
 {
-"maxTick": 12960000,
+"maxTick": 10368000,
 "clouds": [
 		{
 			"id": "gcp",
@@ -21,12 +21,12 @@
             "selectStorageElementsRandomly": false,
             "numFilesCfg": {
                 "type": "fixed",
-                "value": 3000000
+                "value": 800000
             },
             "fileSizeCfg": {
                 "type": "normal",
-                "mean": 2.02,
-                "stddev": 0.25,
+                "mean": 37.2,
+                "stddev": 4.4,
                 "minCfg": {"type": "minAdd", "limit": 0.05}
             },
             "lifetimeCfg": {
@@ -41,12 +41,12 @@
             "selectStorageElementsRandomly": false,
             "numFilesCfg": {
                 "type": "fixed",
-                "value": 2000000
+                "value": 800000
             },
             "fileSizeCfg": {
                 "type": "normal",
-                "mean": 2.02,
-                "stddev": 0.25,
+                "mean": 37.2,
+                "stddev": 4.4,
                 "minCfg": {"type": "minAdd", "limit": 0.05}
             },
             "lifetimeCfg": {
@@ -65,13 +65,13 @@
         "manager": {
             "type": "bandwidth",
             "name": "HotColdTransferMgr",
-            "tickFreq": 10,
+            "tickFreq": 5,
             "startTick": 5
         },
         "generator": {
             "type": "hotCold",
             "name": "HotColdTransferGen",
-            "tickFreq": 15,
+            "tickFreq": 10,
             "startTick": 0,
             "infos": [
                 {
@@ -84,7 +84,7 @@
 					"productionStartTime": 1814400,
 					
                     "numCores": 10000,
-                    "coreFillRate": 150,
+                    "coreFillRate": 120,
 					
                     "jobDurationCfg": {
                         "type": "normal",
@@ -94,11 +94,10 @@
                         "maxCfg": {"type": "maxClip", "limit": 360}
                     },
                     "numOutputCfg": {
-                        "type": "normal",
-                        "mean": 3,
-                        "stddev": 0.3,
-                        "minCfg": {"type": "minAdd", "limit": 1},
-                        "maxCfg": {"type": "maxModulo", "limit": 8}
+                        "type": "geometric",
+                        "p": 0.75,
+                        "minCfg": {"type": "minClip", "limit": 1},
+                        "maxCfg": {"type": "maxModulo", "limit": 12}
                     },
                     "outputSizeCfg": {
                         "type": "normal",
@@ -108,9 +107,9 @@
                     },
                     "reusageNumCfg": {
                         "type": "geometric",
-                        "p": 0.35,
+                        "p": 0.25,
                         "minCfg": {"type": "minClip", "limit": 1},
-                        "maxCfg": {"type": "maxModulo", "limit": 25, "invert": true}
+                        "maxCfg": {"type": "maxModulo", "limit": 20, "invert": false}
                     }
                 },
                 {
@@ -122,8 +121,8 @@
 					
 					"productionStartTime": 1814400,
 					
-                    "numCores": 7500,
-                    "coreFillRate": 100,
+                    "numCores": 8000,
+                    "coreFillRate": 75,
 					
                     "jobDurationCfg": {
                         "type": "normal",
@@ -133,11 +132,10 @@
                         "maxCfg": {"type": "maxClip", "limit": 360}
                     },
                     "numOutputCfg": {
-                        "type": "normal",
-                        "mean": 3,
-                        "stddev": 0.3,
-                        "minCfg": {"type": "minAdd", "limit": 1},
-                        "maxCfg": {"type": "maxModulo", "limit": 8}
+                        "type": "geometric",
+                        "p": 0.75,
+                        "minCfg": {"type": "minClip", "limit": 1},
+                        "maxCfg": {"type": "maxModulo", "limit": 12}
                     },
                     "outputSizeCfg": {
                         "type": "normal",
@@ -147,9 +145,9 @@
                     },
                     "reusageNumCfg": {
                         "type": "geometric",
-                        "p": 0.35,
+                        "p": 0.25,
                         "minCfg": {"type": "minClip", "limit": 1},
-                        "maxCfg": {"type": "maxModulo", "limit": 25, "invert": true}
+                        "maxCfg": {"type": "maxModulo", "limit": 20, "invert": false}
                     }
                 }
             ]

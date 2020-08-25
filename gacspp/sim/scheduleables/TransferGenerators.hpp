@@ -314,3 +314,37 @@ public:
 
     void OnUpdate(TickType now) final;
 };
+
+
+
+class CFixedTransferGen : public CScheduleable, public IStorageElementActionListener
+{
+private:
+    IBaseSim* mSim;
+    std::shared_ptr<CTransferManager> mTransferMgr;
+    TickType mTickFreq;
+
+    std::vector<SReplica*> mCompleteReplicas;
+
+public:
+    CFixedTransferGen(IBaseSim* sim,
+                        std::shared_ptr<CTransferManager> transferMgr,
+                        TickType tickFreq,
+                        TickType startTick=0 );
+
+    struct STransferGenInfo
+    {
+        CStorageElement* mDstStorageElement = nullptr;
+        std::unique_ptr<IValueGenerator> mNumTransferGen;
+        double mDecimalAccu = 0;
+    };
+
+    std::vector<std::pair<CStorageElement*, std::vector<STransferGenInfo>>> mConfig;
+
+    void PostCompleteReplica(SReplica* replica, TickType now) override;
+    void PostCreateReplica(SReplica* replica, TickType now) override;
+    void PreRemoveReplica(SReplica* replica, TickType now) override;
+
+    void OnUpdate(TickType now) final;
+    void Shutdown(const TickType now) final;
+};
