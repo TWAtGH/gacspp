@@ -246,6 +246,8 @@ void CHotColdStorageTransferGen::OnUpdate(TickType now)
         }
     }
 
+    mLastUpdateTime = now;
+
     mNextCallTick = now + mTickFreq;
 }
 
@@ -448,7 +450,7 @@ void CHotColdStorageTransferGen::UpdateActiveJobs(SSiteInfo& siteInfo, TickType 
     std::list<std::pair<TickType, JobInfoList>>& runningJobs = siteInfo.mRunningJobs;
 
     JobInfoList& activeJobs = siteInfo.mActiveJobs;
-
+    
     CNetworkLink* hotToCPULink = siteInfo.mHotToCPULink;
     CNetworkLink* cpuToOutputLink = siteInfo.mCPUToOutputLink;
 
@@ -474,7 +476,9 @@ void CHotColdStorageTransferGen::UpdateActiveJobs(SSiteInfo& siteInfo, TickType 
     }
 
     //should firstly update all mNumActiveTransfers and then calculate bytesDownloaded/uploaded
-    const SpaceType bytesDownloaded = (hotToCPULink->mBandwidthBytesPerSecond / (double)(hotToCPULink->mNumActiveTransfers + 1)) * tDelta;
+    SpaceType bytesDownloaded = (hotToCPULink->mBandwidthBytesPerSecond * tDelta);
+    if (!hotToCPULink->mIsThroughput)
+        bytesDownloaded /= static_cast<double>(hotToCPULink->mNumActiveTransfers + 1);
 
     JobInfoList::iterator activeJobIt = activeJobs.begin();
     while (activeJobIt != activeJobs.end())
@@ -488,6 +492,7 @@ void CHotColdStorageTransferGen::UpdateActiveJobs(SSiteInfo& siteInfo, TickType 
             job->mCurInputFileSize += 1;
             job->mLastTime = now;
             hotToCPULink->mNumActiveTransfers += 1;
+            hotToCPULink->GetSrcStorageElement()->OnOperation(CStorageElement::GET);
         }
         else if (job->mCurInputFileSize < inputFile->GetSize())
         {
@@ -579,13 +584,17 @@ void CHotColdStorageTransferGen::UpdateActiveJobs(SSiteInfo& siteInfo, TickType 
                 outputReplicas.emplace_back(cpuToOutputLink->GetDstStorageElement()->CreateReplica(outputFile, now));
                 outputReplicas.back()->mUsageCounter += 1;
                 cpuToOutputLink->mNumActiveTransfers += 1;
+                cpuToOutputLink->GetSrcStorageElement()->OnOperation(CStorageElement::GET);
                 assert(outputReplicas.back());
             }
         }
         else if (!outputReplicas.empty())
         {
             //update uploads
-            const SpaceType bytesUploaded = (cpuToOutputLink->mBandwidthBytesPerSecond / (double)(cpuToOutputLink->mNumActiveTransfers + 1)) * tDelta;
+            SpaceType bytesUploaded = (cpuToOutputLink->mBandwidthBytesPerSecond * tDelta);
+            if(!cpuToOutputLink->mIsThroughput)
+                bytesUploaded /= static_cast<double>(cpuToOutputLink->mNumActiveTransfers + 1);
+            
             std::size_t idx = 0;
             while (idx < outputReplicas.size())
             {
@@ -647,7 +656,7 @@ void CHotColdStorageTransferGen::UpdateQueuedJobs(SSiteInfo& siteInfo, TickType 
     {
         if (numTotalJobs >= siteInfo.mNumCores)
             break;
-
+        
         if ((*jobIt)->mInputReplica->IsComplete())
         {
             JobInfoList::iterator tmpIt = jobIt++;
@@ -666,28 +675,28 @@ void CHotColdStorageTransferGen::SubmitNewJobs(SSiteInfo& siteInfo, TickType now
     CStorageElement* hotStorageElement = siteInfo.mColdToHotLink->GetDstStorageElement();
     SpaceType hotStorageNeeded = 0;
 
+    std::map<std::uint32_t, SIndexedReplicas>& unusedHotReplicas = siteInfo.mUnusedHotReplicasByPopularity;
     std::vector<std::vector<SFile*>>& archiveFilesPerPopularity = siteInfo.mArchiveFilesPerPopularity;
     std::unordered_set<SReplica*>& hotReplicaDeletions = siteInfo.mHotReplicaDeletions;
 
-    JobInfoList& activeJobs = siteInfo.mActiveJobs;
     JobInfoList& queuedJobs = siteInfo.mQueuedJobs;
     JobInfoList& waitingJobs = siteInfo.mWaitingJobs;
     std::unordered_map <SFile*, std::vector<JobInfoList::iterator>>& waitingForSameFile = siteInfo.mWaitingForSameFile;
     JobInfoList newJobs;
 
-    const std::size_t numCoresInUse = activeJobs.size() + siteInfo.mNumRunningJobs;
-    if ((waitingJobs.size() + numCoresInUse) > (2 * siteInfo.mNumCores))
+    std::uint64_t numToCreate;
+    {
+        const double val = siteInfo.mNumJobSubmissionGen->GetValue(mSim->mRNGEngine) + siteInfo.mNumJobSubmissionAccu;
+        numToCreate = val;
+        siteInfo.mNumJobSubmissionAccu = val - numToCreate;
+    }
+
+    if(numToCreate == 0)
         return;
-
-    assert(siteInfo.mNumCores >= numCoresInUse);
-
-    std::size_t jobCreationLimit = std::min(siteInfo.mNumCores - numCoresInUse, siteInfo.mCoreFillRate);
-    if (waitingJobs.size() > siteInfo.mCoreFillRate)
-        jobCreationLimit = std::min(jobCreationLimit, (std::size_t)2);
-
+    
     std::discrete_distribution<std::size_t> popularityIdxRNG = GetPopularityIdxRNG(siteInfo);
 
-    for (; jobCreationLimit > 0; --jobCreationLimit)
+    for (; numToCreate > 0; --numToCreate)
     {
         std::vector<SFile*>& files = archiveFilesPerPopularity[popularityIdxRNG(mSim->mRNGEngine)];
         std::uniform_int_distribution<std::size_t> fileIdxRNG(0, files.size() - 1);
@@ -715,12 +724,10 @@ void CHotColdStorageTransferGen::SubmitNewJobs(SSiteInfo& siteInfo, TickType now
         if (inputReplica)
         {
             //input replica exists already -> put job into queue
-            if(inputReplica->mUsageCounter == 0)
-            {
-                auto res = siteInfo.mUnusedHotReplicasByPopularity.find(inputFile->mPopularity);
-                if(res != siteInfo.mUnusedHotReplicasByPopularity.end())
-                    res->second.RemoveReplica(inputReplica);
-            }
+            auto res = unusedHotReplicas.find(inputFile->mPopularity);
+            if(res != unusedHotReplicas.end())
+                res->second.RemoveReplica(inputReplica);
+
             inputReplica->mUsageCounter += 1;
             newJob->mQueuedAt = now;
             queuedJobs.emplace_back(std::move(newJob));
@@ -736,10 +743,9 @@ void CHotColdStorageTransferGen::SubmitNewJobs(SSiteInfo& siteInfo, TickType now
     if (!hotStorageElement->CanStoreVolume(hotStorageNeeded))
     {
         //not enough storage for all new jobs -> try to free storage and put jobs into waitForStorage list
-        std::map<std::uint32_t, SIndexedReplicas>& unusedHotReplicasByPopularity = siteInfo.mUnusedHotReplicasByPopularity;
         std::vector<SReplica*> replicasToRemove; //need to cache replicas because removing invalidates popularityIt
-        auto popularityIt = unusedHotReplicasByPopularity.begin();
-        while ((hotStorageNeeded > 0) && (popularityIt != unusedHotReplicasByPopularity.end()))
+        auto popularityIt = unusedHotReplicas.begin();
+        while ((hotStorageNeeded > 0) && (popularityIt != unusedHotReplicas.end()))
         {
             SIndexedReplicas& indexedReplicas = popularityIt->second;
             while ((hotStorageNeeded > 0) && !indexedReplicas.IsEmpty())
@@ -764,7 +770,15 @@ void CHotColdStorageTransferGen::SubmitNewJobs(SSiteInfo& siteInfo, TickType now
             if (!file->GetReplicaByStorageElement(coldStorageElement))
             {
                 SReplica* dstReplica = coldStorageElement->CreateReplica(file, now);
-                assert(dstReplica);
+
+                //if cold storage is limited and replica could not be created just delete it immediately.
+                //Another approach would be to free some cold storage
+                //assert(dstReplica);
+                if(!dstReplica)
+                {
+                    hotStorageElement->RemoveReplica(replica, now);
+                    continue; 
+                }
                 mTransferMgr->CreateTransfer(replica, dstReplica, now, true);
 
                 //prevent using this replica when creating new jobs

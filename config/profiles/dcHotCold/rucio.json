@@ -11,12 +11,13 @@
             [
                 {
                     "name": "CERN-PROD_DATATAPE",
-                    "allowDuplicateReplicas": false
+                    "allowDuplicateReplicas": false,
+                    "accessLatency": 1800
                 },
                 {
                     "name": "CERN-PROD_DATADISK",
                     "allowDuplicateReplicas": false,
-                    "quota": 7.5e+14
+                    "_quota": 1.0e+14
                 },
                 {
                     "name": "CERN-PROD_CPU",
@@ -36,12 +37,13 @@
             [
                 {
                     "name": "UKI-NORTHGRID-MAN-HEP_DATATAPE",
-                    "allowDuplicateReplicas": false
+                    "allowDuplicateReplicas": false,
+                    "accessLatency": 1800
                 },
                 {
                     "name": "UKI-NORTHGRID-MAN-HEP_DATADISK",
                     "allowDuplicateReplicas": false,
-                    "quota": 5.0e+14
+                    "_quota": 1.0e+14
                 },
                 {
                     "name": "UKI-NORTHGRID-MAN-HEP_CPU",

@@ -19,7 +19,7 @@
             },
             "fileSizeCfg": {
                 "type": "exponential",
-                "lambda": 0.6163650120418,
+                "lambda": 0.619722847,
                 "minCfg": {"type": "minClip", "limit": 0.009765625},
                 "maxCfg": {"type": "maxClip", "limit": 12.79106355}
             },
@@ -39,7 +39,7 @@
             },
             "fileSizeCfg": {
                 "type": "exponential",
-                "lambda": 0.6163650120418,
+                "lambda": 0.619722847,
                 "minCfg": {"type": "minClip", "limit": 0.009765625},
                 "maxCfg": {"type": "maxClip", "limit": 12.79106355}
             },
@@ -59,7 +59,7 @@
             },
             "fileSizeCfg": {
                 "type": "exponential",
-                "lambda": 0.6163650120418,
+                "lambda": 0.619722847,
                 "minCfg": {"type": "minClip", "limit": 0.009765625},
                 "maxCfg": {"type": "maxClip", "limit": 12.79106355}
             },

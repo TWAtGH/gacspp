@@ -242,7 +242,7 @@ void CTransferManager::CreateTransfer(SReplica* srcReplica, SReplica* dstReplica
     CStorageElement* srcStorageElement = srcReplica->GetStorageElement();
     CNetworkLink* networkLink = srcStorageElement->GetNetworkLink( dstReplica->GetStorageElement() );
 
-    std::unique_ptr<STransfer> newTransfer = std::make_unique<STransfer>(srcReplica, dstReplica, networkLink, now, now, deleteSrcReplica);
+    std::unique_ptr<STransfer> newTransfer = std::make_unique<STransfer>(srcReplica, dstReplica, networkLink, now, now + srcStorageElement->mAccessLatency, deleteSrcReplica);
 
     AddListener(srcReplica, newTransfer.get());
     AddListener(dstReplica, newTransfer.get());
@@ -263,15 +263,17 @@ void CTransferManager::OnUpdate(TickType now)
     for (auto& queue : mQueuedTransfers)
     {
         CNetworkLink* networkLink = queue.first;
+        std::list<std::unique_ptr<STransfer>>& queuedTransfers = queue.second;
 
         assert(networkLink->mNumActiveTransfers <= networkLink->mMaxNumActiveTransfers);
         std::size_t numToCreate = networkLink->mMaxNumActiveTransfers - networkLink->mNumActiveTransfers;
 
-        std::list<std::unique_ptr<STransfer>>& queuedTransfers = queue.second;
-
         while (!queuedTransfers.empty() && (numToCreate > 0))
         {
             std::unique_ptr<STransfer>& curTransfer = queuedTransfers.front();
+            
+            if(curTransfer->mStartAt > now)
+                break;
 
             curTransfer->mStartAt = now;
             networkLink->mNumActiveTransfers += 1;
@@ -290,6 +292,12 @@ void CTransferManager::OnUpdate(TickType now)
     while (idx < mActiveTransfers.size())
     {
         std::unique_ptr<STransfer>& transfer = mActiveTransfers[idx];
+        
+        if(transfer->mStartAt == now)
+        {
+            ++idx;
+            continue;
+        }
         SReplica* srcReplica = transfer->mSrcReplica;
         SReplica* dstReplica = transfer->mDstReplica;
         CNetworkLink* networkLink = transfer->mNetworkLink;

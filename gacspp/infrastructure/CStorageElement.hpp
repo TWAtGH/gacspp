@@ -60,7 +60,8 @@ public:
 
     std::vector<IStorageElementActionListener*> mActionListener;
 
-
+    TickType mAccessLatency = 0;
+    
 private:
     IdType mId;
     std::string mName;

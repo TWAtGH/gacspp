@@ -106,9 +106,9 @@ public:
         TickType mProductionStartTime = 0;
 
         std::size_t mNumCores = 0;
-        std::size_t mCoreFillRate = 0;
 
         std::unique_ptr<IValueGenerator> mReusageNumGen;
+        std::unique_ptr<IValueGenerator> mNumJobSubmissionGen;
         std::unique_ptr<IValueGenerator> mJobDurationGen;
         std::unique_ptr<IValueGenerator> mNumOutputGen;
         std::unique_ptr<IValueGenerator> mOutputSizeGen;
@@ -130,6 +130,7 @@ public:
         std::unordered_map <SFile*, std::vector<JobInfoList::iterator>> mWaitingForSameFile;
 
         std::size_t mNumRunningJobs = 0;
+        double mNumJobSubmissionAccu = 0;
     };
 
 private:

@@ -445,7 +445,7 @@ auto CDefaultBaseSim::CreateTransferGenerator(const json& transferGenCfg, const 
                 info.mProductionStartTime = infoJson.at("productionStartTime").get<TickType>();
 
                 info.mNumCores = infoJson.at("numCores").get<std::size_t>();
-                info.mCoreFillRate = infoJson.at("coreFillRate").get<std::size_t>();
+                info.mNumJobSubmissionGen = IValueGenerator::CreateFromJson(infoJson.at("numJobSubmissionCfg"));
 
                 info.mReusageNumGen = IValueGenerator::CreateFromJson(infoJson.at("reusageNumCfg"));
                 info.mJobDurationGen = IValueGenerator::CreateFromJson(infoJson.at("jobDurationCfg"));

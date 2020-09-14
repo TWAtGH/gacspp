@@ -21,13 +21,12 @@
             "selectStorageElementsRandomly": false,
             "numFilesCfg": {
                 "type": "fixed",
-                "value": 800000
+                "value": 1000000
             },
             "fileSizeCfg": {
-                "type": "normal",
-                "mean": 37.2,
-                "stddev": 4.4,
-                "minCfg": {"type": "minAdd", "limit": 0.05}
+                "type": "exponential",
+                "lambda": 0.026,
+                "minCfg": {"type": "minAdd", "limit": 0.009765625}
             },
             "lifetimeCfg": {
                 "type": "fixed",
@@ -41,13 +40,12 @@
             "selectStorageElementsRandomly": false,
             "numFilesCfg": {
                 "type": "fixed",
-                "value": 800000
+                "value": 1000000
             },
             "fileSizeCfg": {
-                "type": "normal",
-                "mean": 37.2,
-                "stddev": 4.4,
-                "minCfg": {"type": "minAdd", "limit": 0.05}
+                "type": "exponential",
+                "lambda": 0.026,
+                "minCfg": {"type": "minAdd", "limit": 0.009765625}
             },
             "lifetimeCfg": {
                 "type": "fixed",
@@ -84,26 +82,26 @@
 					"productionStartTime": 1814400,
 					
                     "numCores": 10000,
-                    "coreFillRate": 120,
-					
-                    "jobDurationCfg": {
+
+                    "numJobSubmissionCfg": {
                         "type": "normal",
-                        "mean": 240,
-                        "stddev": 0.25,
-                        "minCfg": {"type": "minAdd", "limit": 15},
-                        "maxCfg": {"type": "maxClip", "limit": 360}
+                        "mean": 0.6336672,
+                        "stddev": 0.372921618,
+                        "minCfg": {"type": "minClip", "limit": 0}
+                    },
+                    "jobDurationCfg": {
+                        "type": "exponential",
+                        "lambda": 0.004092211,
+                        "minCfg": {"type": "minAdd", "limit": 16.666}
                     },
                     "numOutputCfg": {
-                        "type": "geometric",
-                        "p": 0.75,
-                        "minCfg": {"type": "minClip", "limit": 1},
-                        "maxCfg": {"type": "maxModulo", "limit": 12}
+                        "type": "fixed",
+                        "value": 1
                     },
                     "outputSizeCfg": {
-                        "type": "normal",
-                        "mean": 0.1,
-                        "stddev": 0.4,
-                        "minCfg": {"type": "minAdd", "limit": 0.01}
+                        "type": "exponential",
+                        "lambda": 0.6154080364,
+                        "minCfg": {"type": "minAdd", "limit": 0.09}
                     },
                     "reusageNumCfg": {
                         "type": "geometric",
@@ -122,26 +120,26 @@
 					"productionStartTime": 1814400,
 					
                     "numCores": 8000,
-                    "coreFillRate": 75,
-					
-                    "jobDurationCfg": {
+                    
+                    "numJobSubmissionCfg": {
                         "type": "normal",
-                        "mean": 240,
-                        "stddev": 0.25,
-                        "minCfg": {"type": "minAdd", "limit": 15},
-                        "maxCfg": {"type": "maxClip", "limit": 360}
+                        "mean": 0.6336672,
+                        "stddev": 0.372921618,
+                        "minCfg": {"type": "minClip", "limit": 0}
+                    },
+                    "jobDurationCfg": {
+                        "type": "exponential",
+                        "lambda": 0.004092211,
+                        "minCfg": {"type": "minAdd", "limit": 16.666}
                     },
                     "numOutputCfg": {
-                        "type": "geometric",
-                        "p": 0.75,
-                        "minCfg": {"type": "minClip", "limit": 1},
-                        "maxCfg": {"type": "maxModulo", "limit": 12}
+                        "type": "fixed",
+                        "value": 1
                     },
                     "outputSizeCfg": {
-                        "type": "normal",
-                        "mean": 0.1,
-                        "stddev": 0.4,
-                        "minCfg": {"type": "minAdd", "limit": 0.01}
+                        "type": "exponential",
+                        "lambda": 0.6154080364,
+                        "minCfg": {"type": "minAdd", "limit": 0.09}
                     },
                     "reusageNumCfg": {
                         "type": "geometric",

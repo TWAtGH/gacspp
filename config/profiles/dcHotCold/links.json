@@ -1,65 +1,63 @@
 {
     "google_eu":{
         "CERN-PROD_DATADISK": {
-            "bandwidth": 1073741824,
-            "maxActiveTransfers": 80
+            "throughput": 108592660,
+            "maxActiveTransfers": 500
         },
         "UKI-NORTHGRID-MAN-HEP_DATADISK": {
-            "bandwidth": 1073741824,
-            "maxActiveTransfers": 50
+            "throughput": 108592660,
+            "maxActiveTransfers": 500
         }
     },
     "CERN-PROD_DATATAPE": {
         "CERN-PROD_DATADISK": {
-            "accessLatency": 2400000,
-            "bandwidth": 1073741824,
-            "maxActiveTransfers": 50
+            "bandwidth": 900000000,
+            "maxActiveTransfers": 15
         },
         "google_eu": {
-            "bandwidth": 1073741824,
-            "maxActiveTransfers": 30
+            "bandwidth": 900000000,
+            "maxActiveTransfers": 15
         }
     },
     "CERN-PROD_DATADISK": {
         "CERN-PROD_CPU": {
-            "bandwidth": 5e+10,
+            "throughput": 50237404,
             "maxActiveTransfers": 500
         },
         "google_eu": {
-            "bandwidth": 4.295e+9,
-            "maxActiveTransfers": 100
+            "throughput": 472021580,
+            "maxActiveTransfers": 500
         }
     },
     "CERN-PROD_CPU": {
         "CERN-PROD_OUTPUT": {
-            "bandwidth": 5e+9,
+            "throughput": 23317602,
             "maxActiveTransfers": 200
         }
     },
     "UKI-NORTHGRID-MAN-HEP_DATATAPE": {
         "UKI-NORTHGRID-MAN-HEP_DATADISK": {
-            "accessLatency": 2400000,
-            "bandwidth": 1073741824,
-            "maxActiveTransfers": 50
+            "bandwidth": 1750000000,
+            "maxActiveTransfers": 20
         },
         "google_eu": {
-            "bandwidth": 1073741824,
-            "maxActiveTransfers": 30
+            "bandwidth": 1750000000,
+            "maxActiveTransfers": 20
         }
     },
     "UKI-NORTHGRID-MAN-HEP_DATADISK": {
         "UKI-NORTHGRID-MAN-HEP_CPU": {
-            "bandwidth": 5e+10,
+            "throughput": 50237404,
             "maxActiveTransfers": 500
         },
         "google_eu": {
-            "bandwidth": 4.295e+9,
-            "maxActiveTransfers": 100
+            "throughput": 472021580,
+            "maxActiveTransfers": 500
         }
     },
     "UKI-NORTHGRID-MAN-HEP_CPU": {
         "UKI-NORTHGRID-MAN-HEP_OUTPUT": {
-            "bandwidth": 5e+9,
+            "throughput": 23317602,
             "maxActiveTransfers": 200
         }
     }

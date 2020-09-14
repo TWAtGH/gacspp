@@ -25,7 +25,7 @@ namespace gcp
         TieredPriceType::const_iterator nextLevelIt = curLevelIt + 1;
 
         if (amount <= threshold || nextLevelIt == endIt)
-            return (amount * curLevelIt->second) / 1000000000.0;
+            return (amount / 1000000000.0) * curLevelIt->second;
 
         const long double lowerLevelCosts = CalculateCostsRecursive(amount - threshold, nextLevelIt, endIt, curLevelIt->first);
 
@@ -47,9 +47,9 @@ namespace gcp
     {
         std::stringstream res;
         res << std::fixed << std::setprecision(2);
-        res << std::setw(12) << "Storage: " << mStorageCost << " CHF" << std::endl;
-        res << std::setw(12) << "Network: " << mNetworkCost << " CHF (" << mTraffic << " GiB)" << std::endl;
-        res << std::setw(12) << "Operations: " << mOperationCost << " CHF ";
+        res << std::setw(12) << "Storage: " << mStorageCost << " USD" << std::endl;
+        res << std::setw(12) << "Network: " << mNetworkCost << " USD (" << mTraffic << " GiB)" << std::endl;
+        res << std::setw(12) << "Operations: " << mOperationCost << " USD ";
         res << "(ClassA: " << mNumClassA / 1000 << "k + ClassB: " << mNumClassB / 1000 << "k)" << std::endl;
         return res.str();
     }
@@ -358,6 +358,9 @@ namespace gcp
                                 const SpaceType quota = bucketJson.contains("quota") ? bucketJson["quota"].get<SpaceType>() : 0;
                                 const bool duplicates = bucketJson.contains("allowDuplicateReplicas") ? bucketJson["allowDuplicateReplicas"].get<bool>() : false;
                                 CBucket* bucket = region->CreateStorageElement(std::move(name), duplicates, quota);
+                                
+                                if(bucket && bucketJson.contains("accessLatency"))
+                                    bucket->mAccessLatency = bucketJson["accessLatency"].get<TickType>();
 
                                 bucket->mPriceData->mStoragePrice = GetTieredRateFromSKUId(std::move(storageSKUId));
                                 bucket->mPriceData->mClassAOpPrice = GetTieredRateFromSKUId(std::move(classAOpSKUId));

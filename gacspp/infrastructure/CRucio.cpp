@@ -301,7 +301,9 @@ bool CRucio::LoadConfig(const json& config)
 
                             const SpaceType quota = storageElementJson.contains("quota") ? storageElementJson["quota"].get<SpaceType>() : 0;
                             const bool duplicates = storageElementJson.contains("allowDuplicateReplicas") ? storageElementJson["allowDuplicateReplicas"].get<bool>() : false;
-                            site->CreateStorageElement(std::move(name), duplicates, quota);
+                            CStorageElement* se = site->CreateStorageElement(std::move(name), duplicates, quota);
+                            if(se && storageElementJson.contains("accessLatency"))
+                               se->mAccessLatency = storageElementJson["accessLatency"].get<TickType>();
                         }
                     }
                     else if ((siteJsonKey == "name") || (siteJsonKey == "location") || (siteJsonKey == "multiLocationIdx"))
