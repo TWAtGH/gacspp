@@ -1,0 +1,155 @@
+{
+"maxTick": 7776000,
+"clouds": [
+		{
+			"id": "gcp",
+			"name": "gcp_default",
+			"config": {"_file_": "gcp.json"}
+		}
+	],
+"rucio": {
+	"config": {"_file_": "rucio.json"}
+	},
+"links": {
+	"config": {"_file_": "links.json"}
+    },
+"dataGens": [
+        {
+            "name": "CERNTapeDataGen",
+            "storageElements": ["CERN-PROD_DATATAPE"],
+            "numReplicaRatios": [],
+            "selectStorageElementsRandomly": false,
+            "numFilesCfg": {
+                "type": "fixed",
+                "value": 1000000
+            },
+            "fileSizeCfg": {
+                "type": "exponential",
+                "lambda": 0.026,
+                "minCfg": {"type": "minAdd", "limit": 0.009765625}
+            },
+            "lifetimeCfg": {
+                "type": "fixed",
+                "value": 157680000
+            }
+        },
+        {
+            "name": "UKITapeDataGen",
+            "storageElements": ["UKI-NORTHGRID-MAN-HEP_DATATAPE"],
+            "numReplicaRatios": [],
+            "selectStorageElementsRandomly": false,
+            "numFilesCfg": {
+                "type": "fixed",
+                "value": 1000000
+            },
+            "fileSizeCfg": {
+                "type": "exponential",
+                "lambda": 0.026,
+                "minCfg": {"type": "minAdd", "limit": 0.009765625}
+            },
+            "lifetimeCfg": {
+                "type": "fixed",
+                "value": 157680000
+            }
+        }
+    ],
+"reaper": {
+        "name": "Reaper",
+        "tickFreq": 300,
+        "startTick": 300
+    },
+"transferCfgs": [
+    {
+        "manager": {
+            "type": "bandwidth",
+            "name": "HotColdTransferMgr",
+            "tickFreq": 1,
+            "startTick": 0
+        },
+        "generator": {
+            "type": "hotCold",
+            "name": "HotColdTransferGen",
+            "tickFreq": 10,
+            "startTick": 0,
+            "infos": [
+                {
+					"archiveStorageElement": "CERN-PROD_DATATAPE",
+                    "coldStorageElement": "google_eu",
+                    "hotStorageElement": "CERN-PROD_DATADISK",
+                    "cpuStorageElement": "CERN-PROD_CPU",
+                    "outputStorageElement": "CERN-PROD_OUTPUT",
+					
+					"productionStartTime": 0,
+					
+                    "numCores": 10000,
+
+                    "numJobSubmissionCfg": {
+                        "type": "normal",
+                        "mean": 0.6336672,
+                        "stddev": 0.372921618,
+                        "minCfg": {"type": "minClip", "limit": 0}
+                    },
+                    "jobDurationCfg": {
+                        "type": "exponential",
+                        "lambda": 0.004092211,
+                        "minCfg": {"type": "minAdd", "limit": 16.666}
+                    },
+                    "numOutputCfg": {
+                        "type": "fixed",
+                        "value": 1
+                    },
+                    "outputSizeCfg": {
+                        "type": "exponential",
+                        "lambda": 0.6154080364,
+                        "minCfg": {"type": "minAdd", "limit": 0.09}
+                    },
+                    "reusageNumCfg": {
+                        "type": "geometric",
+                        "p": 0.25,
+                        "minCfg": {"type": "minClip", "limit": 1},
+                        "maxCfg": {"type": "maxModulo", "limit": 20, "invert": false}
+                    }
+                },
+                {
+					"archiveStorageElement": "UKI-NORTHGRID-MAN-HEP_DATATAPE",
+                    "coldStorageElement": "google_eu",
+                    "hotStorageElement": "UKI-NORTHGRID-MAN-HEP_DATADISK",
+                    "cpuStorageElement": "UKI-NORTHGRID-MAN-HEP_CPU",
+                    "outputStorageElement": "UKI-NORTHGRID-MAN-HEP_OUTPUT",
+					
+					"productionStartTime": 0,
+					
+                    "numCores": 8000,
+                    
+                    "numJobSubmissionCfg": {
+                        "type": "normal",
+                        "mean": 0.6336672,
+                        "stddev": 0.372921618,
+                        "minCfg": {"type": "minClip", "limit": 0}
+                    },
+                    "jobDurationCfg": {
+                        "type": "exponential",
+                        "lambda": 0.004092211,
+                        "minCfg": {"type": "minAdd", "limit": 16.666}
+                    },
+                    "numOutputCfg": {
+                        "type": "fixed",
+                        "value": 1
+                    },
+                    "outputSizeCfg": {
+                        "type": "exponential",
+                        "lambda": 0.6154080364,
+                        "minCfg": {"type": "minAdd", "limit": 0.09}
+                    },
+                    "reusageNumCfg": {
+                        "type": "geometric",
+                        "p": 0.25,
+                        "minCfg": {"type": "minClip", "limit": 1},
+                        "maxCfg": {"type": "maxModulo", "limit": 20, "invert": false}
+                    }
+                }
+            ]
+        }
+    }
+]
+}

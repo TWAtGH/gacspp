@@ -1,0 +1,24 @@
+{
+  "gcp": {
+    "skuIds": {"_file_": "20200910skus.json"},
+	  "networkPrices": {"_file_": "gcp_network_prices.json"},
+    "regions": [
+      {
+        "multiLocationIdx": 2,
+        "name": "europe",
+        "location": "Europe",
+        "numJobSlots": 1000,
+        "buckets": [
+          {
+            "name": "google_eu",
+            "quota": 1,
+            "allowDuplicateReplicas": false,
+    		    "storageSKUId": "EC40-8747-D6FF",
+    		    "classAOpSKUId": "9ADA-9AED-1B24",
+    		    "classBOpSKUId": "8AE7-5BBD-8F38"
+          }
+        ]
+      }
+    ]
+  }
+}

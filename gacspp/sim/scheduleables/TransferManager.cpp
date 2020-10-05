@@ -265,8 +265,14 @@ void CTransferManager::OnUpdate(TickType now)
         CNetworkLink* networkLink = queue.first;
         std::list<std::unique_ptr<STransfer>>& queuedTransfers = queue.second;
 
-        assert(networkLink->mNumActiveTransfers <= networkLink->mMaxNumActiveTransfers);
-        std::size_t numToCreate = networkLink->mMaxNumActiveTransfers - networkLink->mNumActiveTransfers;
+        std::size_t numToCreate;
+        if(networkLink->mMaxNumActiveTransfers > 0)
+        {
+            assert(networkLink->mNumActiveTransfers <= networkLink->mMaxNumActiveTransfers);
+            numToCreate = networkLink->mMaxNumActiveTransfers - networkLink->mNumActiveTransfers;
+        }
+        else
+            numToCreate = queuedTransfers.size();
 
         while (!queuedTransfers.empty() && (numToCreate > 0))
         {

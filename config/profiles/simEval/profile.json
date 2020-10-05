@@ -1,5 +1,5 @@
 {
-"maxTick": 5137200,
+"maxTick": 5166000,
 "clouds": [],
 "rucio": {
 	"config": {"_file_": "rucio.json"}
@@ -19,7 +19,7 @@
             },
             "fileSizeCfg": {
                 "type": "exponential",
-                "lambda": 0.619722847,
+                "lambda": 0.61972,
                 "minCfg": {"type": "minClip", "limit": 0.009765625},
                 "maxCfg": {"type": "maxClip", "limit": 12.79106355}
             },
@@ -35,11 +35,11 @@
             "selectStorageElementsRandomly": false,
             "numFilesCfg": {
                 "type": "fixed",
-                "value": 800000
+                "value": 1000000
             },
             "fileSizeCfg": {
                 "type": "exponential",
-                "lambda": 0.619722847,
+                "lambda": 0.61972,
                 "minCfg": {"type": "minClip", "limit": 0.009765625},
                 "maxCfg": {"type": "maxClip", "limit": 12.79106355}
             },
@@ -55,11 +55,11 @@
             "selectStorageElementsRandomly": false,
             "numFilesCfg": {
                 "type": "fixed",
-                "value": 800000
+                "value": 1000000
             },
             "fileSizeCfg": {
                 "type": "exponential",
-                "lambda": 0.619722847,
+                "lambda": 0.61972,
                 "minCfg": {"type": "minClip", "limit": 0.009765625},
                 "maxCfg": {"type": "maxClip", "limit": 12.79106355}
             },
@@ -79,7 +79,7 @@
         "manager": {
             "type": "bandwidth",
             "name": "DefaultTransferMgr",
-            "tickFreq": 5,
+            "tickFreq": 1,
             "startTick": 5
         },
         "generator": {

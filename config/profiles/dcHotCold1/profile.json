@@ -1,5 +1,5 @@
 {
-"maxTick": 10368000,
+"maxTick": 7776000,
 "clouds": [
 		{
 			"id": "gcp",
@@ -63,8 +63,8 @@
         "manager": {
             "type": "bandwidth",
             "name": "HotColdTransferMgr",
-            "tickFreq": 5,
-            "startTick": 5
+            "tickFreq": 1,
+            "startTick": 0
         },
         "generator": {
             "type": "hotCold",
@@ -79,7 +79,7 @@
                     "cpuStorageElement": "CERN-PROD_CPU",
                     "outputStorageElement": "CERN-PROD_OUTPUT",
 					
-					"productionStartTime": 1814400,
+					"productionStartTime": 0,
 					
                     "numCores": 10000,
 
@@ -117,7 +117,7 @@
                     "cpuStorageElement": "UKI-NORTHGRID-MAN-HEP_CPU",
                     "outputStorageElement": "UKI-NORTHGRID-MAN-HEP_OUTPUT",
 					
-					"productionStartTime": 1814400,
+					"productionStartTime": 0,
 					
                     "numCores": 8000,
                     

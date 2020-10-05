@@ -16,8 +16,7 @@
                 },
                 {
                     "name": "CERN-PROD_DATADISK",
-                    "allowDuplicateReplicas": false,
-                    "_quota": 1.0e+14
+                    "allowDuplicateReplicas": false
                 },
                 {
                     "name": "CERN-PROD_CPU",
@@ -42,8 +41,7 @@
                 },
                 {
                     "name": "UKI-NORTHGRID-MAN-HEP_DATADISK",
-                    "allowDuplicateReplicas": false,
-                    "_quota": 1.0e+14
+                    "allowDuplicateReplicas": false
                 },
                 {
                     "name": "UKI-NORTHGRID-MAN-HEP_CPU",
