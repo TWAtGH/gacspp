@@ -85,7 +85,7 @@
         "generator": {
             "type": "fixed",
             "name": "FixedTransferGen",
-            "tickFreq": 15,
+            "tickFreq": 10,
             "startTick": 5,
             "infos": [
                 {
@@ -93,11 +93,11 @@
                     "destinations": {
                         "CERN-PROD_DATADISK": {
                             "type": "exponential",
-                            "lambda": 2.209294199
+                            "lambda": 3.33437
                         },
                         "NDGF-T1_DATADISK": {
                             "type": "exponential",
-                            "lambda": 2.209294199
+                            "lambda": 3.33437
                         }
                     }
                 },
@@ -106,11 +106,11 @@
                     "destinations": {
                         "BNL-OSG2_DATADISK": {
                             "type": "exponential",
-                            "lambda": 2.209294199
+                            "lambda": 3.33437
                         },
                         "NDGF-T1_DATADISK": {
                             "type": "exponential",
-                            "lambda": 2.209294199
+                            "lambda": 3.33437
                         }
                     }
                 },
@@ -119,11 +119,11 @@
                     "destinations": {
                         "BNL-OSG2_DATADISK": {
                             "type": "exponential",
-                            "lambda": 2.209294199
+                            "lambda": 3.33437
                         },
                         "CERN-PROD_DATADISK": {
                             "type": "exponential",
-                            "lambda": 2.209294199
+                            "lambda": 3.33437
                         }
                     }
                 }
