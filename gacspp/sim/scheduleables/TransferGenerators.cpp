@@ -1557,9 +1557,15 @@ void CFixedTransferGen::PostCompleteReplica(SReplica* replica, TickType now)
         mCompleteReplicas.push_back(replica);
 }
 void CFixedTransferGen::PostCreateReplica(SReplica* replica, TickType now)
-{}
+{
+    (void)replica;
+    (void)now;
+}
 void CFixedTransferGen::PreRemoveReplica(SReplica* replica, TickType now)
-{}
+{
+    (void)replica;
+    (void)now;
+}
 
 void CFixedTransferGen::OnUpdate(TickType now)
 {
@@ -1613,6 +1619,7 @@ void CFixedTransferGen::OnUpdate(TickType now)
 
 void CFixedTransferGen::Shutdown(const TickType now)
 {
+    (void)now;
     for(const std::pair<CStorageElement*, std::vector<STransferGenInfo>>& cfg : mConfig)
     {
         for(const STransferGenInfo& info : cfg.second)

@@ -131,7 +131,7 @@ auto IValueGenerator::CreateFromJson(const json& cfg) -> std::unique_ptr<IValueG
     else if (type == "geometric")
     {
         const double p = cfg.at("p");
-        valueGenerator = std::make_unique<CExponentialRandomValueGenerator>(p);
+        valueGenerator = std::make_unique<CGeometricRandomValueGenerator>(p);
     }
     else if(type == "fixed")
     {

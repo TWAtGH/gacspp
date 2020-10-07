@@ -21,7 +21,7 @@
             "selectStorageElementsRandomly": false,
             "numFilesCfg": {
                 "type": "fixed",
-                "value": 1000000
+                "value": 2000000
             },
             "fileSizeCfg": {
                 "type": "exponential",
@@ -40,7 +40,7 @@
             "selectStorageElementsRandomly": false,
             "numFilesCfg": {
                 "type": "fixed",
-                "value": 1000000
+                "value": 2000000
             },
             "fileSizeCfg": {
                 "type": "exponential",
@@ -105,9 +105,9 @@
                     },
                     "reusageNumCfg": {
                         "type": "geometric",
-                        "p": 0.25,
+                        "p": 0.1,
                         "minCfg": {"type": "minClip", "limit": 1},
-                        "maxCfg": {"type": "maxModulo", "limit": 20, "invert": false}
+                        "maxCfg": {"type": "maxModulo", "limit": 50, "invert": false}
                     }
                 },
                 {
@@ -143,9 +143,9 @@
                     },
                     "reusageNumCfg": {
                         "type": "geometric",
-                        "p": 0.25,
+                        "p": 0.1,
                         "minCfg": {"type": "minClip", "limit": 1},
-                        "maxCfg": {"type": "maxModulo", "limit": 20, "invert": false}
+                        "maxCfg": {"type": "maxModulo", "limit": 50, "invert": false}
                     }
                 }
             ]
