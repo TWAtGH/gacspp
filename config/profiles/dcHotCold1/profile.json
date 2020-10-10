@@ -15,8 +15,8 @@
     },
 "dataGens": [
         {
-            "name": "CERNTapeDataGen",
-            "storageElements": ["CERN-PROD_DATATAPE"],
+            "name": "TapeDataGen1",
+            "storageElements": ["SITE-1_DATATAPE"],
             "numReplicaRatios": [],
             "selectStorageElementsRandomly": false,
             "numFilesCfg": {
@@ -34,8 +34,8 @@
             }
         },
         {
-            "name": "UKITapeDataGen",
-            "storageElements": ["UKI-NORTHGRID-MAN-HEP_DATATAPE"],
+            "name": "TapeDataGen2",
+            "storageElements": ["SITE-2_DATATAPE"],
             "numReplicaRatios": [],
             "selectStorageElementsRandomly": false,
             "numFilesCfg": {
@@ -73,11 +73,11 @@
             "startTick": 0,
             "infos": [
                 {
-					"archiveStorageElement": "CERN-PROD_DATATAPE",
+					"archiveStorageElement": "SITE-1_DATATAPE",
                     "coldStorageElement": "google_eu",
-                    "hotStorageElement": "CERN-PROD_DATADISK",
-                    "cpuStorageElement": "CERN-PROD_CPU",
-                    "outputStorageElement": "CERN-PROD_OUTPUT",
+                    "hotStorageElement": "SITE-1_DATADISK",
+                    "cpuStorageElement": "SITE-1_CPU",
+                    "outputStorageElement": "SITE-1_OUTPUT",
 					
 					"productionStartTime": 0,
 					
@@ -106,16 +106,16 @@
                     "reusageNumCfg": {
                         "type": "geometric",
                         "p": 0.1,
-                        "minCfg": {"type": "minClip", "limit": 1},
-                        "maxCfg": {"type": "maxModulo", "limit": 50, "invert": false}
+                        "minCfg": {"type": "minAdd", "limit": 1},
+                        "maxCfg": {"type": "maxModulo", "limit": 49, "invert": false}
                     }
                 },
                 {
-					"archiveStorageElement": "UKI-NORTHGRID-MAN-HEP_DATATAPE",
+					"archiveStorageElement": "SITE-2_DATATAPE",
                     "coldStorageElement": "google_eu",
-                    "hotStorageElement": "UKI-NORTHGRID-MAN-HEP_DATADISK",
-                    "cpuStorageElement": "UKI-NORTHGRID-MAN-HEP_CPU",
-                    "outputStorageElement": "UKI-NORTHGRID-MAN-HEP_OUTPUT",
+                    "hotStorageElement": "SITE-2_DATADISK",
+                    "cpuStorageElement": "SITE-2_CPU",
+                    "outputStorageElement": "SITE-2_OUTPUT",
 					
 					"productionStartTime": 0,
 					
@@ -144,8 +144,8 @@
                     "reusageNumCfg": {
                         "type": "geometric",
                         "p": 0.1,
-                        "minCfg": {"type": "minClip", "limit": 1},
-                        "maxCfg": {"type": "maxModulo", "limit": 50, "invert": false}
+                        "minCfg": {"type": "minAdd", "limit": 1},
+                        "maxCfg": {"type": "maxModulo", "limit": 49, "invert": false}
                     }
                 }
             ]

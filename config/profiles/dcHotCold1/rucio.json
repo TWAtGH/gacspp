@@ -5,52 +5,52 @@
     [
         {
             "multiLocationIdx": 2,
-            "name": "CERN-PROD",
+            "name": "SITE-1",
             "location": "eu",
             "storageElements":
             [
                 {
-                    "name": "CERN-PROD_DATATAPE",
+                    "name": "SITE-1_DATATAPE",
                     "allowDuplicateReplicas": false,
                     "accessLatency": 1800
                 },
                 {
-                    "name": "CERN-PROD_DATADISK",
+                    "name": "SITE-1_DATADISK",
                     "allowDuplicateReplicas": false,
                     "quota": 1.0e+14
                 },
                 {
-                    "name": "CERN-PROD_CPU",
+                    "name": "SITE-1_CPU",
                     "allowDuplicateReplicas": true
                 },
                 {
-                    "name": "CERN-PROD_OUTPUT",
+                    "name": "SITE-1_OUTPUT",
                     "allowDuplicateReplicas": true
                 }
             ]
         },
         {
             "multiLocationIdx": 2,
-            "name": "UKI-NORTHGRID-MAN-HEP",
+            "name": "SITE-2",
             "location": "eu",
             "storageElements":
             [
                 {
-                    "name": "UKI-NORTHGRID-MAN-HEP_DATATAPE",
+                    "name": "SITE-2_DATATAPE",
                     "allowDuplicateReplicas": false,
                     "accessLatency": 1800
                 },
                 {
-                    "name": "UKI-NORTHGRID-MAN-HEP_DATADISK",
+                    "name": "SITE-2_DATADISK",
                     "allowDuplicateReplicas": false,
                     "quota": 1.0e+14
                 },
                 {
-                    "name": "UKI-NORTHGRID-MAN-HEP_CPU",
+                    "name": "SITE-2_CPU",
                     "allowDuplicateReplicas": true
                 },
                 {
-                    "name": "UKI-NORTHGRID-MAN-HEP_OUTPUT",
+                    "name": "SITE-2_OUTPUT",
                     "allowDuplicateReplicas": true
                 }
             ]

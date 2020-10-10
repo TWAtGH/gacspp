@@ -177,6 +177,9 @@ auto CStorageElement::GetUsedStorage() const -> SpaceType
 auto CStorageElement::GetAllocatedStorage() const->SpaceType
 {return mDelegate->GetAllocatedStorage();}
 
+auto CStorageElement::GetQuota() const -> SpaceType
+{return mDelegate->GetQuota();}
+
 auto CStorageElement::GetUsedStorageQuotaRatio() const -> double
 {return mDelegate->GetUsedStorageQuotaRatio();}
 

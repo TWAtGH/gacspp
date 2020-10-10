@@ -116,13 +116,13 @@ public:
         // runtime data / initialised automatically / book keeping
         std::vector<std::vector<SFile*>> mArchiveFilesPerPopularity;
         std::map<std::uint32_t, SIndexedReplicas> mHotReplicasByPopularity;
-        std::map<std::uint32_t, SIndexedReplicas> mUnusedHotReplicasByPopularity;
 
         //hot replicas that will be deleted after their transfer to cold storage is done
-
         std::unordered_set<SReplica*> mHotReplicaDeletions;
+        std::list<std::pair<TickType, std::vector<SReplica*>>> mHotReplicasDeletionQueue;
 
         JobInfoList mWaitingJobs;
+        std::unordered_map <SReplica*, JobInfoList> mTransferringJobs;
         JobInfoList mQueuedJobs;
         JobInfoList mActiveJobs;
         std::list<std::pair<TickType, JobInfoList>> mRunningJobs;
@@ -136,7 +136,7 @@ public:
 private:
     std::discrete_distribution<std::size_t> GetPopularityIdxRNG(const SSiteInfo& siteInfo);
 
-    void CreateJobInputTransfer(CStorageElement* archiveStorageElement, CStorageElement* coldStorageElement, CStorageElement* hotStorageElement, SJobInfo* job, TickType now);
+    void QueueHotReplicasDeletion(SSiteInfo& siteInfo, SReplica* replica, TickType expireAt);
 
     void UpdateProductionCampaign(SSiteInfo& siteInfo, TickType now);
     void UpdateWaitingJobs(SSiteInfo& siteInfo, TickType now);

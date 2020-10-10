@@ -55,6 +55,7 @@ public:
 
     auto GetUsedStorage() const->SpaceType;
     auto GetAllocatedStorage() const->SpaceType;
+    auto GetQuota() const -> SpaceType;
     auto GetUsedStorageQuotaRatio() const -> double;
     bool CanStoreVolume(SpaceType volume) const;
 
@@ -105,6 +106,8 @@ public:
     {return mUsedStorage;}
     inline auto GetAllocatedStorage() const -> SpaceType
     {return mAllocatedStorage;}
+    inline auto GetQuota() const -> SpaceType
+    {return mQuota;}
     inline auto GetUsedStorageQuotaRatio() const -> double
     {return (mQuota > 0) ? static_cast<double>(mUsedStorage) / mQuota : 0;}
     inline bool CanStoreVolume(SpaceType volume) const

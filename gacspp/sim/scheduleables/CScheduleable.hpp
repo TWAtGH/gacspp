@@ -11,6 +11,7 @@ class CScheduleable
 public:
     std::string mName;
     DurationType mUpdateDurationSummed = DurationType::zero();
+    std::vector<std::pair<std::string, DurationType>> mDebugDurations;
     TickType mNextCallTick;
 
     CScheduleable(const TickType startTick=0)

@@ -227,16 +227,33 @@ void CHeartbeat::OnUpdate(const TickType now)
         ++idx;
     }
 
+    const std::string indent(2, ' ');
     statusOutput << "Sim stats:" << std::endl;
-    statusOutput << "  " << std::setw(maxW) << "Duration: " << std::setw(6) << timeDiff.count() << "s\n";
+    statusOutput << indent << std::setw(maxW) << "Duration";
+    statusOutput << ": " << std::setw(6) << timeDiff.count() << "s\n";
     for(std::weak_ptr<CScheduleable> weakptr : mProccessDurations)
     {
         std::shared_ptr<CScheduleable> scheduleable = weakptr.lock();
-        statusOutput << "  " << std::setw(maxW) << scheduleable->mName;
+        statusOutput << indent << std::setw(maxW) << scheduleable->mName;
         statusOutput << ": " << std::setw(6) << scheduleable->mUpdateDurationSummed.count();
-        statusOutput << "s ("<< std::setw(5) << (scheduleable->mUpdateDurationSummed.count() / timeDiff.count()) * 100 << "%)\n";
-        scheduleable->mUpdateDurationSummed = std::chrono::duration<double>::zero();
+        statusOutput << "s (" << std::setw(5) << (scheduleable->mUpdateDurationSummed.count() / timeDiff.count()) * 100 << "%)\n";
+
+        maxW = 0;
+        for(std::pair<std::string, DurationType>& dbg : scheduleable->mDebugDurations)
+            if(dbg.first.size() > maxW)
+                maxW = dbg.first.size();
+        
+        for(std::pair<std::string, DurationType>& dbg : scheduleable->mDebugDurations)
+        {
+            statusOutput << indent << indent << "-> " << std::setw(maxW) << dbg.first;
+            statusOutput << ": " << std::setw(6) << dbg.second.count();
+            statusOutput << "s (" << std::setw(5) << (dbg.second.count() / scheduleable->mUpdateDurationSummed.count()) * 100 << "%)\n";
+            dbg.second = DurationType::zero();
+        }
+
+        scheduleable->mUpdateDurationSummed = DurationType::zero();
     }
+
     std::cout << statusOutput.str() << std::endl;
 
     mNextCallTick = now + mTickFreq;
