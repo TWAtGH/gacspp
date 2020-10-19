@@ -390,10 +390,8 @@ void CHotColdStorageTransferGen::PrepareProductionCampaign(SSiteInfo& siteInfo, 
     }
 }
 
-#include <fstream>
 void CHotColdStorageTransferGen::UpdateProductionCampaign(SSiteInfo& siteInfo, TickType now)
 {
-    static std::ofstream dumpf("dump500.csv");
     {
         CScopedTimeDiffAdd durationUpdate(mDebugDurations[0].second);
 
@@ -401,19 +399,13 @@ void CHotColdStorageTransferGen::UpdateProductionCampaign(SSiteInfo& siteInfo, T
         CStorageElement* coldStorageElement = siteInfo.mColdToHotLink->GetSrcStorageElement();
         std::list<std::pair<TickType, std::vector<SReplica*>>>& queue = siteInfo.mHotReplicasDeletionQueue;
         
-        std::size_t dbg = 0;
-        dumpf<<now<<','<<hotStorageElement->GetSite()->GetId()<<',';
-        dumpf<<siteInfo.mWaitingJobs.size()<<','<<siteInfo.mTransferringJobs.size()<<','<<siteInfo.mQueuedJobs.size()<<',';
-        dumpf<<siteInfo.mActiveJobs.size()<<','<<siteInfo.mNumRunningJobs<<','<<queue.size()<<','<<siteInfo.mHotReplicaDeletions.size()<<',';
         while(!queue.empty() && (queue.front().first <= now))
         {
             assert(!queue.front().second.empty());
             for(SReplica* replica : queue.front().second)
             {
-                dbg += 1;
                 SFile* file = replica->GetFile();
                 
-                //create transfer to remove replicas or remove replica instantly
                 if (!file->GetReplicaByStorageElement(coldStorageElement))
                 {
                     SReplica* dstReplica = coldStorageElement->CreateReplica(file, now);
@@ -436,8 +428,6 @@ void CHotColdStorageTransferGen::UpdateProductionCampaign(SSiteInfo& siteInfo, T
             }
             queue.pop_front();
         }
-        
-        dumpf<<dbg<<std::endl;
     }
     
     {
@@ -730,9 +720,6 @@ void CHotColdStorageTransferGen::SubmitNewJobs(SSiteInfo& siteInfo, TickType now
         numToCreate = val;
         siteInfo.mNumJobSubmissionAccu = val - numToCreate;
     }
-    
-    if(numToCreate == 0 /*|| (waitingJobs.size() + queuedJobs.size()) > 20000*/)
-        return;
     
     std::discrete_distribution<std::size_t> popularityIdxRNG = GetPopularityIdxRNG(siteInfo);
     for (; numToCreate > 0; --numToCreate)
