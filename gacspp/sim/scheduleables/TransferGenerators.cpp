@@ -725,24 +725,22 @@ void CHotColdStorageTransferGen::SubmitNewJobs(SSiteInfo& siteInfo, TickType now
     for (; numToCreate > 0; --numToCreate)
     {
         std::vector<SFile*>& files = archiveFilesPerPopularity[popularityIdxRNG(mSim->mRNGEngine)];
-        std::uniform_int_distribution<std::size_t> fileIdxRNG(0, files.size() - 1);
+        const std::size_t numFiles = files.size();
+        const std::size_t randomFileIdxOrigin = std::uniform_int_distribution<std::size_t>(0, numFiles - 1)(mSim->mRNGEngine);
+        std::size_t randomFileIdxCur = randomFileIdxOrigin;
 
-        SFile* inputFile = files[fileIdxRNG(mSim->mRNGEngine)];
-        SReplica* inputReplica = inputFile->GetReplicaByStorageElement(hotStorageElement);
-        std::size_t retry=0;
-        while((retry<5) && (hotReplicaDeletions.count(inputReplica) > 0))
+        SFile* inputFile;
+        SReplica* inputReplica;
+        do
         {
-            assert(inputReplica); //nullptr must not be in hotReplicaDeletions
-            inputFile = files[fileIdxRNG(mSim->mRNGEngine)];
+            inputFile = files[randomFileIdxCur];
             inputReplica = inputFile->GetReplicaByStorageElement(hotStorageElement);
-            ++retry;
-        }
+            randomFileIdxCur = (randomFileIdxCur + 1) % numFiles;
+        } while ((randomFileIdxCur != randomFileIdxOrigin) && (hotReplicaDeletions.count(inputReplica) > 0));
+        
+        assert((randomFileIdxCur != randomFileIdxOrigin) || (hotReplicaDeletions.count(inputReplica) == 0));
 
-        if(retry >= 5)
-            continue;
-        
         std::unique_ptr<SJobInfo> newJob = std::make_unique<SJobInfo>();
-        
         newJob->mJobId = GetNewId();
         newJob->mCreatedAt = now;
         newJob->mInputFile = inputFile;
