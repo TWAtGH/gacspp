@@ -16,7 +16,8 @@
                     },
                     {
                         "name": "SITE-1_DATADISK",
-                        "allowDuplicateReplicas": false
+                        "allowDuplicateReplicas": false,
+                        "quota": 1.0e+14
                     },
                     {
                         "name": "SITE-1_CPU",
@@ -41,7 +42,8 @@
                     },
                     {
                         "name": "SITE-2_DATADISK",
-                        "allowDuplicateReplicas": false
+                        "allowDuplicateReplicas": false,
+                        "quota": 1.0e+14
                     },
                     {
                         "name": "SITE-2_CPU",

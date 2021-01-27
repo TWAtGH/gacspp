@@ -21,7 +21,7 @@
             "selectStorageElementsRandomly": false,
             "numFilesCfg": {
                 "type": "fixed",
-                "value": 2000000
+                "value": 1000000
             },
             "fileSizeCfg": {
                 "type": "exponential",
@@ -40,7 +40,7 @@
             "selectStorageElementsRandomly": false,
             "numFilesCfg": {
                 "type": "fixed",
-                "value": 2000000
+                "value": 1000000
             },
             "fileSizeCfg": {
                 "type": "exponential",

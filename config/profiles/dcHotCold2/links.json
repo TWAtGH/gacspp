@@ -1,31 +1,31 @@
 {
     "google_eu":{
         "SITE-1_DATADISK": {
-            "throughput": 108592660,
+            "throughput": 294000000,
             "maxActiveTransfers": 100
         },
         "SITE-2_DATADISK": {
-            "throughput": 108592660,
+            "throughput": 294000000,
             "maxActiveTransfers": 100
         }
     },
     "SITE-1_DATATAPE": {
         "SITE-1_DATADISK": {
-            "bandwidth": 2000000000,
+            "throughput": 22620000,
             "maxActiveTransfers": 100
         },
         "google_eu": {
-            "bandwidth": 2000000000,
+            "bandwidth": 1800000000,
             "maxActiveTransfers": 100
         }
     },
     "SITE-1_DATADISK": {
         "SITE-1_CPU": {
-            "throughput": 50237404,
+            "throughput": 88240000,
             "maxActiveTransfers": 500
         },
         "google_eu": {
-            "throughput": 472021580,
+            "throughput": 500000000,
             "maxActiveTransfers": 100
         }
     },
@@ -37,21 +37,21 @@
     },
     "SITE-2_DATATAPE": {
         "SITE-2_DATADISK": {
-            "bandwidth": 7000000000,
+            "throughput": 62350000,
             "maxActiveTransfers": 100
         },
         "google_eu": {
-            "bandwidth": 7000000000,
+            "bandwidth": 4100000000,
             "maxActiveTransfers": 100
         }
     },
     "SITE-2_DATADISK": {
         "SITE-2_CPU": {
-            "throughput": 50237404,
+            "throughput": 88240000,
             "maxActiveTransfers": 500
         },
         "google_eu": {
-            "throughput": 472021580,
+            "throughput": 500000000,
             "maxActiveTransfers": 100
         }
     },
