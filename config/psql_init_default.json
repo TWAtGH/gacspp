@@ -6,7 +6,7 @@
     "CREATE TABLE NetworkLinks (id BIGINT, srcStorageElementId BIGINT, dstStorageElementId BIGINT);",
     "CREATE TABLE Files (id BIGINT, createdAt BIGINT, expiredAt BIGINT, filesize BIGINT, popularity INTEGER);",
     "CREATE TABLE Replicas (id BIGINT, fileId BIGINT, storageElementId BIGINT, createdAt BIGINT, expiredAt BIGINT);",
-    "CREATE TABLE Transfers (id BIGINT, srcStorageElementId BIGINT, dstStorageElementId BIGINT, fileId BIGINT, srcReplicaId BIGINT, dstReplicaId BIGINT, queuedAt BIGINT, startedAt BIGINT, finishedAt BIGINT, accessLatency BIGINT, traffic BIGINT);",
+    "CREATE TABLE Transfers (id BIGINT, srcStorageElementId BIGINT, dstStorageElementId BIGINT, fileId BIGINT, srcReplicaId BIGINT, dstReplicaId BIGINT, queuedAt BIGINT, activatedAt BIGINT, startedAt BIGINT, finishedAt BIGINT, traffic BIGINT);",
     "CREATE TABLE InputTraces (id BIGINT, jobId BIGINT, siteId BIGINT, storageElementId BIGINT, fileId BIGINT, replicaId BIGINT, startedAt BIGINT, finishedAt BIGINT, traffic BIGINT);",
 	"CREATE TABLE OutputTraces (id BIGINT, jobId BIGINT, siteId BIGINT, storageElementId BIGINT, fileId BIGINT, replicaId BIGINT, startedAt BIGINT, finishedAt BIGINT, traffic BIGINT);",
 	"CREATE TABLE JobTraces (id BIGINT, siteId BIGINT, createdAt BIGINT, queuedAt BIGINT, startedAt BIGINT, finishedAt BIGINT);",

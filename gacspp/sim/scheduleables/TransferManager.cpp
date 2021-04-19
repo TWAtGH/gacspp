@@ -71,6 +71,7 @@ CTransferManager::STransfer::STransfer( SReplica* srcReplica,
       mDstReplica(dstReplica),
       mNetworkLink(networkLink),
       mQueuedAt(queuedAt),
+      mActivatedAt(queuedAt),
       mStartAt(startAt),
       mDeleteSrcReplica(deleteSrcReplica)
 {}
@@ -107,7 +108,7 @@ CTransferManager::CTransferManager(TickType tickFreq, TickType startTick)
     : CBaseTransferManager(startTick),
       mTickFreq(tickFreq)
 {
-    mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Transfers(id, srcStorageElementId, dstStorageElementId, fileId, srcReplicaId, dstReplicaId, queuedAt, startedAt, finishedAt, accessLatency, traffic) FROM STDIN with(FORMAT csv);", 11, '?');
+    mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Transfers(id, srcStorageElementId, dstStorageElementId, fileId, srcReplicaId, dstReplicaId, queuedAt, activatedAt, startedAt, finishedAt, traffic) FROM STDIN with(FORMAT csv);", 11, '?');
 }
 
 void CTransferManager::CreateTransfer(SReplica* srcReplica, SReplica* dstReplica, TickType now, bool deleteSrcReplica)
@@ -154,8 +155,8 @@ void CTransferManager::OnUpdate(TickType now)
         {
             std::unique_ptr<STransfer>& curTransfer = queuedTransfers.front();
 
-            curTransfer->mAccessLatency = networkLink->GetSrcStorageElement()->mAccessLatency->GetValue(IBaseSim::Sim->mRNGEngine);
-            curTransfer->mStartAt = now + curTransfer->mAccessLatency;
+            curTransfer->mActivatedAt = now;
+            curTransfer->mStartAt = now + networkLink->GetSrcStorageElement()->mAccessLatency->GetValue(IBaseSim::Sim->mRNGEngine);
             networkLink->mNumActiveTransfers += 1;
             networkLink->GetSrcStorageElement()->OnOperation(CStorageElement::GET);
 
@@ -212,9 +213,9 @@ void CTransferManager::OnUpdate(TickType now)
             transferInsertQueries->AddValue(srcReplica->GetId());
             transferInsertQueries->AddValue(dstReplica->GetId());
             transferInsertQueries->AddValue(transfer->mQueuedAt);
+            transferInsertQueries->AddValue(transfer->mActivatedAt);
             transferInsertQueries->AddValue(transfer->mStartAt);
             transferInsertQueries->AddValue(now);
-            transferInsertQueries->AddValue(transfer->mAccessLatency);
             transferInsertQueries->AddValue(dstReplica->GetCurSize());
 
             ++mNumCompletedTransfers;

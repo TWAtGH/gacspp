@@ -49,8 +49,8 @@ private:
         SReplica* mDstReplica;
         CNetworkLink* mNetworkLink;
         TickType mQueuedAt;
+        TickType mActivatedAt;
         TickType mStartAt;
-        TickType mAccessLatency = 0;
         bool mDeleteSrcReplica;
 
         STransfer(  SReplica* srcReplica,
