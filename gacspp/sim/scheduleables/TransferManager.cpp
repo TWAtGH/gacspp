@@ -2,6 +2,8 @@
 
 #include "TransferManager.hpp"
 
+#include "sim/IBaseSim.hpp"
+
 #include "common/utils.hpp"
 
 #include "infrastructure/CNetworkLink.hpp"
@@ -59,132 +61,6 @@ void RemoveListener(SReplica* replica, IReplicaPreRemoveListener* listener)
 }
 
 
-CTransferBatchManager::STransfer::STransfer(SReplica* srcReplica, SReplica* dstReplica, TickType queuedAt, TickType startedAt, std::size_t routeIdx)
-    : mSrcReplica(srcReplica),
-      mDstReplica(dstReplica),
-      mQueuedAt(queuedAt),
-      mStartAt(startedAt),
-      mCurRouteIdx(routeIdx)
-{}
-
-CTransferBatchManager::CTransferBatchManager(TickType tickFreq, TickType startTick)
-    : CBaseTransferManager(startTick),
-      mTickFreq(tickFreq)
-{}
-
-void CTransferBatchManager::OnUpdate(TickType now)
-{
-    CScopedTimeDiffAdd durationUpdate(mUpdateDurationSummed);
-
-    std::size_t i = 0;
-    while(i < mQueuedTransferBatches.size())
-    {
-        if (mQueuedTransferBatches[i]->mStartAt <= now)
-        {
-            mQueuedTransferBatches[i]->mRoute[0]->mNumActiveTransfers += mQueuedTransferBatches[i]->mTransfers.size();
-            mActiveTransferBatches.emplace_back(std::move(mQueuedTransferBatches[i]));
-            mQueuedTransferBatches[i] = std::move(mQueuedTransferBatches.back());
-            mQueuedTransferBatches.pop_back();
-        }
-        else
-            ++i;
-    }
-
-    const std::uint32_t timeDiff = static_cast<std::uint32_t>(now - mLastUpdated);
-    mLastUpdated = now;
-
-    std::size_t batchIdx = 0;
-    std::unique_ptr<IInsertValuesContainer> transferInsertQueries = mOutputTransferInsertQuery->CreateValuesContainer();
-
-    while (batchIdx < mActiveTransferBatches.size())
-    {
-        std::shared_ptr<STransferBatch>& batch = mActiveTransferBatches[batchIdx];
-        std::vector<std::unique_ptr<STransfer>>& transfers = batch->mTransfers;
-
-        std::size_t transferIdx = 0;
-
-        while(transferIdx < transfers.size())
-        {
-            std::unique_ptr<STransfer>& transfer = transfers[transferIdx];
-            SReplica* srcReplica = transfer->mSrcReplica;
-            SReplica* dstReplica = transfer->mDstReplica;
-            CNetworkLink* const networkLink = batch->mRoute[transfer->mCurRouteIdx];
-
-            const double sharedBandwidth = networkLink->mBandwidthBytesPerSecond / static_cast<double>(networkLink->mNumActiveTransfers);
-            SpaceType amount = static_cast<SpaceType>(sharedBandwidth * timeDiff);
-            amount = dstReplica->Increase(amount, now);
-            networkLink->mUsedTraffic += amount;
-
-            if(dstReplica->IsComplete())
-            {
-                transferInsertQueries->AddValue(GetNewId());
-                transferInsertQueries->AddValue(srcReplica->GetStorageElement()->GetId());
-                transferInsertQueries->AddValue(dstReplica->GetStorageElement()->GetId());
-                transferInsertQueries->AddValue(srcReplica->GetFile()->GetId());
-                transferInsertQueries->AddValue(srcReplica->GetId());
-                transferInsertQueries->AddValue(dstReplica->GetId());
-                transferInsertQueries->AddValue(transfer->mQueuedAt);
-                transferInsertQueries->AddValue(transfer->mStartAt);
-                transferInsertQueries->AddValue(now);
-                transferInsertQueries->AddValue(dstReplica->GetCurSize());
-
-                networkLink->mNumDoneTransfers += 1;
-                networkLink->mNumActiveTransfers -= 1;
-
-                mNumCompletedTransfers += 1;
-                mSummedTransferDuration += now - transfer->mStartAt;
-
-                std::size_t nextRouteIdx = transfer->mCurRouteIdx + 1;
-                while(nextRouteIdx < batch->mRoute.size())
-                {
-                    CStorageElement* dstStorageElement = batch->mRoute[nextRouteIdx]->GetDstStorageElement();
-                    SReplica* replica = dstReplica->GetFile()->GetReplicaByStorageElement(dstStorageElement);
-                    if(!replica)
-                    {
-                        batch->mRoute[nextRouteIdx]->mNumActiveTransfers += 1;
-                        replica = dstStorageElement->CreateReplica(dstReplica->GetFile(), now);
-                        transfers.emplace_back(std::make_unique<STransfer>(dstReplica, replica, now, now, nextRouteIdx));
-
-                        ++transferIdx; // dont handle new transfer immediately
-                        break;
-                    }
-                    else
-                    {
-                        dstReplica = replica;
-                        //store replica if it is used as src for next transfer
-                        nextRouteIdx += 1;
-                    }
-                }
-                //dstReplica.use_count()
-
-                if(nextRouteIdx >= batch->mRoute.size())
-                    batch->mNumDoneTransfers += 1;
-
-                transfer = std::move(transfers.back());
-                transfers.pop_back();
-                continue; // handle same idx again
-            }
-
-            ++transferIdx;
-        }
-
-        if(transfers.empty())
-        {
-            batch = std::move(mActiveTransferBatches.back());
-            mActiveTransferBatches.pop_back();
-            continue; // handle same idx again
-        }
-
-        ++batchIdx;
-    }
-
-    COutput::GetRef().QueueInserts(std::move(transferInsertQueries));
-
-    mNextCallTick = now + mTickFreq;
-}
-
-
-
 CTransferManager::STransfer::STransfer( SReplica* srcReplica,
                                         SReplica* dstReplica,
                                         CNetworkLink* networkLink,
@@ -231,7 +107,7 @@ CTransferManager::CTransferManager(TickType tickFreq, TickType startTick)
     : CBaseTransferManager(startTick),
       mTickFreq(tickFreq)
 {
-    mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Transfers(id, srcStorageElementId, dstStorageElementId, fileId, srcReplicaId, dstReplicaId, queuedAt, startedAt, finishedAt, traffic) FROM STDIN with(FORMAT csv);", 10, '?');
+    mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Transfers(id, srcStorageElementId, dstStorageElementId, fileId, srcReplicaId, dstReplicaId, queuedAt, startedAt, finishedAt, accessLatency, traffic) FROM STDIN with(FORMAT csv);", 10, '?');
 }
 
 void CTransferManager::CreateTransfer(SReplica* srcReplica, SReplica* dstReplica, TickType now, bool deleteSrcReplica)
@@ -278,7 +154,8 @@ void CTransferManager::OnUpdate(TickType now)
         {
             std::unique_ptr<STransfer>& curTransfer = queuedTransfers.front();
 
-            curTransfer->mStartAt = now + networkLink->GetSrcStorageElement()->mAccessLatency;
+            curTransfer->mAccessLatency = networkLink->GetSrcStorageElement()->mAccessLatency->GetValue(IBaseSim::Sim->mRNGEngine);
+            curTransfer->mStartAt = now + curTransfer->mAccessLatency;
             networkLink->mNumActiveTransfers += 1;
             networkLink->GetSrcStorageElement()->OnOperation(CStorageElement::GET);
 
@@ -290,7 +167,7 @@ void CTransferManager::OnUpdate(TickType now)
     }
 
     std::size_t idx = 0;
-    std::unique_ptr<IInsertValuesContainer> transferInsertQueries = mOutputTransferInsertQuery->CreateValuesContainer(6 + mActiveTransfers.size());
+    std::unique_ptr<IInsertValuesContainer> transferInsertQueries = mOutputTransferInsertQuery->CreateValuesContainer(7 + mActiveTransfers.size());
 
     while (idx < mActiveTransfers.size())
     {
@@ -337,6 +214,7 @@ void CTransferManager::OnUpdate(TickType now)
             transferInsertQueries->AddValue(transfer->mQueuedAt);
             transferInsertQueries->AddValue(transfer->mStartAt);
             transferInsertQueries->AddValue(now);
+            transferInsertQueries->AddValue(transfer->mAccessLatency);
             transferInsertQueries->AddValue(dstReplica->GetCurSize());
 
             ++mNumCompletedTransfers;

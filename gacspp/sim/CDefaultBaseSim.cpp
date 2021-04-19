@@ -354,8 +354,6 @@ auto CDefaultBaseSim::CreateTransferManager(const json& transferManagerCfg) cons
             transferManager = std::make_shared<CTransferManager>(tickFreq, startTick);
         else if(typeStr == "fixedTime")
             transferManager = std::make_shared<CFixedTimeTransferManager>(tickFreq, startTick);
-        else if(typeStr == "batched")
-            transferManager = std::make_shared<CTransferBatchManager>(tickFreq, startTick);
         else
             std::cout << "Unknown transfer manager type: " << typeStr << std::endl;
         if (transferManager)

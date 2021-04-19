@@ -8,6 +8,7 @@
 #include "infrastructure/CRucio.hpp"
 #include "infrastructure/CStorageElement.hpp"
 
+IBaseSim* IBaseSim::Sim = nullptr;
 
 IBaseSim::IBaseSim()
 {
@@ -15,6 +16,7 @@ IBaseSim::IBaseSim()
     auto seed = rd();
     std::cout<<"Using seed: "<<seed<<std::endl;
     mRNGEngine = RNGEngineType(seed);
+    IBaseSim::Sim = this;
 }
 IBaseSim::~IBaseSim() = default;
 

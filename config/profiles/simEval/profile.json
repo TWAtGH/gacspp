@@ -9,13 +9,13 @@
     },
 "dataGens": [
         {
-            "name": "BNLTapeDataGen",
+            "name": "BNLDataGen",
             "storageElements": ["BNL-OSG2_DATADISK"],
             "numReplicaRatios": [],
             "selectStorageElementsRandomly": false,
             "numFilesCfg": {
                 "type": "fixed",
-                "value": 1000000
+                "value": 1000
             },
             "fileSizeCfg": {
                 "type": "exponential",
@@ -29,13 +29,13 @@
             }
         },
         {
-            "name": "CERNTapeDataGen",
+            "name": "CERNDataGen",
             "storageElements": ["CERN-PROD_DATADISK"],
             "numReplicaRatios": [],
             "selectStorageElementsRandomly": false,
             "numFilesCfg": {
                 "type": "fixed",
-                "value": 1000000
+                "value": 1000
             },
             "fileSizeCfg": {
                 "type": "exponential",
@@ -49,13 +49,13 @@
             }
         },
         {
-            "name": "NDGFTapeDataGen",
+            "name": "NDGFDataGen",
             "storageElements": ["NDGF-T1_DATADISK"],
             "numReplicaRatios": [],
             "selectStorageElementsRandomly": false,
             "numFilesCfg": {
                 "type": "fixed",
-                "value": 1000000
+                "value": 1000
             },
             "fileSizeCfg": {
                 "type": "exponential",

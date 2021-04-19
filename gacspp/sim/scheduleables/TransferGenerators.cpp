@@ -1526,7 +1526,8 @@ void CFixedTransferGen::OnUpdate(TickType now)
     {
         const CStorageElement* srcStorageElement = cfg.first;
         const std::vector<std::unique_ptr<SReplica>>& srcReplicas = srcStorageElement->GetReplicas();
-        assert(srcReplicas.size() > 0);
+        const std::size_t numSrcReplicas = srcReplicas.size();
+        assert(numSrcReplicas > 0);
         for(STransferGenInfo& info : cfg.second)
         {
             CStorageElement* dstStorageElement = info.mDstStorageElement;
@@ -1535,25 +1536,43 @@ void CFixedTransferGen::OnUpdate(TickType now)
             std::uint64_t numToCreate = val;
             info.mDecimalAccu = val - numToCreate;
 
-            std::uint32_t loopLimit = 100;
-
-            std::uniform_int_distribution<std::size_t> replicaIdxRNG(0, srcReplicas.size() - 1);
-            while(numToCreate > 0 && loopLimit > 0)
+            while(numToCreate > 0)
             {
-                SReplica* srcReplica = srcReplicas[replicaIdxRNG(rngEngine)].get();
-                SFile* srcFile = srcReplica->GetFile();
-                if(!srcReplica->IsComplete() || srcFile->GetReplicaByStorageElement(dstStorageElement))
+                std::uniform_int_distribution<std::size_t> replicaIdxRNG(0, numSrcReplicas - 1);
+                const std::size_t rngIdxOffset = replicaIdxRNG(rngEngine);
+                std::size_t i = 0;
+                for(; i<numSrcReplicas; ++i)
                 {
-                    --loopLimit;
-                    continue;
+                    SReplica* srcReplica = srcReplicas[(rngIdxOffset + i) % numSrcReplicas].get();
+                    SFile* srcFile = srcReplica->GetFile();
+                    if(srcReplica->IsComplete() && !srcFile->GetReplicaByStorageElement(dstStorageElement))
+                    {
+                        SReplica* dstReplica = dstStorageElement->CreateReplica(srcFile, now);
+                        assert(dstReplica);
+                        mTransferMgr->CreateTransfer(srcReplica, dstReplica, now);
+                        --numToCreate;
+                        break;
+                    }
                 }
-                else
-                    loopLimit = 100;
 
-                SReplica* dstReplica = dstStorageElement->CreateReplica(srcFile, now);
-                assert(dstReplica);
-                mTransferMgr->CreateTransfer(srcReplica, dstReplica, now);
-                --numToCreate;
+                // no src replicas available
+                if(i == numSrcReplicas)
+                {
+                    // approach 1
+                    assert(false);
+
+                    // approach 2
+                    break; 
+
+                    // approach 3
+                    SFile* tmplFile = srcReplicas[rngIdxOffset]->GetFile();
+                    SFile* srcFile = mSim->mRucio->CreateFile(tmplFile->GetSize(), now, tmplFile->mExpiresAt);
+                    SReplica* srcReplica = cfg.first->CreateReplica(srcFile, now);
+                    srcReplica->Increase(srcFile->GetSize(), now);
+                    SReplica* dstReplica = dstStorageElement->CreateReplica(srcFile, now);
+                    mTransferMgr->CreateTransfer(srcReplica, dstReplica, now);
+                    --numToCreate;
+                }
             }
         }
     }

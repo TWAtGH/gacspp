@@ -35,60 +35,6 @@ public:
 };
 
 
-class CTransferBatchManager : public CBaseTransferManager
-{
-public:
-    struct STransfer// : public IReplicaPreRemoveListener
-    {
-        SReplica* mSrcReplica;
-        SReplica* mDstReplica;
-
-        TickType mQueuedAt;
-        TickType mStartAt;
-
-        std::size_t mCurRouteIdx = 0;
-
-        STransfer(SReplica* srcReplica, SReplica* dstReplica, TickType queuedAt, TickType startedAt, std::size_t routeIdx = 0);
-
-        //void PreRemoveReplica(const SReplica* replica, TickType now) override;
-    };
-
-    struct STransferBatch
-    {
-        std::vector<CNetworkLink*> mRoute;
-
-        TickType mStartAt;
-
-        std::vector<std::unique_ptr<STransfer>> mTransfers;
-        std::uint32_t mNumDoneTransfers = 0;
-    };
-
-public:
-    CTransferBatchManager(TickType tickFreq, TickType startTick=0);
-
-    void OnUpdate(TickType now) final;
-
-    void QueueTransferBatch(std::shared_ptr<STransferBatch> transferBatch)
-    {
-        if(!transferBatch->mTransfers.empty())
-            mQueuedTransferBatches.emplace_back(transferBatch);
-    }
-
-    auto GetNumActiveTransfers() const -> std::size_t
-    {return mActiveTransferBatches.size();}
-
-private:
-    std::shared_ptr<IPreparedInsert> mOutputTransferInsertQuery;
-
-    TickType mLastUpdated = 0;
-    TickType mTickFreq;
-
-    std::vector<std::shared_ptr<STransferBatch>> mActiveTransferBatches;
-    std::vector<std::shared_ptr<STransferBatch>> mQueuedTransferBatches;
-
-};
-
-
 class CTransferManager : public CBaseTransferManager
 {
 private:
@@ -104,6 +50,7 @@ private:
         CNetworkLink* mNetworkLink;
         TickType mQueuedAt;
         TickType mStartAt;
+        TickType mAccessLatency = 0;
         bool mDeleteSrcReplica;
 
         STransfer(  SReplica* srcReplica,

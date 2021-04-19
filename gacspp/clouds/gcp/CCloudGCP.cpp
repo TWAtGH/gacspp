@@ -10,6 +10,8 @@
 #include "infrastructure/CNetworkLink.hpp"
 #include "infrastructure/SFile.hpp"
 
+#include "common/utils.hpp"
+
 #include "third_party/nlohmann/json.hpp"
 
 
@@ -360,7 +362,9 @@ namespace gcp
                                 CBucket* bucket = region->CreateStorageElement(std::move(name), duplicates, quota);
                                 
                                 if(bucket && bucketJson.contains("accessLatency"))
-                                    bucket->mAccessLatency = bucketJson["accessLatency"].get<TickType>();
+                                    bucket->mAccessLatency = IValueGenerator::CreateFromJson(bucketJson.at("accessLatency"));
+                                else
+                                    bucket->mAccessLatency = std::make_unique<CFixedValueGenerator>(0);
 
                                 bucket->mPriceData->mStoragePrice = GetTieredRateFromSKUId(std::move(storageSKUId));
                                 bucket->mPriceData->mClassAOpPrice = GetTieredRateFromSKUId(std::move(classAOpSKUId));

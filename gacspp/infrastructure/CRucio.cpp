@@ -10,6 +10,8 @@
 #include "CStorageElement.hpp"
 #include "SFile.hpp"
 
+#include "common/utils.hpp"
+
 #include "third_party/nlohmann/json.hpp"
 
 #define NUM_REPEAR_THREADS 1
@@ -303,7 +305,9 @@ bool CRucio::LoadConfig(const json& config)
                             const bool duplicates = storageElementJson.contains("allowDuplicateReplicas") ? storageElementJson["allowDuplicateReplicas"].get<bool>() : false;
                             CStorageElement* se = site->CreateStorageElement(std::move(name), duplicates, quota);
                             if(se && storageElementJson.contains("accessLatency"))
-                               se->mAccessLatency = storageElementJson["accessLatency"].get<TickType>();
+                                se->mAccessLatency = IValueGenerator::CreateFromJson(storageElementJson.at("accessLatency"));
+                            else
+                               se->mAccessLatency = std::make_unique<CFixedValueGenerator>(0);
                         }
                     }
                     else if ((siteJsonKey == "name") || (siteJsonKey == "location") || (siteJsonKey == "multiLocationIdx"))

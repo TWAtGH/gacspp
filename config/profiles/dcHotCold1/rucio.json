@@ -12,7 +12,12 @@
                 {
                     "name": "SITE-1_DATATAPE",
                     "allowDuplicateReplicas": false,
-                    "accessLatency": 1800
+                    "accessLatency": {
+                        "type": "normal",
+                        "mean": 1800,
+                        "stddev": 900,
+                        "minCfg": {"type": "minClip", "limit": 0}
+                    }
                 },
                 {
                     "name": "SITE-1_DATADISK",
@@ -37,7 +42,12 @@
                 {
                     "name": "SITE-2_DATATAPE",
                     "allowDuplicateReplicas": false,
-                    "accessLatency": 1800
+                    "accessLatency": {
+                        "type": "normal",
+                        "mean": 1800,
+                        "stddev": 900,
+                        "minCfg": {"type": "minClip", "limit": 0}
+                    }
                 },
                 {
                     "name": "SITE-2_DATADISK",

@@ -44,6 +44,7 @@ public:
 public:
     auto GetStorageElementByName(const std::string& name) const -> CStorageElement*;
 
+    static IBaseSim* Sim;
 protected:
     bool mIsRunning = false;
     ScheduleType mSchedule;

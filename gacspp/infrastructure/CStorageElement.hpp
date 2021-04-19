@@ -61,7 +61,7 @@ public:
 
     std::vector<IStorageElementActionListener*> mActionListener;
 
-    TickType mAccessLatency = 0;
+    std::unique_ptr<class IValueGenerator> mAccessLatency;
     
 private:
     IdType mId;
