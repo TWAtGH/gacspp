@@ -2,7 +2,6 @@
 #include <iostream>
 
 #include "CTestSim.hpp"
-#include "CDeterministicSim01.hpp"
 
 #include "common/CConfigManager.hpp"
 
@@ -136,6 +135,5 @@ int main(int argc, char** argv)
     const auto runTime = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - startTime);
     std::cout<<"Simulation took "<<runTime.count()<<"s"<<std::endl;
 
-    int a;
-    std::cin >> a;
+    return 0;
 }

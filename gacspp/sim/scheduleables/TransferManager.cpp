@@ -107,7 +107,7 @@ CTransferManager::CTransferManager(TickType tickFreq, TickType startTick)
     : CBaseTransferManager(startTick),
       mTickFreq(tickFreq)
 {
-    mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Transfers(id, srcStorageElementId, dstStorageElementId, fileId, srcReplicaId, dstReplicaId, queuedAt, startedAt, finishedAt, accessLatency, traffic) FROM STDIN with(FORMAT csv);", 10, '?');
+    mOutputTransferInsertQuery = COutput::GetRef().CreatePreparedInsert("COPY Transfers(id, srcStorageElementId, dstStorageElementId, fileId, srcReplicaId, dstReplicaId, queuedAt, startedAt, finishedAt, accessLatency, traffic) FROM STDIN with(FORMAT csv);", 11, '?');
 }
 
 void CTransferManager::CreateTransfer(SReplica* srcReplica, SReplica* dstReplica, TickType now, bool deleteSrcReplica)
