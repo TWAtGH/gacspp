@@ -160,25 +160,20 @@ void CTransferManager::OnUpdate(TickType now)
             networkLink->mNumActiveTransfers += 1;
             networkLink->GetSrcStorageElement()->OnOperation(CStorageElement::GET);
 
-            mActiveTransfers.emplace_back(std::move(curTransfer));
+            mActiveTransfers.emplace(curTransfer->mStartAt, std::move(curTransfer));
 
             numToCreate -= 1;
             queuedTransfers.pop_front();
         }
     }
 
-    std::size_t idx = 0;
     std::unique_ptr<IInsertValuesContainer> transferInsertQueries = mOutputTransferInsertQuery->CreateValuesContainer(7 + mActiveTransfers.size());
 
-    while (idx < mActiveTransfers.size())
+    std::multimap<TickType, std::unique_ptr<STransfer>>::iterator transferIt = mActiveTransfers.begin();
+    while((transferIt != mActiveTransfers.end()) && (transferIt->first <= now))
     {
-        std::unique_ptr<STransfer>& transfer = mActiveTransfers[idx];
+        std::unique_ptr<STransfer>& transfer = transferIt->second;
         
-        if(transfer->mStartAt >= now)
-        {
-            ++idx;
-            continue;
-        }
         SReplica* srcReplica = transfer->mSrcReplica;
         SReplica* dstReplica = transfer->mDstReplica;
         CNetworkLink* networkLink = transfer->mNetworkLink;
@@ -187,9 +182,8 @@ void CTransferManager::OnUpdate(TickType now)
         {
             networkLink->mNumFailedTransfers += 1;
             networkLink->mNumActiveTransfers -= 1;
-            transfer = std::move(mActiveTransfers.back());
-            mActiveTransfers.pop_back();
-            continue; // handle same idx again
+            transferIt = mActiveTransfers.erase(transferIt);
+            continue;
         }
 
         SpaceType amount;
@@ -234,8 +228,7 @@ void CTransferManager::OnUpdate(TickType now)
 
             bool deleteSrc = transfer->mDeleteSrcReplica;
 
-            transfer = std::move(mActiveTransfers.back());
-            mActiveTransfers.pop_back();
+            transferIt = mActiveTransfers.erase(transferIt);
 
             if (deleteSrc)
             {
@@ -243,9 +236,9 @@ void CTransferManager::OnUpdate(TickType now)
                 srcReplica->GetStorageElement()->RemoveReplica(srcReplica, now, false);
             }
 
-            continue; // handle same idx again
+            continue;
         }
-        ++idx;
+        ++transferIt;
     }
 
     COutput::GetRef().QueueInserts(std::move(transferInsertQueries));

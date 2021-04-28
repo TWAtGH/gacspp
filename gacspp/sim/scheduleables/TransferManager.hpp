@@ -2,6 +2,7 @@
 
 #include <forward_list>
 #include <list>
+#include <map>
 #include <unordered_map>
 
 #include "CScheduleable.hpp"
@@ -64,7 +65,7 @@ private:
         bool PreRemoveReplica(SReplica* replica, TickType now) override;
     };
 
-    std::vector<std::unique_ptr<STransfer>> mActiveTransfers;
+    std::multimap<TickType, std::unique_ptr<STransfer>> mActiveTransfers;
     std::unordered_map<CNetworkLink*, std::list<std::unique_ptr<STransfer>>> mQueuedTransfers;
 
 public:
