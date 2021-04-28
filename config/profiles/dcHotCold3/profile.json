@@ -26,7 +26,8 @@
             "fileSizeCfg": {
                 "type": "exponential",
                 "lambda": 0.026,
-                "minCfg": {"type": "minAdd", "limit": 0.009765625}
+                "minCfg": {"type": "minAdd", "limit": 0.009765625},
+                "maxCfg": {"type": "maxModulo", "limit": 134.0}
             },
             "lifetimeCfg": {
                 "type": "fixed",
@@ -45,7 +46,8 @@
             "fileSizeCfg": {
                 "type": "exponential",
                 "lambda": 0.026,
-                "minCfg": {"type": "minAdd", "limit": 0.009765625}
+                "minCfg": {"type": "minAdd", "limit": 0.009765625},
+                "maxCfg": {"type": "maxModulo", "limit": 134.0}
             },
             "lifetimeCfg": {
                 "type": "fixed",

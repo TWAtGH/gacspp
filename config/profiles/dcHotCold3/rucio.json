@@ -16,7 +16,8 @@
                             "type": "normal",
                             "mean": 1800,
                             "stddev": 900,
-                            "minCfg": {"type": "minClip", "limit": 0}
+                            "minCfg": {"type": "minAdd", "limit": 0},
+                            "maxCfg": {"type": "maxModulo", "limit": 5400}
                         }
                     },
                     {
@@ -47,7 +48,8 @@
                             "type": "normal",
                             "mean": 1800,
                             "stddev": 900,
-                            "minCfg": {"type": "minClip", "limit": 0}
+                            "minCfg": {"type": "minAdd", "limit": 0},
+                            "maxCfg": {"type": "maxModulo", "limit": 5400}
                         }
                     },
                     {
