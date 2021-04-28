@@ -73,7 +73,7 @@ namespace gcp
     public:
         using ISite::ISite;
 
-        auto CreateStorageElement(std::string&& name, bool allowDuplicateReplicas = false, SpaceType quota = 0) -> CBucket* final;
+        auto CreateStorageElement(std::string&& name, bool allowDuplicateReplicas = false, SpaceType limit = 0) -> CBucket* final;
         auto GetStorageElements() const -> std::vector<CStorageElement*> final;
 
         auto CalculateStorageCosts(TickType now) -> double;

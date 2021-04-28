@@ -23,7 +23,7 @@ public:
     virtual ~CGridSite();
 
 
-    auto CreateStorageElement(std::string&& name, bool allowDuplicateReplicas = false, SpaceType quota = 0) -> CStorageElement*;
+    auto CreateStorageElement(std::string&& name, bool allowDuplicateReplicas = false, SpaceType limit = 0) -> CStorageElement*;
     auto GetStorageElements() const -> std::vector<CStorageElement*> override;
 
     std::vector<std::unique_ptr<CStorageElement>> mStorageElements;

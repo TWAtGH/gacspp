@@ -304,25 +304,8 @@ std::discrete_distribution<std::size_t> CHotColdStorageTransferGen::GetPopularit
 
 void CHotColdStorageTransferGen::QueueHotReplicasDeletion(SSiteInfo& siteInfo, SReplica* replica, TickType expireAt)
 {
-    std::list<std::pair<TickType, std::vector<SReplica*>>>& queue = siteInfo.mHotReplicasDeletionQueue;
+    siteInfo.mHotReplicasDeletionQueue[expireAt].emplace_back(replica);
     siteInfo.mHotReplicaDeletions.insert(replica);
-    auto it = queue.end();
-    while(it != queue.begin())
-    {
-        --it;
-        if(it->first < expireAt)
-        {
-            ++it;
-            queue.insert(it, {expireAt, std::vector<SReplica*>{replica}});
-            return;
-        }
-        else if(it->first == expireAt)
-        {
-            it->second.emplace_back(replica);
-            return;
-        }
-    }
-    queue.push_front({expireAt, std::vector<SReplica*>{replica}});
 }
 
 void CHotColdStorageTransferGen::PrepareProductionCampaign(SSiteInfo& siteInfo, TickType now)
@@ -397,12 +380,14 @@ void CHotColdStorageTransferGen::UpdateProductionCampaign(SSiteInfo& siteInfo, T
 
         CStorageElement* hotStorageElement = siteInfo.mColdToHotLink->GetDstStorageElement();
         CStorageElement* coldStorageElement = siteInfo.mColdToHotLink->GetSrcStorageElement();
-        std::list<std::pair<TickType, std::vector<SReplica*>>>& queue = siteInfo.mHotReplicasDeletionQueue;
         
-        while(!queue.empty() && (queue.front().first <= now))
+        std::map<TickType, std::vector<SReplica*>>& queue = siteInfo.mHotReplicasDeletionQueue;
+        std::map<TickType, std::vector<SReplica*>>::iterator queueIt = queue.begin();
+        const std::map<TickType, std::vector<SReplica*>>::iterator expiredEntries = queue.lower_bound(now + 1);
+        for(; queueIt != expiredEntries; ++queueIt)
         {
-            assert(!queue.front().second.empty());
-            for(SReplica* replica : queue.front().second)
+            assert(!queueIt->second.empty());
+            for(SReplica* replica : queueIt->second)
             {
                 SFile* file = replica->GetFile();
                 
@@ -426,8 +411,9 @@ void CHotColdStorageTransferGen::UpdateProductionCampaign(SSiteInfo& siteInfo, T
                     hotStorageElement->RemoveReplica(replica, now);
                 }
             }
-            queue.pop_front();
         }
+
+        queue.erase(queue.begin(), expiredEntries);
     }
     
     {
@@ -494,25 +480,34 @@ void CHotColdStorageTransferGen::UpdateQueuedJobs(SSiteInfo& siteInfo, TickType 
 {
     (void)now;
     JobInfoList& queuedJobs = siteInfo.mQueuedJobs;
-    JobInfoList& activeJobs = siteInfo.mActiveJobs;
-    std::size_t numTotalJobs = activeJobs.size() + siteInfo.mNumRunningJobs;
+    JobInfoList& newJobs = siteInfo.mNewJobs;
 
-    while(!queuedJobs.empty() && (numTotalJobs < siteInfo.mNumCores))
+    assert(siteInfo.mNumCores >= siteInfo.mNumJobs);
+    std::size_t numJobsToActivate = siteInfo.mNumCores - siteInfo.mNumJobs;
+
+    if(numJobsToActivate > queuedJobs.size())
     {
-        assert(queuedJobs.front()->mInputReplica->IsComplete());
-        activeJobs.splice(activeJobs.end(), queuedJobs, queuedJobs.begin());
-        ++numTotalJobs;
+        JobInfoList::iterator queuedJobIt = queuedJobs.begin();
+        while((queuedJobIt != queuedJobs.end()) && (numJobsToActivate > 0))
+        {
+            newJobs.splice(newJobs.end(), queuedJobs, queuedJobIt++);
+            numJobsToActivate -= 1;
+        }
     }
+    else
+        newJobs.splice(newJobs.end(), std::move(queuedJobs));
 }
 
 void CHotColdStorageTransferGen::UpdateActiveJobs(SSiteInfo& siteInfo, TickType now)
 {
     const TickType tDelta = now - mLastUpdateTime;
 
-    std::size_t& numRunningJobs = siteInfo.mNumRunningJobs;
-    std::list<std::pair<TickType, JobInfoList>>& runningJobs = siteInfo.mRunningJobs;
+    std::size_t& numJobs = siteInfo.mNumJobs;
+    std::map<TickType, JobInfoList>& runningJobs = siteInfo.mRunningJobs;
 
-    JobInfoList& activeJobs = siteInfo.mActiveJobs;
+    JobInfoList& newJobs = siteInfo.mNewJobs;
+    JobInfoList& downloadingJobs = siteInfo.mDownloadingJobs;
+    JobInfoList& uploadingJobs = siteInfo.mUploadingJobs;
     
     CNetworkLink* hotToCPULink = siteInfo.mHotToCPULink;
     CNetworkLink* cpuToOutputLink = siteInfo.mCPUToOutputLink;
@@ -523,178 +518,165 @@ void CHotColdStorageTransferGen::UpdateActiveJobs(SSiteInfo& siteInfo, TickType 
     std::unique_ptr<IInsertValuesContainer> jobTraceInsertQueries = mJobTraceInsertQuery->CreateValuesContainer(6 * 30);
     std::unique_ptr<IInsertValuesContainer> outputTraceInsertQueries = mOutputTraceInsertQuery->CreateValuesContainer(9 * 30);
 
-    //first put all completed jobs back into jobInfos
-    while (!runningJobs.empty() && (runningJobs.front().first <= now))
-    {
-        JobInfoList& curRunningJobsList = runningJobs.front().second;
-        assert(numRunningJobs >= curRunningJobsList.size());
-
-        numRunningJobs -= curRunningJobsList.size();
-        activeJobs.splice(activeJobs.end(), curRunningJobsList);
-
-        runningJobs.pop_front();
-    }
 
     //should firstly update all mNumActiveTransfers and then calculate bytesDownloaded/uploaded
     SpaceType bytesDownloaded = (hotToCPULink->mBandwidthBytesPerSecond * tDelta);
     if (!hotToCPULink->mIsThroughput)
         bytesDownloaded /= static_cast<double>(hotToCPULink->mNumActiveTransfers + 1);
 
-    JobInfoList::iterator activeJobIt = activeJobs.begin();
-    while (activeJobIt != activeJobs.end())
+    // update downloading jobs before adding the new jobs
+    JobInfoList::iterator jobIt = downloadingJobs.begin();
+    while(jobIt != downloadingJobs.end())
     {
-        std::unique_ptr<SJobInfo>& job = *activeJobIt;
+        std::unique_ptr<SJobInfo>& job = *jobIt;
         SFile* inputFile = job->mInputFile;
-        std::vector<SReplica*>& outputReplicas = job->mOutputReplicas;
-        if (job->mCurInputFileSize == 0)
+        SpaceType newSize = job->mCurInputFileSize + bytesDownloaded;
+        if (newSize >= inputFile->GetSize())
         {
-            //download just started
-            job->mCurInputFileSize += 1;
-            job->mLastTime = now;
-            hotToCPULink->mNumActiveTransfers += 1;
-            hotToCPULink->GetSrcStorageElement()->OnOperation(CStorageElement::GET);
+            //download completed
+            hotToCPULink->mUsedTraffic += inputFile->GetSize() - job->mCurInputFileSize;
+            hotToCPULink->mNumActiveTransfers -= 1;
+            hotToCPULink->mNumDoneTransfers += 1;
+
+            job->mCurInputFileSize = inputFile->GetSize();
+
+            inputTraceInsertQueries->AddValue(GetNewId());
+            inputTraceInsertQueries->AddValue(job->mJobId);
+            inputTraceInsertQueries->AddValue(hotStorageElement->GetSite()->GetId());
+            inputTraceInsertQueries->AddValue(hotStorageElement->GetId());
+            inputTraceInsertQueries->AddValue(inputFile->GetId());
+            inputTraceInsertQueries->AddValue(job->mInputReplica->GetId());
+            inputTraceInsertQueries->AddValue(job->mLastTime);
+            inputTraceInsertQueries->AddValue(now);
+            inputTraceInsertQueries->AddValue(inputFile->GetSize());
+
+            TickType finishTime = now + (static_cast<TickType>(siteInfo.mJobDurationGen->GetValue(mSim->mRNGEngine)) * 60);
+
+            //insert job trace directly so that jobId of input trace points to a valid jobId
+            jobTraceInsertQueries->AddValue(job->mJobId);
+            jobTraceInsertQueries->AddValue(hotStorageElement->GetSite()->GetId());
+            jobTraceInsertQueries->AddValue(job->mCreatedAt);
+            jobTraceInsertQueries->AddValue(job->mQueuedAt);
+            jobTraceInsertQueries->AddValue(now);
+            jobTraceInsertQueries->AddValue(finishTime);
+
+            job->mLastTime = finishTime;
+
+            //move job from jobInfos list to mRunningJobs while it is 'idling'
+            JobInfoList& runningJobsAtFinishTime = runningJobs[finishTime];
+            runningJobsAtFinishTime.splice(runningJobsAtFinishTime.end(), downloadingJobs, jobIt++);
+            continue;
         }
-        else if (job->mCurInputFileSize < inputFile->GetSize())
+        else
         {
-            //still downloading input
-
-            SpaceType newSize = job->mCurInputFileSize + bytesDownloaded;
-            if (newSize >= inputFile->GetSize())
-            {
-                //download completed
-                hotToCPULink->mUsedTraffic += inputFile->GetSize() - job->mCurInputFileSize;
-                hotToCPULink->mNumActiveTransfers -= 1;
-                hotToCPULink->mNumDoneTransfers += 1;
-
-                job->mCurInputFileSize = inputFile->GetSize();
-                job->mInputReplica->mUsageCounter -= 1;
-
-                if(job->mInputReplica->mUsageCounter == 0 && (hotStorageElement->GetQuota() > 0))
-                    QueueHotReplicasDeletion(siteInfo, job->mInputReplica, now + static_cast<TickType>(inputFile->GetSize()/1000000000.0));
-
-                inputTraceInsertQueries->AddValue(GetNewId());
-                inputTraceInsertQueries->AddValue(job->mJobId);
-                inputTraceInsertQueries->AddValue(hotStorageElement->GetSite()->GetId());
-                inputTraceInsertQueries->AddValue(hotStorageElement->GetId());
-                inputTraceInsertQueries->AddValue(inputFile->GetId());
-                inputTraceInsertQueries->AddValue(job->mInputReplica->GetId());
-                inputTraceInsertQueries->AddValue(job->mLastTime);
-                inputTraceInsertQueries->AddValue(now);
-                inputTraceInsertQueries->AddValue(inputFile->GetSize());
-
-                TickType finishTime = now + (static_cast<TickType>(siteInfo.mJobDurationGen->GetValue(mSim->mRNGEngine)) * 60);
-
-                //insert job trace directly so that jobId of input trace points to a valid jobId
-                jobTraceInsertQueries->AddValue(job->mJobId);
-                jobTraceInsertQueries->AddValue(hotStorageElement->GetSite()->GetId());
-                jobTraceInsertQueries->AddValue(job->mCreatedAt);
-                jobTraceInsertQueries->AddValue(job->mQueuedAt);
-                jobTraceInsertQueries->AddValue(now);
-                jobTraceInsertQueries->AddValue(finishTime);
-
-                job->mLastTime = finishTime;
-
-                //move job from jobInfos list to mRunningJobs while it is 'idling'
-                auto runningJobsIt = runningJobs.end();
-                while (runningJobsIt != runningJobs.begin())
-                {
-                    --runningJobsIt;
-                    if (runningJobsIt->first < finishTime)
-                    {
-                        ++runningJobsIt;
-                        runningJobs.emplace(runningJobsIt, finishTime, JobInfoList{})->second.emplace_back(std::move(job));
-                        break;
-                    }
-                    else if (runningJobsIt->first == finishTime)
-                    {
-                        runningJobsIt->second.emplace_back(std::move(job));
-                        break;
-                    }
-                }
-
-                if (runningJobsIt == runningJobs.begin())
-                    runningJobs.emplace_front(finishTime, JobInfoList{}).second.emplace_back(std::move(job));
-
-                activeJobIt = activeJobs.erase(activeJobIt);
-                numRunningJobs += 1;
-                continue;
-            }
-            else
-            {
-                hotToCPULink->mUsedTraffic += bytesDownloaded;
-                job->mCurInputFileSize = newSize;
-            }
+            hotToCPULink->mUsedTraffic += bytesDownloaded;
+            job->mCurInputFileSize = newSize;
         }
-        else if (outputReplicas.empty() && (now >= job->mLastTime))
-        {
-            //no upload created yet but job finished
-            job->mLastTime = now;
-
-            //create upload
-            //todo: consider cpuToOutputLink->mMaxNumActiveTransfers
-            std::size_t numOutputReplicas = siteInfo.mNumOutputGen->GetValue(mSim->mRNGEngine);
-            for (; numOutputReplicas > 0; --numOutputReplicas)
-            {
-                SpaceType size = static_cast<SpaceType>(GiB_TO_BYTES(siteInfo.mOutputSizeGen->GetValue(mSim->mRNGEngine)));
-                SFile* outputFile = mSim->mRucio->CreateFile(size, now, SECONDS_PER_MONTH * 12);
-                outputReplicas.emplace_back(cpuToOutputLink->GetDstStorageElement()->CreateReplica(outputFile, now));
-                outputReplicas.back()->mUsageCounter += 1;
-                cpuToOutputLink->mNumActiveTransfers += 1;
-                cpuToOutputLink->GetSrcStorageElement()->OnOperation(CStorageElement::GET);
-                assert(outputReplicas.back());
-            }
-        }
-        else if (!outputReplicas.empty())
-        {
-            //update uploads
-            SpaceType bytesUploaded = (cpuToOutputLink->mBandwidthBytesPerSecond * tDelta);
-            if(!cpuToOutputLink->mIsThroughput)
-                bytesUploaded /= static_cast<double>(cpuToOutputLink->mNumActiveTransfers + 1);
-            
-            std::size_t idx = 0;
-            while (idx < outputReplicas.size())
-            {
-                SReplica* outputReplica = outputReplicas[idx];
-
-                const SpaceType amount = outputReplica->Increase(bytesUploaded, now);
-                cpuToOutputLink->mUsedTraffic += amount;
-
-                if (outputReplica->IsComplete())
-                {
-                    outputReplica->mUsageCounter -= 1;
-                    cpuToOutputLink->mNumActiveTransfers -= 1;
-                    cpuToOutputLink->mNumDoneTransfers += 1;
-
-                    outputTraceInsertQueries->AddValue(GetNewId());
-                    outputTraceInsertQueries->AddValue(job->mJobId);
-                    outputTraceInsertQueries->AddValue(outputReplica->GetStorageElement()->GetSite()->GetId());
-                    outputTraceInsertQueries->AddValue(outputReplica->GetStorageElement()->GetId());
-                    outputTraceInsertQueries->AddValue(outputReplica->GetFile()->GetId());
-                    outputTraceInsertQueries->AddValue(outputReplica->GetId());
-                    outputTraceInsertQueries->AddValue(job->mLastTime);
-                    outputTraceInsertQueries->AddValue(now);
-                    outputTraceInsertQueries->AddValue(outputReplica->GetFile()->GetSize());
-
-                    //workaround to reduce memory load/output file not needed after trace is stored
-                    mSim->mRucio->RemoveFile(outputReplica->GetFile(), now);
-
-                    outputReplicas[idx] = outputReplicas.back();
-                    outputReplicas.pop_back();
-
-                    continue;
-                }
-                ++idx;
-            }
-
-            if (outputReplicas.empty())
-            {
-                activeJobIt = activeJobs.erase(activeJobIt);
-                continue;
-            }
-        }
-        activeJobIt++;
+        ++jobIt;
     }
+
+
+    // add new jobs
+    hotToCPULink->mNumActiveTransfers += newJobs.size();
+    numJobs += newJobs.size();
+    hotToCPULink->mNumActiveTransfers += newJobs.size();
+    for(std::unique_ptr<SJobInfo>& job : newJobs)
+    {
+        //download just started
+        job->mLastTime = now;
+        hotToCPULink->GetSrcStorageElement()->OnOperation(CStorageElement::GET);
+    }
+    downloadingJobs.splice(downloadingJobs.end(), std::move(newJobs));
+
+
+    // put finished jobs to uploading state
+    {
+        std::map<TickType, JobInfoList>::iterator runningJobsIt = runningJobs.begin();
+        while((runningJobsIt != runningJobs.end()) && (runningJobsIt->first <= now))
+        {
+            // create unlock input and create output
+            for(std::unique_ptr<SJobInfo>& job : runningJobsIt->second)
+            {
+                std::vector<SReplica*>& outputReplicas = job->mOutputReplicas;
+                job->mLastTime = now;
+
+                // unlock input replica at hot storage
+                job->mInputReplica->mUsageCounter -= 1;
+                if(job->mInputReplica->mUsageCounter == 0 && (hotStorageElement->GetLimit() > 0))
+                    QueueHotReplicasDeletion(siteInfo, job->mInputReplica, now + static_cast<TickType>(job->mInputFile->GetSize()/1000000000.0));
+
+                //todo: consider cpuToOutputLink->mMaxNumActiveTransfers
+                std::size_t numOutputReplicas = siteInfo.mNumOutputGen->GetValue(mSim->mRNGEngine);
+                cpuToOutputLink->mNumActiveTransfers += numOutputReplicas;
+                for (; numOutputReplicas > 0; --numOutputReplicas)
+                {
+                    const SpaceType size = static_cast<SpaceType>(GiB_TO_BYTES(siteInfo.mOutputSizeGen->GetValue(mSim->mRNGEngine)));
+                    SFile* outputFile = mSim->mRucio->CreateFile(size, now, SECONDS_PER_MONTH * 12);
+                    outputReplicas.emplace_back(cpuToOutputLink->GetDstStorageElement()->CreateReplica(outputFile, now));
+                    outputReplicas.back()->mUsageCounter += 1;
+                    cpuToOutputLink->GetSrcStorageElement()->OnOperation(CStorageElement::GET);
+                    assert(outputReplicas.back());
+                }
+            }
+            uploadingJobs.splice(uploadingJobs.end(), std::move(runningJobsIt->second));
+            ++runningJobsIt;
+        }
+        runningJobs.erase(runningJobs.begin(), runningJobsIt);
+    }
+
+
+    // update uploads
+    SpaceType bytesUploaded = (cpuToOutputLink->mBandwidthBytesPerSecond * tDelta);
+    if(!cpuToOutputLink->mIsThroughput)
+        bytesUploaded /= static_cast<double>(cpuToOutputLink->mNumActiveTransfers + 1);
     
+    jobIt = uploadingJobs.begin();
+    while(jobIt != uploadingJobs.end())
+    {
+        std::unique_ptr<SJobInfo>& job = *jobIt;
+        std::vector<SReplica*>& outputReplicas = job->mOutputReplicas;
+        std::size_t idx = 0;
+        while (idx < outputReplicas.size())
+        {
+            SReplica* outputReplica = outputReplicas[idx];
+
+            const SpaceType amount = outputReplica->Increase(bytesUploaded, now);
+            cpuToOutputLink->mUsedTraffic += amount;
+
+            if (outputReplica->IsComplete())
+            {
+                outputReplica->mUsageCounter -= 1;
+                cpuToOutputLink->mNumActiveTransfers -= 1;
+                cpuToOutputLink->mNumDoneTransfers += 1;
+
+                outputTraceInsertQueries->AddValue(GetNewId());
+                outputTraceInsertQueries->AddValue(job->mJobId);
+                outputTraceInsertQueries->AddValue(outputReplica->GetStorageElement()->GetSite()->GetId());
+                outputTraceInsertQueries->AddValue(outputReplica->GetStorageElement()->GetId());
+                outputTraceInsertQueries->AddValue(outputReplica->GetFile()->GetId());
+                outputTraceInsertQueries->AddValue(outputReplica->GetId());
+                outputTraceInsertQueries->AddValue(job->mLastTime);
+                outputTraceInsertQueries->AddValue(now);
+                outputTraceInsertQueries->AddValue(outputReplica->GetFile()->GetSize());
+
+                //workaround to reduce memory load/output file not needed after trace is stored
+                mSim->mRucio->RemoveFile(outputReplica->GetFile(), now);
+
+                outputReplicas[idx] = outputReplicas.back();
+                outputReplicas.pop_back();
+
+                continue;
+            }
+            ++idx;
+        }
+
+        if (outputReplicas.empty())
+        {
+            numJobs -= 1;
+            jobIt = uploadingJobs.erase(jobIt);
+        }
+    }
+
     COutput::GetRef().QueueInserts(std::move(inputTraceInsertQueries));
     COutput::GetRef().QueueInserts(std::move(jobTraceInsertQueries));
     //COutput::GetRef().QueueInserts(std::move(outputTraceInsertQueries)); //dont write output traces to DB for now
@@ -1133,7 +1115,7 @@ void CJobIOTransferGen::OnUpdate(TickType now)
             numJobsToCreate -= 1;
         }
 
-        if(diskSE->GetUsedStorageQuotaRatio() <= siteInfo.mDiskQuotaThreshold)
+        if(diskSE->GetUsedStorageLimitRatio() <= siteInfo.mDiskLimitThreshold)
         {
             //if storage on diskSE available create transfers from cloudSE to diskSE
             assert(cloudToDiskLink->mMaxNumActiveTransfers >= cloudToDiskLink->mNumActiveTransfers);

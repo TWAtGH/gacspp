@@ -119,17 +119,20 @@ public:
 
         //hot replicas that will be deleted after their transfer to cold storage is done
         std::unordered_set<SReplica*> mHotReplicaDeletions;
-        std::list<std::pair<TickType, std::vector<SReplica*>>> mHotReplicasDeletionQueue;
+        std::map<TickType, std::vector<SReplica*>> mHotReplicasDeletionQueue;
 
         JobInfoList mWaitingJobs;
         std::unordered_map <SReplica*, JobInfoList> mTransferringJobs;
         JobInfoList mQueuedJobs;
-        JobInfoList mActiveJobs;
-        std::list<std::pair<TickType, JobInfoList>> mRunningJobs;
+
+        JobInfoList mNewJobs;
+        JobInfoList mDownloadingJobs;
+        std::map<TickType, JobInfoList> mRunningJobs;
+        JobInfoList mUploadingJobs;
 
         std::unordered_map <SFile*, std::vector<JobInfoList::iterator>> mWaitingForSameFile;
 
-        std::size_t mNumRunningJobs = 0;
+        std::size_t mNumJobs = 0;
         double mNumJobSubmissionAccu = 0;
     };
 
@@ -238,7 +241,7 @@ public:
         std::list<std::unique_ptr<SJobInfo>> mActiveJobs;
         std::list<std::pair<TickType, std::list<std::unique_ptr<SJobInfo>>>> mRunningJobs;
         std::size_t mNumRunningJobs = 0;
-        double mDiskQuotaThreshold = 0.0;
+        double mDiskLimitThreshold = 0.0;
     };
     std::vector<SSiteInfo> mSiteInfos;
 

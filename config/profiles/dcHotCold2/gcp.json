@@ -11,7 +11,7 @@
         "buckets": [
           {
             "name": "google_eu",
-            "quota": 1,
+            "limit": 1,
             "allowDuplicateReplicas": false,
     		    "storageSKUId": "EC40-8747-D6FF",
     		    "classAOpSKUId": "9ADA-9AED-1B24",

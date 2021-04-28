@@ -12,9 +12,9 @@
 #include "output/COutput.hpp"
 
 
-IStorageElementDelegate::IStorageElementDelegate(CStorageElement* storageElement, SpaceType quota)
+IStorageElementDelegate::IStorageElementDelegate(CStorageElement* storageElement, SpaceType limit)
     : mStorageElement(storageElement),
-      mQuota(quota)
+      mLimit(limit)
 {}
 
 IStorageElementDelegate::~IStorageElementDelegate() = default;
@@ -28,7 +28,7 @@ void CBaseStorageElementDelegate::OnOperation(CStorageElement::OPERATION op)
 
 auto CBaseStorageElementDelegate::CreateReplica(SFile* file, TickType now) -> SReplica*
 {
-    if(mQuota > 0 && (mUsedStorage + mAllocatedStorage + file->GetSize()) > mQuota)
+    if(mLimit > 0 && (mUsedStorage + mAllocatedStorage + file->GetSize()) > mLimit)
         return nullptr;
 
     mAllocatedStorage += file->GetSize();
@@ -102,15 +102,15 @@ auto CUniqueReplicaStorageElementDelegate::CreateReplica(SFile* file, TickType n
 
 
 
-CStorageElement::CStorageElement(std::string&& name, ISite* site, bool allowDuplicateReplicas, SpaceType quota)
+CStorageElement::CStorageElement(std::string&& name, ISite* site, bool allowDuplicateReplicas, SpaceType limit)
     : mId(GetNewId()),
       mName(std::move(name)),
       mSite(site)
 {
     if(allowDuplicateReplicas)
-        mDelegate.reset(new CBaseStorageElementDelegate(this, quota));
+        mDelegate.reset(new CBaseStorageElementDelegate(this, limit));
     else
-        mDelegate.reset(new CUniqueReplicaStorageElementDelegate(this, quota));
+        mDelegate.reset(new CUniqueReplicaStorageElementDelegate(this, limit));
 }
 
 void CStorageElement::OnOperation(OPERATION op)
@@ -177,11 +177,11 @@ auto CStorageElement::GetUsedStorage() const -> SpaceType
 auto CStorageElement::GetAllocatedStorage() const->SpaceType
 {return mDelegate->GetAllocatedStorage();}
 
-auto CStorageElement::GetQuota() const -> SpaceType
-{return mDelegate->GetQuota();}
+auto CStorageElement::GetLimit() const -> SpaceType
+{return mDelegate->GetLimit();}
 
-auto CStorageElement::GetUsedStorageQuotaRatio() const -> double
-{return mDelegate->GetUsedStorageQuotaRatio();}
+auto CStorageElement::GetUsedStorageLimitRatio() const -> double
+{return mDelegate->GetUsedStorageLimitRatio();}
 
 bool CStorageElement::CanStoreVolume(SpaceType volume) const
 {return mDelegate->CanStoreVolume(volume);}

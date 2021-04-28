@@ -141,9 +141,9 @@ auto CReaper::RunReaper(std::vector<std::unique_ptr<SFile>>& files, TickType now
 
 CGridSite::~CGridSite() = default;
 
-auto CGridSite::CreateStorageElement(std::string&& name, bool allowDuplicateReplicas, SpaceType quota) -> CStorageElement*
+auto CGridSite::CreateStorageElement(std::string&& name, bool allowDuplicateReplicas, SpaceType limit) -> CStorageElement*
 {
-    mStorageElements.emplace_back(std::make_unique<CStorageElement>(std::move(name), this, allowDuplicateReplicas, quota));
+    mStorageElements.emplace_back(std::make_unique<CStorageElement>(std::move(name), this, allowDuplicateReplicas, limit));
     return mStorageElements.back().get();
 }
 
@@ -301,9 +301,9 @@ bool CRucio::LoadConfig(const json& config)
                                 continue;
                             }
 
-                            const SpaceType quota = storageElementJson.contains("quota") ? storageElementJson["quota"].get<SpaceType>() : 0;
+                            const SpaceType limit = storageElementJson.contains("limit") ? storageElementJson["limit"].get<SpaceType>() : 0;
                             const bool duplicates = storageElementJson.contains("allowDuplicateReplicas") ? storageElementJson["allowDuplicateReplicas"].get<bool>() : false;
-                            CStorageElement* se = site->CreateStorageElement(std::move(name), duplicates, quota);
+                            CStorageElement* se = site->CreateStorageElement(std::move(name), duplicates, limit);
                             if(se && storageElementJson.contains("accessLatency"))
                                 se->mAccessLatency = IValueGenerator::CreateFromJson(storageElementJson.at("accessLatency"));
                             else

@@ -30,7 +30,7 @@ public:
         CUSTOM
     };
 
-    CStorageElement(std::string&& name, ISite* site, bool allowDuplicateReplicas = false, SpaceType quota = 0);
+    CStorageElement(std::string&& name, ISite* site, bool allowDuplicateReplicas = false, SpaceType limit = 0);
 
     virtual void OnOperation(OPERATION op);
 
@@ -55,8 +55,8 @@ public:
 
     auto GetUsedStorage() const->SpaceType;
     auto GetAllocatedStorage() const->SpaceType;
-    auto GetQuota() const -> SpaceType;
-    auto GetUsedStorageQuotaRatio() const -> double;
+    auto GetLimit() const -> SpaceType;
+    auto GetUsedStorageLimitRatio() const -> double;
     bool CanStoreVolume(SpaceType volume) const;
 
     std::vector<IStorageElementActionListener*> mActionListener;
@@ -81,7 +81,7 @@ protected:
 class IStorageElementDelegate
 {
 public:
-    IStorageElementDelegate(CStorageElement* storageElement, SpaceType quota = 0);
+    IStorageElementDelegate(CStorageElement* storageElement, SpaceType limit = 0);
 
     IStorageElementDelegate(IStorageElementDelegate&&) = delete;
     IStorageElementDelegate& operator=(IStorageElementDelegate&&) = delete;
@@ -106,19 +106,19 @@ public:
     {return mUsedStorage;}
     inline auto GetAllocatedStorage() const -> SpaceType
     {return mAllocatedStorage;}
-    inline auto GetQuota() const -> SpaceType
-    {return mQuota;}
-    inline auto GetUsedStorageQuotaRatio() const -> double
-    {return (mQuota > 0) ? static_cast<double>(mUsedStorage) / mQuota : 0;}
+    inline auto GetLimit() const -> SpaceType
+    {return mLimit;}
+    inline auto GetUsedStorageLimitRatio() const -> double
+    {return (mLimit > 0) ? static_cast<double>(mUsedStorage) / mLimit : 0;}
     inline bool CanStoreVolume(SpaceType volume) const
-    {return (mQuota > 0) ? ((mUsedStorage + mAllocatedStorage + volume) <= mQuota) : true;}
+    {return (mLimit > 0) ? ((mUsedStorage + mAllocatedStorage + volume) <= mLimit) : true;}
 
 protected:
     std::vector<std::unique_ptr<SReplica>> mReplicas;
     CStorageElement *mStorageElement;
     SpaceType mUsedStorage = 0;
     SpaceType mAllocatedStorage = 0;
-    SpaceType mQuota;
+    SpaceType mLimit;
 };
 
 

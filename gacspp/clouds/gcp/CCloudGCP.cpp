@@ -140,9 +140,9 @@ namespace gcp
 
 
 
-    auto CRegion::CreateStorageElement(std::string&& name, bool allowDuplicateReplicas, SpaceType quota) -> CBucket*
+    auto CRegion::CreateStorageElement(std::string&& name, bool allowDuplicateReplicas, SpaceType limit) -> CBucket*
     {
-        mStorageElements.emplace_back(std::make_unique<CBucket>(std::move(name), this, allowDuplicateReplicas, quota));
+        mStorageElements.emplace_back(std::make_unique<CBucket>(std::move(name), this, allowDuplicateReplicas, limit));
         return mStorageElements.back().get();
     }
 
@@ -357,9 +357,9 @@ namespace gcp
                                     continue;
                                 }
 
-                                const SpaceType quota = bucketJson.contains("quota") ? bucketJson["quota"].get<SpaceType>() : 0;
+                                const SpaceType limit = bucketJson.contains("limit") ? bucketJson["limit"].get<SpaceType>() : 0;
                                 const bool duplicates = bucketJson.contains("allowDuplicateReplicas") ? bucketJson["allowDuplicateReplicas"].get<bool>() : false;
-                                CBucket* bucket = region->CreateStorageElement(std::move(name), duplicates, quota);
+                                CBucket* bucket = region->CreateStorageElement(std::move(name), duplicates, limit);
                                 
                                 if(bucket && bucketJson.contains("accessLatency"))
                                     bucket->mAccessLatency = IValueGenerator::CreateFromJson(bucketJson.at("accessLatency"));
