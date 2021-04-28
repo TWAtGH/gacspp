@@ -466,9 +466,9 @@ void CHotColdStorageTransferGen::UpdateWaitingJobs(SSiteInfo& siteInfo, TickType
         auto findResult = waitingForSameFile.find(file);
         JobInfoList& transferringList = transferringJobs.emplace(newReplica, JobInfoList()).first->second;
         assert(findResult != waitingForSameFile.end());
+        newReplica->mUsageCounter += findResult->second.size();
         for (JobInfoList::iterator& it : findResult->second)
         {
-            newReplica->mUsageCounter += 1;
             (*it)->mInputReplica = newReplica;
             transferringList.splice(transferringList.end(), waitingJobs, it);
         }
@@ -485,7 +485,7 @@ void CHotColdStorageTransferGen::UpdateQueuedJobs(SSiteInfo& siteInfo, TickType 
     assert(siteInfo.mNumCores >= siteInfo.mNumJobs);
     std::size_t numJobsToActivate = siteInfo.mNumCores - siteInfo.mNumJobs;
 
-    if(numJobsToActivate > queuedJobs.size())
+    if(numJobsToActivate < queuedJobs.size())
     {
         JobInfoList::iterator queuedJobIt = queuedJobs.begin();
         while((queuedJobIt != queuedJobs.end()) && (numJobsToActivate > 0))
@@ -494,7 +494,7 @@ void CHotColdStorageTransferGen::UpdateQueuedJobs(SSiteInfo& siteInfo, TickType 
             numJobsToActivate -= 1;
         }
     }
-    else
+    else if(numJobsToActivate > 0)
         newJobs.splice(newJobs.end(), std::move(queuedJobs));
 }
 
@@ -503,10 +503,10 @@ void CHotColdStorageTransferGen::UpdateActiveJobs(SSiteInfo& siteInfo, TickType 
     const TickType tDelta = now - mLastUpdateTime;
 
     std::size_t& numJobs = siteInfo.mNumJobs;
-    std::map<TickType, JobInfoList>& runningJobs = siteInfo.mRunningJobs;
 
     JobInfoList& newJobs = siteInfo.mNewJobs;
     JobInfoList& downloadingJobs = siteInfo.mDownloadingJobs;
+    std::map<TickType, JobInfoList>& runningJobs = siteInfo.mRunningJobs;
     JobInfoList& uploadingJobs = siteInfo.mUploadingJobs;
     
     CNetworkLink* hotToCPULink = siteInfo.mHotToCPULink;
@@ -530,7 +530,7 @@ void CHotColdStorageTransferGen::UpdateActiveJobs(SSiteInfo& siteInfo, TickType 
     {
         std::unique_ptr<SJobInfo>& job = *jobIt;
         SFile* inputFile = job->mInputFile;
-        SpaceType newSize = job->mCurInputFileSize + bytesDownloaded;
+        const SpaceType newSize = job->mCurInputFileSize + bytesDownloaded;
         if (newSize >= inputFile->GetSize())
         {
             //download completed
@@ -603,7 +603,7 @@ void CHotColdStorageTransferGen::UpdateActiveJobs(SSiteInfo& siteInfo, TickType 
                 // unlock input replica at hot storage
                 job->mInputReplica->mUsageCounter -= 1;
                 if(job->mInputReplica->mUsageCounter == 0 && (hotStorageElement->GetLimit() > 0))
-                    QueueHotReplicasDeletion(siteInfo, job->mInputReplica, now + static_cast<TickType>(job->mInputFile->GetSize()/1000000000.0));
+                    QueueHotReplicasDeletion(siteInfo, job->mInputReplica, now + 90 + static_cast<TickType>(job->mInputFile->GetSize()/MiB_TO_BYTES(500.0)));
 
                 //todo: consider cpuToOutputLink->mMaxNumActiveTransfers
                 std::size_t numOutputReplicas = siteInfo.mNumOutputGen->GetValue(mSim->mRNGEngine);
