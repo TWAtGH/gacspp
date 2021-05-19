@@ -463,8 +463,8 @@ void CHotColdStorageTransferGen::UpdateWaitingJobs(SSiteInfo& siteInfo, TickType
         mTransferMgr->CreateTransfer(srcReplica, newReplica, now);
 
         // move all jobs that have been waiting for this replica into transferring
+        JobInfoList& transferringList = transferringJobs[newReplica];
         auto findResult = waitingForSameFile.find(file);
-        JobInfoList& transferringList = transferringJobs.emplace(newReplica, JobInfoList()).first->second;
         assert(findResult != waitingForSameFile.end());
         newReplica->mUsageCounter += findResult->second.size();
         for (JobInfoList::iterator& it : findResult->second)
@@ -577,7 +577,6 @@ void CHotColdStorageTransferGen::UpdateActiveJobs(SSiteInfo& siteInfo, TickType 
 
 
     // add new jobs
-    hotToCPULink->mNumActiveTransfers += newJobs.size();
     numJobs += newJobs.size();
     hotToCPULink->mNumActiveTransfers += newJobs.size();
     for(std::unique_ptr<SJobInfo>& job : newJobs)
