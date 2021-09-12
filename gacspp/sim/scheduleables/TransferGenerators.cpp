@@ -375,45 +375,10 @@ void CHotColdStorageTransferGen::PrepareProductionCampaign(SSiteInfo& siteInfo, 
 
 void CHotColdStorageTransferGen::UpdateProductionCampaign(SSiteInfo& siteInfo, TickType now)
 {
+    //delete unused expired replicas
     {
         CScopedTimeDiffAdd durationUpdate(mDebugDurations[0].second);
-
-        CStorageElement* hotStorageElement = siteInfo.mColdToHotLink->GetDstStorageElement();
-        CStorageElement* coldStorageElement = siteInfo.mColdToHotLink->GetSrcStorageElement();
-        
-        std::map<TickType, std::vector<SReplica*>>& queue = siteInfo.mHotReplicasDeletionQueue;
-        std::map<TickType, std::vector<SReplica*>>::iterator queueIt = queue.begin();
-        const std::map<TickType, std::vector<SReplica*>>::iterator expiredEntries = queue.lower_bound(now + 1);
-        for(; queueIt != expiredEntries; ++queueIt)
-        {
-            assert(!queueIt->second.empty());
-            for(SReplica* replica : queueIt->second)
-            {
-                SFile* file = replica->GetFile();
-                
-                if (!file->GetReplicaByStorageElement(coldStorageElement))
-                {
-                    SReplica* dstReplica = coldStorageElement->CreateReplica(file, now);
-
-                    //if cold storage is limited and replica could not be created just delete it immediately.
-                    //Another approach would be to free some cold storage
-                    //assert(dstReplica);
-                    if(!dstReplica)
-                    {
-                        CScopedTimeDiffAdd durationUpdate(mDebugDurations[5].second);
-                        hotStorageElement->RemoveReplica(replica, now);
-                    }
-                    else
-                        mTransferMgr->CreateTransfer(replica, dstReplica, now, true);
-                }
-                else
-                {
-                    hotStorageElement->RemoveReplica(replica, now);
-                }
-            }
-        }
-
-        queue.erase(queue.begin(), expiredEntries);
+        UpdatePendingDeletions(siteInfo, now);
     }
     
     {
@@ -434,6 +399,103 @@ void CHotColdStorageTransferGen::UpdateProductionCampaign(SSiteInfo& siteInfo, T
     {
         CScopedTimeDiffAdd durationUpdate(mDebugDurations[4].second);
         SubmitNewJobs(siteInfo, now);
+    }
+}
+
+SpaceType CHotColdStorageTransferGen::DeleteQueuedHotReplicas(SSiteInfo& siteInfo, TickType now)
+{
+    CStorageElement* hotStorageElement = siteInfo.mColdToHotLink->GetDstStorageElement();
+    CStorageElement* coldStorageElement = siteInfo.mColdToHotLink->GetSrcStorageElement();
+
+    SpaceType requiredSpace = 0;
+    std::map<std::uint32_t, std::forward_list<SReplica*>>& coldReplicasByPopularity = siteInfo.mColdReplicasByPopularity;
+    std::map<TickType, std::vector<SReplica*>>& queue = siteInfo.mHotReplicasDeletionQueue;
+    std::map<TickType, std::vector<SReplica*>>::iterator queueIt = queue.begin();
+    const std::map<TickType, std::vector<SReplica*>>::iterator expiredEntries = queue.lower_bound(now + 1);
+
+    while (queueIt != expiredEntries)
+    {
+        std::vector<SReplica*>& hotReplicasToDelete = queueIt->second;
+        assert(!hotReplicasToDelete.empty());
+
+        for (std::size_t hotReplicaIdx = 0; hotReplicaIdx < hotReplicasToDelete.size();)
+        {
+            SReplica* hotReplica = hotReplicasToDelete[hotReplicaIdx];
+            assert(hotReplica->mUsageCounter == 0);
+
+            SFile* file = hotReplica->GetFile();
+            SReplica* coldStorageReplica = file->GetReplicaByStorageElement(coldStorageElement);
+            if (!coldStorageReplica && coldStorageElement->GetLimit() != 1)
+            {
+                SReplica* dstReplica = coldStorageElement->CreateReplica(file, now);
+
+                if (!dstReplica)
+                {
+                    //if cold storage is limited and replica could not be created free some cold storage
+                    requiredSpace += file->GetSize();
+                    ++hotReplicaIdx;
+                    continue;
+                }
+                else
+                {
+                    //transfer to cold storage prior to deleltion
+                    coldReplicasByPopularity.emplace(std::make_pair(file->mPopularity, std::forward_list<SReplica*>())).first->second.emplace_front(dstReplica);
+                    mTransferMgr->CreateTransfer(hotReplica, dstReplica, now, true);
+                }
+            }
+            else
+            {
+                //cold storage replica exists already or cold storage is not available
+                hotStorageElement->RemoveReplica(hotReplica, now);
+            }
+
+            hotReplicasToDelete[hotReplicaIdx] = hotReplicasToDelete.back();
+            hotReplicasToDelete.pop_back();
+        }
+
+        if (hotReplicasToDelete.empty())
+            queueIt = queue.erase(queueIt);
+        else
+            ++queueIt;
+    }
+
+    return requiredSpace;
+}
+
+void CHotColdStorageTransferGen::UpdatePendingDeletions(SSiteInfo& siteInfo, TickType now)
+{
+    CStorageElement* coldStorageElement = siteInfo.mColdToHotLink->GetSrcStorageElement();
+
+    std::map<std::uint32_t, std::forward_list<SReplica*>>& coldReplicasByPopularity = siteInfo.mColdReplicasByPopularity;
+
+    SpaceType requiredSpace = DeleteQueuedHotReplicas(siteInfo, now) * 1;
+    if (requiredSpace > 0)
+    {
+        auto popularityIt = coldReplicasByPopularity.begin();
+        while (popularityIt != coldReplicasByPopularity.end() && requiredSpace > 0)
+        {
+            std::forward_list<SReplica*>& coldReplicas = popularityIt->second;
+            auto prevReplicaIt = coldReplicas.before_begin();
+            auto curReplicaIt = coldReplicas.begin();
+            while (curReplicaIt != coldReplicas.end() && requiredSpace > 0)
+            {
+                SReplica* coldReplica = *curReplicaIt;
+                if (coldReplica->mUsageCounter != 0)
+                {
+                    ++prevReplicaIt;
+                    ++curReplicaIt;
+                    continue;
+                }
+
+                requiredSpace = (coldReplica->GetCurSize() < requiredSpace) ? (requiredSpace - coldReplica->GetCurSize()) : 0;
+                coldStorageElement->RemoveReplica(coldReplica, now);
+
+                curReplicaIt = coldReplicas.erase_after(prevReplicaIt);
+            }
+            ++popularityIt;
+        }
+
+        DeleteQueuedHotReplicas(siteInfo, now);
     }
 }
 

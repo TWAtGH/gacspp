@@ -44,6 +44,8 @@ Debug/
 Release/
 *.sln
 *.vcxproj*
+*.ilk
+*.pdb
 
 # db connection
 config/psql_connection.json

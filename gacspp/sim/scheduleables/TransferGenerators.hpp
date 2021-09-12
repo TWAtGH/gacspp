@@ -116,6 +116,7 @@ public:
         // runtime data / initialised automatically / book keeping
         std::vector<std::vector<SFile*>> mArchiveFilesPerPopularity;
         std::map<std::uint32_t, SIndexedReplicas> mHotReplicasByPopularity;
+        std::map<std::uint32_t, std::forward_list<SReplica*>>  mColdReplicasByPopularity;
 
         //hot replicas that will be deleted after their transfer to cold storage is done
         std::unordered_set<SReplica*> mHotReplicaDeletions;
@@ -140,8 +141,10 @@ private:
     std::discrete_distribution<std::size_t> GetPopularityIdxRNG(const SSiteInfo& siteInfo);
 
     void QueueHotReplicasDeletion(SSiteInfo& siteInfo, SReplica* replica, TickType expireAt);
+    SpaceType DeleteQueuedHotReplicas(SSiteInfo& siteInfo, TickType now);
 
     void UpdateProductionCampaign(SSiteInfo& siteInfo, TickType now);
+    void UpdatePendingDeletions(SSiteInfo& siteInfo, TickType now);
     void UpdateWaitingJobs(SSiteInfo& siteInfo, TickType now);
     void UpdateActiveJobs(SSiteInfo& siteInfo, TickType now);
     void UpdateQueuedJobs(SSiteInfo& siteInfo, TickType now);
