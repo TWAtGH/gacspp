@@ -64,93 +64,105 @@
     {
         "manager": {
             "type": "bandwidth",
-            "name": "HotColdTransferMgr",
+            "name": "HCDCTransferMgrS1",
             "tickFreq": 1,
             "startTick": 0
         },
         "generator": {
-            "type": "hotCold",
-            "name": "HotColdTransferGen",
+            "type": "hcdc",
+            "name": "HCDCTransferGenS1",
             "tickFreq": 10,
             "startTick": 0,
-            "infos": [
-                {
-					"archiveStorageElement": "SITE-1_DATATAPE",
-                    "coldStorageElement": "google_eu",
-                    "hotStorageElement": "SITE-1_DATADISK",
-                    "cpuStorageElement": "SITE-1_CPU",
-                    "outputStorageElement": "SITE-1_OUTPUT",
-					
-					"productionStartTime": 0,
-					
-                    "numCores": 20000,
+            "config": {
+				"archiveStorageElement": "SITE-1_DATATAPE",
+				"coldStorageElement": "google_eu",
+				"hotStorageElement": "SITE-1_DATADISK",
+				"cpuStorageElement": "SITE-1_CPU",
+				"outputStorageElement": "SITE-1_OUTPUT",
+				
+				"productionStartTime": 0,
+				
+				"numCores": 20000,
 
-                    "numJobSubmissionCfg": {
-                        "type": "normal",
-                        "mean": 0.6336672,
-                        "stddev": 0.372921618,
-                        "minCfg": {"type": "minClip", "limit": 0}
-                    },
-                    "jobDurationCfg": {
-                        "type": "exponential",
-                        "lambda": 0.004092211,
-                        "minCfg": {"type": "minAdd", "limit": 16.666}
-                    },
-                    "numOutputCfg": {
-                        "type": "fixed",
-                        "value": 1
-                    },
-                    "outputSizeCfg": {
-                        "type": "exponential",
-                        "lambda": 0.6154080364,
-                        "minCfg": {"type": "minAdd", "limit": 0.09}
-                    },
-                    "reusageNumCfg": {
-                        "type": "geometric",
-                        "p": 0.1,
-                        "minCfg": {"type": "minAdd", "limit": 1},
-                        "maxCfg": {"type": "maxModulo", "limit": 49, "invert": false}
-                    }
-                },
-                {
-					"archiveStorageElement": "SITE-2_DATATAPE",
-                    "coldStorageElement": "google_eu",
-                    "hotStorageElement": "SITE-2_DATADISK",
-                    "cpuStorageElement": "SITE-2_CPU",
-                    "outputStorageElement": "SITE-2_OUTPUT",
-					
-					"productionStartTime": 0,
-					
-                    "numCores": 20000,
-                    
-                    "numJobSubmissionCfg": {
-                        "type": "normal",
-                        "mean": 0.6336672,
-                        "stddev": 0.372921618,
-                        "minCfg": {"type": "minClip", "limit": 0}
-                    },
-                    "jobDurationCfg": {
-                        "type": "exponential",
-                        "lambda": 0.004092211,
-                        "minCfg": {"type": "minAdd", "limit": 16.666}
-                    },
-                    "numOutputCfg": {
-                        "type": "fixed",
-                        "value": 1
-                    },
-                    "outputSizeCfg": {
-                        "type": "exponential",
-                        "lambda": 0.6154080364,
-                        "minCfg": {"type": "minAdd", "limit": 0.09}
-                    },
-                    "reusageNumCfg": {
-                        "type": "geometric",
-                        "p": 0.1,
-                        "minCfg": {"type": "minAdd", "limit": 1},
-                        "maxCfg": {"type": "maxModulo", "limit": 49, "invert": false}
-                    }
-                }
-            ]
+				"numJobSubmissionCfg": {
+					"type": "normal",
+					"mean": 0.6336672,
+					"stddev": 0.372921618,
+					"minCfg": {"type": "minClip", "limit": 0}
+				},
+				"jobDurationCfg": {
+					"type": "exponential",
+					"lambda": 0.004092211,
+					"minCfg": {"type": "minAdd", "limit": 16.666}
+				},
+				"numOutputCfg": {
+					"type": "fixed",
+					"value": 1
+				},
+				"outputSizeCfg": {
+					"type": "exponential",
+					"lambda": 0.6154080364,
+					"minCfg": {"type": "minAdd", "limit": 0.09}
+				},
+				"reusageNumCfg": {
+					"type": "geometric",
+					"p": 0.1,
+					"minCfg": {"type": "minAdd", "limit": 1},
+					"maxCfg": {"type": "maxModulo", "limit": 49, "invert": false}
+				}
+			}
+		}
+	},
+	{
+        "manager": {
+            "type": "bandwidth",
+            "name": "HCDCTransferMgrS2",
+            "tickFreq": 1,
+            "startTick": 0
+        },
+        "generator": {
+            "type": "hcdc",
+            "name": "HCDCTransferGenS2",
+            "tickFreq": 10,
+            "startTick": 0,
+            "config": {
+				"archiveStorageElement": "SITE-2_DATATAPE",
+				"coldStorageElement": "google_eu",
+				"hotStorageElement": "SITE-2_DATADISK",
+				"cpuStorageElement": "SITE-2_CPU",
+				"outputStorageElement": "SITE-2_OUTPUT",
+				
+				"productionStartTime": 0,
+				
+				"numCores": 20000,
+				
+				"numJobSubmissionCfg": {
+					"type": "normal",
+					"mean": 0.6336672,
+					"stddev": 0.372921618,
+					"minCfg": {"type": "minClip", "limit": 0}
+				},
+				"jobDurationCfg": {
+					"type": "exponential",
+					"lambda": 0.004092211,
+					"minCfg": {"type": "minAdd", "limit": 16.666}
+				},
+				"numOutputCfg": {
+					"type": "fixed",
+					"value": 1
+				},
+				"outputSizeCfg": {
+					"type": "exponential",
+					"lambda": 0.6154080364,
+					"minCfg": {"type": "minAdd", "limit": 0.09}
+				},
+				"reusageNumCfg": {
+					"type": "geometric",
+					"p": 0.1,
+					"minCfg": {"type": "minAdd", "limit": 1},
+					"maxCfg": {"type": "maxModulo", "limit": 49, "invert": false}
+				}
+			}
         }
     }
 ]

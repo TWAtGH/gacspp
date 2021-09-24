@@ -1,5 +1,5 @@
 {
-"profile": "dcHotCold1",
+"profile": "dcHotCold3",
 "output": {
     "insertQueryBufferLen": 8192,
     "keepInMemory": true,

@@ -62,7 +62,7 @@ public:
 
 
 
-class CHotColdStorageTransferGen : public CScheduleable, public IStorageElementActionListener
+class CHCDCTransferGen : public CScheduleable, public IStorageElementActionListener
 {
 private:
     IBaseSim* mSim;
@@ -92,74 +92,70 @@ public:
     
     typedef std::list<std::unique_ptr<SJobInfo>> JobInfoList;
 
-    struct SSiteInfo
-    {
-        // configuration data / initialised by config
-        CNetworkLink* mArchiveToHotLink = nullptr;
-        CNetworkLink* mArchiveToColdLink = nullptr;
 
-        CNetworkLink* mColdToHotLink = nullptr;
+    // configuration data / initialised by config
+    CNetworkLink* mArchiveToHotLink = nullptr;
+    CNetworkLink* mArchiveToColdLink = nullptr;
 
-        CNetworkLink* mHotToCPULink = nullptr;
-        CNetworkLink* mCPUToOutputLink = nullptr;
+    CNetworkLink* mColdToHotLink = nullptr;
 
-        TickType mProductionStartTime = 0;
+    CNetworkLink* mHotToCPULink = nullptr;
+    CNetworkLink* mCPUToOutputLink = nullptr;
 
-        std::size_t mNumCores = 0;
+    TickType mProductionStartTime = 0;
 
-        std::unique_ptr<IValueGenerator> mReusageNumGen;
-        std::unique_ptr<IValueGenerator> mNumJobSubmissionGen;
-        std::unique_ptr<IValueGenerator> mJobDurationGen;
-        std::unique_ptr<IValueGenerator> mNumOutputGen;
-        std::unique_ptr<IValueGenerator> mOutputSizeGen;
+    std::size_t mNumCores = 0;
 
-        // runtime data / initialised automatically / book keeping
-        std::vector<std::vector<SFile*>> mArchiveFilesPerPopularity;
-        std::map<std::uint32_t, SIndexedReplicas> mHotReplicasByPopularity;
-        std::map<std::uint32_t, std::forward_list<SReplica*>>  mColdReplicasByPopularity;
+    std::unique_ptr<IValueGenerator> mReusageNumGen;
+    std::unique_ptr<IValueGenerator> mNumJobSubmissionGen;
+    std::unique_ptr<IValueGenerator> mJobDurationGen;
+    std::unique_ptr<IValueGenerator> mNumOutputGen;
+    std::unique_ptr<IValueGenerator> mOutputSizeGen;
 
-        //hot replicas that will be deleted after their transfer to cold storage is done
-        std::unordered_set<SReplica*> mHotReplicaDeletions;
-        std::map<TickType, std::vector<SReplica*>> mHotReplicasDeletionQueue;
+    // runtime data / initialised automatically / book keeping
+    std::vector<std::vector<SFile*>> mArchiveFilesPerPopularity;
+    std::map<std::uint32_t, SIndexedReplicas> mHotReplicasByPopularity;
+    std::map<std::uint32_t, std::forward_list<SReplica*>>  mColdReplicasByPopularity;
 
-        JobInfoList mWaitingJobs;
-        std::unordered_map <SReplica*, JobInfoList> mTransferringJobs;
-        JobInfoList mQueuedJobs;
+    //hot replicas that will be deleted after their transfer to cold storage is done
+    std::unordered_set<SReplica*> mHotReplicaDeletions;
+    std::map<TickType, std::vector<SReplica*>> mHotReplicasDeletionQueue;
 
-        JobInfoList mNewJobs;
-        JobInfoList mDownloadingJobs;
-        std::map<TickType, JobInfoList> mRunningJobs;
-        JobInfoList mUploadingJobs;
+    JobInfoList mWaitingJobs;
+    std::unordered_map <SReplica*, JobInfoList> mTransferringJobs;
+    JobInfoList mQueuedJobs;
 
-        std::unordered_map <SFile*, std::vector<JobInfoList::iterator>> mWaitingForSameFile;
+    JobInfoList mNewJobs;
+    JobInfoList mDownloadingJobs;
+    std::map<TickType, JobInfoList> mRunningJobs;
+    JobInfoList mUploadingJobs;
 
-        std::size_t mNumJobs = 0;
-        double mNumJobSubmissionAccu = 0;
-    };
+    std::unordered_map <SFile*, std::vector<JobInfoList::iterator>> mWaitingForSameFile;
+
+    std::size_t mNumJobs = 0;
+    double mNumJobSubmissionAccu = 0;
 
 private:
-    std::discrete_distribution<std::size_t> GetPopularityIdxRNG(const SSiteInfo& siteInfo);
+    std::discrete_distribution<std::size_t> GetPopularityIdxRNG();
 
-    void QueueHotReplicasDeletion(SSiteInfo& siteInfo, SReplica* replica, TickType expireAt);
-    SpaceType DeleteQueuedHotReplicas(SSiteInfo& siteInfo, TickType now);
+    void QueueHotReplicasDeletion(SReplica* replica, TickType expireAt);
+    SpaceType DeleteQueuedHotReplicas(TickType now);
 
-    void UpdateProductionCampaign(SSiteInfo& siteInfo, TickType now);
-    void UpdatePendingDeletions(SSiteInfo& siteInfo, TickType now);
-    void UpdateWaitingJobs(SSiteInfo& siteInfo, TickType now);
-    void UpdateActiveJobs(SSiteInfo& siteInfo, TickType now);
-    void UpdateQueuedJobs(SSiteInfo& siteInfo, TickType now);
-    void SubmitNewJobs(SSiteInfo& siteInfo, TickType now);
+    void UpdateProductionCampaign(TickType now);
+    void UpdatePendingDeletions(TickType now);
+    void UpdateWaitingJobs(TickType now);
+    void UpdateActiveJobs(TickType now);
+    void UpdateQueuedJobs(TickType now);
+    void SubmitNewJobs(TickType now);
 
-    void PrepareProductionCampaign(SSiteInfo& siteInfo, TickType now);
+    void PrepareProductionCampaign(TickType now);
 
 public:
-    std::vector<SSiteInfo> mSiteInfos;
-
     void PostCompleteReplica(SReplica* replica, TickType now) override;
     void PostCreateReplica(SReplica* replica, TickType now) override;
     void PreRemoveReplica(SReplica* replica, TickType now) override;
 
-    CHotColdStorageTransferGen(IBaseSim* sim,
+    CHCDCTransferGen(IBaseSim* sim,
         std::shared_ptr<CTransferManager> transferMgr,
         TickType tickFreq,
         TickType startTick = 0);

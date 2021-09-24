@@ -25,11 +25,12 @@ int main(int argc, char** argv)
     configManager.TryLoadCfg(configJson, "simconfig.json");
 
     //try to load sim profile
+    std::string profileDir;
     if (argc < 2)
     {
         try
         {
-            configManager.mProfileDirPath = configManager.mConfigDirPath / "profiles" / configJson.at("profile").get<std::string>();
+            profileDir = configJson.at("profile").get<std::string>();
         }
         catch (const json::out_of_range& error)
         {
@@ -38,9 +39,11 @@ int main(int argc, char** argv)
         }
     }
     else
-        configManager.mProfileDirPath = configManager.mConfigDirPath / "profiles" / argv[1];
+        profileDir = argv[1];
 
+    configManager.mProfileDirPath = configManager.mConfigDirPath / "profiles" / profileDir;
     std::cout << "Using profile directory: " << configManager.mProfileDirPath << std::endl;
+    system(("title " + profileDir).c_str());
 
     json profileJson;
     if (!configManager.TryLoadProfileCfg(profileJson, "profile.json"))

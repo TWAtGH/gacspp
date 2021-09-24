@@ -425,7 +425,7 @@ auto CDefaultBaseSim::CreateTransferGenerator(const json& transferGenCfg, const 
 
             transferGen = specTransferGen;
         }
-        else if (typeStr == "hotCold")
+        else if (typeStr == "hcdc")
         {
             auto mgr = std::dynamic_pointer_cast<CTransferManager>(transferManager);
             if (!mgr)
@@ -434,85 +434,74 @@ auto CDefaultBaseSim::CreateTransferGenerator(const json& transferGenCfg, const 
                 return transferGen;
             }
 
-            auto specTransferGen = std::make_shared<CHotColdStorageTransferGen>(this, mgr, tickFreq, startTick);
+            auto specTransferGen = std::make_shared<CHCDCTransferGen>(this, mgr, tickFreq, startTick);
+            const json& specCfg = transferGenCfg.at("config");
 
-            for (const json& infoJson : transferGenCfg.at("infos"))
+            specTransferGen->mProductionStartTime = specCfg.at("productionStartTime").get<TickType>();
+
+            specTransferGen->mNumCores = specCfg.at("numCores").get<std::size_t>();
+            specTransferGen->mNumJobSubmissionGen = IValueGenerator::CreateFromJson(specCfg.at("numJobSubmissionCfg"));
+
+            specTransferGen->mReusageNumGen = IValueGenerator::CreateFromJson(specCfg.at("reusageNumCfg"));
+            specTransferGen->mJobDurationGen = IValueGenerator::CreateFromJson(specCfg.at("jobDurationCfg"));
+            specTransferGen->mNumOutputGen = IValueGenerator::CreateFromJson(specCfg.at("numOutputCfg"));
+            specTransferGen->mOutputSizeGen = IValueGenerator::CreateFromJson(specCfg.at("outputSizeCfg"));
+
+            std::string name = specCfg.at("archiveStorageElement").get<std::string>();
+            CStorageElement* archiveStorageElement = GetStorageElementByName(name);
+            if (!archiveStorageElement)
             {
-                CHotColdStorageTransferGen::SSiteInfo info;
-
-                info.mProductionStartTime = infoJson.at("productionStartTime").get<TickType>();
-
-                info.mNumCores = infoJson.at("numCores").get<std::size_t>();
-                info.mNumJobSubmissionGen = IValueGenerator::CreateFromJson(infoJson.at("numJobSubmissionCfg"));
-
-                info.mReusageNumGen = IValueGenerator::CreateFromJson(infoJson.at("reusageNumCfg"));
-                info.mJobDurationGen = IValueGenerator::CreateFromJson(infoJson.at("jobDurationCfg"));
-                info.mNumOutputGen = IValueGenerator::CreateFromJson(infoJson.at("numOutputCfg"));
-                info.mOutputSizeGen = IValueGenerator::CreateFromJson(infoJson.at("outputSizeCfg"));
-
-                std::string name = infoJson.at("archiveStorageElement").get<std::string>();
-                CStorageElement* archiveStorageElement = GetStorageElementByName(name);
-                if (!archiveStorageElement)
-                {
-                    std::cout << "Failed to find storage element by name: " << name << std::endl;
-                    continue;
-                }
-
-                name = infoJson.at("coldStorageElement").get<std::string>();
-                CStorageElement* coldStorageElement = GetStorageElementByName(name);
-                if (!coldStorageElement)
-                {
-                    std::cout << "Failed to find storage element by name: " << name << std::endl;
-                    continue;
-                }
-
-                name = infoJson.at("hotStorageElement").get<std::string>();
-                CStorageElement* hotStorageElement = GetStorageElementByName(name);
-                if (!hotStorageElement)
-                {
-                    std::cout << "Failed to find storage element by name: " << name << std::endl;
-                    continue;
-                }
-
-                name = infoJson.at("cpuStorageElement").get<std::string>();
-                CStorageElement* cpuStorageElement = GetStorageElementByName(name);
-                if (!cpuStorageElement)
-                {
-                    std::cout << "Failed to find storage element by name: " << name << std::endl;
-                    continue;
-                }
-
-                name = infoJson.at("outputStorageElement").get<std::string>();
-                CStorageElement* outputStorageElement = GetStorageElementByName(name);
-                if (!outputStorageElement)
-                {
-                    std::cout << "Failed to find storage element by name: " << name << std::endl;
-                    continue;
-                }
-
-                info.mArchiveToHotLink = archiveStorageElement->GetNetworkLink(hotStorageElement);
-                if (!info.mArchiveToHotLink)
-                {
-                    std::cout << "Failed to find link: " << archiveStorageElement->GetName();
-                    std::cout<< " -> " << hotStorageElement->GetName() << std::endl;
-                    continue;
-                }
-
-                info.mArchiveToColdLink = GetLinkChecked(archiveStorageElement, coldStorageElement);
-                info.mArchiveToHotLink = GetLinkChecked(archiveStorageElement, hotStorageElement);
-                info.mHotToCPULink = GetLinkChecked(hotStorageElement, cpuStorageElement);
-                info.mColdToHotLink = GetLinkChecked(coldStorageElement, hotStorageElement);
-                info.mCPUToOutputLink = GetLinkChecked(cpuStorageElement, outputStorageElement);
-
-                if (!info.mArchiveToColdLink || !info.mArchiveToHotLink || !info.mHotToCPULink || !info.mColdToHotLink || !info.mCPUToOutputLink)
-                    continue;
-
-                archiveStorageElement->mActionListener.push_back(specTransferGen.get());
-                hotStorageElement->mActionListener.push_back(specTransferGen.get());
-                specTransferGen->mSiteInfos.push_back(std::move(info));
+                std::cout << "Failed to find storage element by name: " << name << std::endl;
             }
 
-            transferGen = specTransferGen;
+            name = specCfg.at("coldStorageElement").get<std::string>();
+            CStorageElement* coldStorageElement = GetStorageElementByName(name);
+            if (!coldStorageElement)
+            {
+                std::cout << "Failed to find storage element by name: " << name << std::endl;
+            }
+
+            name = specCfg.at("hotStorageElement").get<std::string>();
+            CStorageElement* hotStorageElement = GetStorageElementByName(name);
+            if (!hotStorageElement)
+            {
+                std::cout << "Failed to find storage element by name: " << name << std::endl;
+            }
+
+            name = specCfg.at("cpuStorageElement").get<std::string>();
+            CStorageElement* cpuStorageElement = GetStorageElementByName(name);
+            if (!cpuStorageElement)
+            {
+                std::cout << "Failed to find storage element by name: " << name << std::endl;
+            }
+
+            name = specCfg.at("outputStorageElement").get<std::string>();
+            CStorageElement* outputStorageElement = GetStorageElementByName(name);
+            if (!outputStorageElement)
+            {
+                std::cout << "Failed to find storage element by name: " << name << std::endl;
+            }
+
+            specTransferGen->mArchiveToHotLink = archiveStorageElement->GetNetworkLink(hotStorageElement);
+            if (!specTransferGen->mArchiveToHotLink)
+            {
+                std::cout << "Failed to find link: " << archiveStorageElement->GetName();
+                std::cout << " -> " << hotStorageElement->GetName() << std::endl;
+            }
+
+            specTransferGen->mArchiveToColdLink = GetLinkChecked(archiveStorageElement, coldStorageElement);
+            specTransferGen->mArchiveToHotLink = GetLinkChecked(archiveStorageElement, hotStorageElement);
+            specTransferGen->mHotToCPULink = GetLinkChecked(hotStorageElement, cpuStorageElement);
+            specTransferGen->mColdToHotLink = GetLinkChecked(coldStorageElement, hotStorageElement);
+            specTransferGen->mCPUToOutputLink = GetLinkChecked(cpuStorageElement, outputStorageElement);
+
+            if (specTransferGen->mArchiveToColdLink && specTransferGen->mArchiveToHotLink && specTransferGen->mHotToCPULink && specTransferGen->mColdToHotLink && specTransferGen->mCPUToOutputLink)
+            {
+                archiveStorageElement->mActionListener.push_back(specTransferGen.get());
+                hotStorageElement->mActionListener.push_back(specTransferGen.get());
+
+                transferGen = specTransferGen;
+            }
         }
         else if (typeStr == "cachedSrc")
         {

@@ -11,10 +11,11 @@
         "buckets": [
           {
             "name": "google_eu",
+			"limit": 1.0e+15,
             "allowDuplicateReplicas": false,
-    		    "storageSKUId": "EC40-8747-D6FF",
-    		    "classAOpSKUId": "9ADA-9AED-1B24",
-    		    "classBOpSKUId": "8AE7-5BBD-8F38"
+			"storageSKUId": "EC40-8747-D6FF",
+			"classAOpSKUId": "9ADA-9AED-1B24",
+			"classBOpSKUId": "8AE7-5BBD-8F38"
           }
         ]
       }
