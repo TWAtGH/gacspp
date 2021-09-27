@@ -489,13 +489,16 @@ auto CDefaultBaseSim::CreateTransferGenerator(const json& transferGenCfg, const 
                 std::cout << " -> " << hotStorageElement->GetName() << std::endl;
             }
 
+            specTransferGen->mArchiveStorageElement = archiveStorageElement;
+            specTransferGen->mColdStorageElement = coldStorageElement;
+            specTransferGen->mHotStorageElement = hotStorageElement;
+
             specTransferGen->mArchiveToColdLink = GetLinkChecked(archiveStorageElement, coldStorageElement);
             specTransferGen->mArchiveToHotLink = GetLinkChecked(archiveStorageElement, hotStorageElement);
             specTransferGen->mHotToCPULink = GetLinkChecked(hotStorageElement, cpuStorageElement);
-            specTransferGen->mColdToHotLink = GetLinkChecked(coldStorageElement, hotStorageElement);
             specTransferGen->mCPUToOutputLink = GetLinkChecked(cpuStorageElement, outputStorageElement);
 
-            if (specTransferGen->mArchiveToColdLink && specTransferGen->mArchiveToHotLink && specTransferGen->mHotToCPULink && specTransferGen->mColdToHotLink && specTransferGen->mCPUToOutputLink)
+            if (specTransferGen->mArchiveToColdLink && specTransferGen->mArchiveToHotLink && specTransferGen->mHotToCPULink && specTransferGen->mCPUToOutputLink)
             {
                 archiveStorageElement->mActionListener.push_back(specTransferGen.get());
                 hotStorageElement->mActionListener.push_back(specTransferGen.get());

@@ -153,7 +153,7 @@ void CHCDCTransferGen::PostCompleteReplica(SReplica* replica, TickType now)
     std::uint32_t& popularity = replica->GetFile()->mPopularity;
     SFile* file = replica->GetFile();
 
-    if (replicaStorageElement == mArchiveToHotLink->GetSrcStorageElement())
+    if (replicaStorageElement == mArchiveStorageElement)
     {
         //this case only works as long as replicas are only created once at archive storage
         std::vector<std::vector<SFile*>>& archiveFilesPerPopularity = mArchiveFilesPerPopularity;
@@ -170,7 +170,7 @@ void CHCDCTransferGen::PostCompleteReplica(SReplica* replica, TickType now)
         archiveFilesPerPopularity.emplace_back();
         archiveFilesPerPopularity.back().push_back(file);
     }
-    else if (replicaStorageElement == mArchiveToHotLink->GetDstStorageElement())
+    else if (replicaStorageElement == mHotStorageElement)
     {
         JobInfoList& queuedJobs = mQueuedJobs;
         std::unordered_map<SReplica*, JobInfoList>::iterator transferringJobs = mTransferringJobs.find(replica);
@@ -190,7 +190,7 @@ void CHCDCTransferGen::PostCreateReplica(SReplica* replica, TickType now)
     const CStorageElement* const replicaStorageElement = replica->GetStorageElement();
     std::uint32_t& popularity = replica->GetFile()->mPopularity;
 
-    if (replicaStorageElement == mArchiveToHotLink->GetDstStorageElement())
+    if (replicaStorageElement == mHotStorageElement)
     {
         auto res = mHotReplicasByPopularity.insert({ popularity, SIndexedReplicas() });
         bool wasAdded = res.first->second.AddReplica(replica);
@@ -205,7 +205,7 @@ void CHCDCTransferGen::PreRemoveReplica(SReplica* replica, TickType now)
     SFile* file = replica->GetFile();
     std::uint32_t popularity = file->mPopularity;
 
-    if (replicaStorageElement == mArchiveToHotLink->GetDstStorageElement())
+    if (replicaStorageElement == mHotStorageElement)
     {
         mHotReplicaDeletions.erase(replica);
         std::map<std::uint32_t, SIndexedReplicas>& hotReplicasByPopularity = mHotReplicasByPopularity;
@@ -247,7 +247,7 @@ void CHCDCTransferGen::Shutdown(const TickType now)
 {
     (void)now;
     //remove this as archive storage element listener
-    std::vector<IStorageElementActionListener*>& listeners1 = mArchiveToHotLink->GetSrcStorageElement()->mActionListener;
+    std::vector<IStorageElementActionListener*>& listeners1 = mArchiveStorageElement->mActionListener;
     auto listenerIt = listeners1.begin();
     auto listenerEnd = listeners1.end();
     for (; listenerIt != listenerEnd; ++listenerIt)
@@ -260,7 +260,7 @@ void CHCDCTransferGen::Shutdown(const TickType now)
     }
 
     //remove this as hot storage element listener
-    std::vector<IStorageElementActionListener*>& listeners2 = mArchiveToHotLink->GetDstStorageElement()->mActionListener;
+    std::vector<IStorageElementActionListener*>& listeners2 = mHotStorageElement->mActionListener;
     listenerIt = listeners2.begin();
     listenerEnd = listeners2.end();
     for (; listenerIt != listenerEnd; ++listenerIt)
@@ -293,10 +293,6 @@ void CHCDCTransferGen::PrepareProductionCampaign(TickType now)
 {
     std::discrete_distribution<std::size_t> popularityIdxRNG = GetPopularityIdxRNG();
 
-    CStorageElement* archiveStorageElement = mArchiveToColdLink->GetSrcStorageElement();
-    CStorageElement* coldStorageElement = mArchiveToColdLink->GetDstStorageElement();
-    CStorageElement* hotStorageElement = mArchiveToHotLink->GetDstStorageElement();
-
     assert(mArchiveToHotLink->mMaxNumActiveTransfers >= mArchiveToHotLink->mNumActiveTransfers);
     std::size_t hotReplicasCreationLimit = mArchiveToHotLink->mMaxNumActiveTransfers - mArchiveToHotLink->mNumActiveTransfers;
 
@@ -319,9 +315,9 @@ void CHCDCTransferGen::PrepareProductionCampaign(TickType now)
         SFile* srcFile = files[fileIdxRNG(mSim->mRNGEngine)];
 
         SReplica* newReplica;
-        if (hotStorageElement->CanStoreVolume(srcFile->GetSize()))
+        if (mHotStorageElement->CanStoreVolume(srcFile->GetSize()))
         {
-            newReplica = hotStorageElement->CreateReplica(srcFile, now);
+            newReplica = mHotStorageElement->CreateReplica(srcFile, now);
             if (!newReplica)
             {
                 --maxRetries;
@@ -334,7 +330,7 @@ void CHCDCTransferGen::PrepareProductionCampaign(TickType now)
         else if (coldReplicaCreationLimit > 0)
         {
             //not enough storage at hot storage so try cold storage
-            newReplica = coldStorageElement->CreateReplica(srcFile, now);
+            newReplica = mColdStorageElement->CreateReplica(srcFile, now);
             if (!newReplica)
                 break;
 
@@ -343,7 +339,7 @@ void CHCDCTransferGen::PrepareProductionCampaign(TickType now)
         else
             break;
 
-        SReplica* srcReplica = srcFile->GetReplicaByStorageElement(archiveStorageElement);
+        SReplica* srcReplica = srcFile->GetReplicaByStorageElement(mArchiveStorageElement);
         assert(srcReplica && srcReplica->IsComplete());
 
         mTransferMgr->CreateTransfer(srcReplica, newReplica, now);
@@ -381,15 +377,12 @@ void CHCDCTransferGen::UpdateProductionCampaign(TickType now)
 
 SpaceType CHCDCTransferGen::DeleteQueuedHotReplicas(TickType now)
 {
-    CStorageElement* hotStorageElement = mColdToHotLink->GetDstStorageElement();
-    CStorageElement* coldStorageElement = mColdToHotLink->GetSrcStorageElement();
-
     SpaceType requiredSpace = 0;
     std::map<TickType, std::vector<SReplica*>>::iterator queueIt = mHotReplicasDeletionQueue.begin();
     const std::map<TickType, std::vector<SReplica*>>::iterator expiredEntries = mHotReplicasDeletionQueue.lower_bound(now + 1);
 
     // only use cold storage if no limit is set or limit is greater than 1 MiB
-    const bool isColdStorageEnabled = (coldStorageElement->GetLimit() == 0) || (coldStorageElement->GetLimit() > ONE_MiB);
+    const bool isColdStorageEnabled = (mColdStorageElement->GetLimit() == 0) || (mColdStorageElement->GetLimit() > ONE_MiB);
 
     while (queueIt != expiredEntries)
     {
@@ -402,10 +395,10 @@ SpaceType CHCDCTransferGen::DeleteQueuedHotReplicas(TickType now)
             assert(hotReplica->mUsageCounter == 0);
 
             SFile* file = hotReplica->GetFile();
-            SReplica* coldStorageReplica = file->GetReplicaByStorageElement(coldStorageElement);
+            SReplica* coldStorageReplica = file->GetReplicaByStorageElement(mColdStorageElement);
             if (!coldStorageReplica && isColdStorageEnabled)
             {
-                SReplica* dstReplica = coldStorageElement->CreateReplica(file, now);
+                SReplica* dstReplica = mColdStorageElement->CreateReplica(file, now);
 
                 if (!dstReplica)
                 {
@@ -424,7 +417,7 @@ SpaceType CHCDCTransferGen::DeleteQueuedHotReplicas(TickType now)
             else
             {
                 //cold storage replica exists already or cold storage is not available
-                hotStorageElement->RemoveReplica(hotReplica, now);
+                mHotStorageElement->RemoveReplica(hotReplica, now);
             }
 
             hotReplicasToDelete[hotReplicaIdx] = hotReplicasToDelete.back();
@@ -442,8 +435,6 @@ SpaceType CHCDCTransferGen::DeleteQueuedHotReplicas(TickType now)
 
 void CHCDCTransferGen::UpdatePendingDeletions(TickType now)
 {
-    CStorageElement* coldStorageElement = mColdToHotLink->GetSrcStorageElement();
-
     SpaceType requiredSpace = DeleteQueuedHotReplicas(now) * 1;
     if (requiredSpace > 0)
     {
@@ -464,7 +455,7 @@ void CHCDCTransferGen::UpdatePendingDeletions(TickType now)
                 }
 
                 requiredSpace = (coldReplica->GetCurSize() < requiredSpace) ? (requiredSpace - coldReplica->GetCurSize()) : 0;
-                coldStorageElement->RemoveReplica(coldReplica, now);
+                mColdStorageElement->RemoveReplica(coldReplica, now);
 
                 curReplicaIt = coldReplicas.erase_after(prevReplicaIt);
             }
@@ -477,21 +468,17 @@ void CHCDCTransferGen::UpdatePendingDeletions(TickType now)
 
 void CHCDCTransferGen::UpdateWaitingJobs(TickType now)
 {
-    CStorageElement* archiveStorageElement = mArchiveToColdLink->GetSrcStorageElement();
-    CStorageElement* coldStorageElement = mColdToHotLink->GetSrcStorageElement();
-    CStorageElement* hotStorageElement = mColdToHotLink->GetDstStorageElement();
-
-    while (!mWaitingJobs.empty() && hotStorageElement->CanStoreVolume(mWaitingJobs.front()->mInputFile->GetSize()))
+    while (!mWaitingJobs.empty() && mHotStorageElement->CanStoreVolume(mWaitingJobs.front()->mInputFile->GetSize()))
     {
         SFile* file = mWaitingJobs.front()->mInputFile;
 
         // storage is free so create a transfer and notify all waiting jobs
-        SReplica* newReplica = hotStorageElement->CreateReplica(file, now);
+        SReplica* newReplica = mHotStorageElement->CreateReplica(file, now);
         assert(newReplica);
         
-        SReplica* srcReplica = file->GetReplicaByStorageElement(coldStorageElement);
+        SReplica* srcReplica = file->GetReplicaByStorageElement(mColdStorageElement);
         if (!srcReplica)
-            srcReplica = file->GetReplicaByStorageElement(archiveStorageElement);
+            srcReplica = file->GetReplicaByStorageElement(mArchiveStorageElement);
         assert(srcReplica);
 
         mTransferMgr->CreateTransfer(srcReplica, newReplica, now);
@@ -533,11 +520,6 @@ void CHCDCTransferGen::UpdateQueuedJobs(TickType now)
 void CHCDCTransferGen::UpdateActiveJobs(TickType now)
 {
     const TickType tDelta = now - mLastUpdateTime;
-    
-    CNetworkLink* hotToCPULink = mHotToCPULink;
-    CNetworkLink* cpuToOutputLink = mCPUToOutputLink;
-
-    CStorageElement* hotStorageElement = mColdToHotLink->GetDstStorageElement();
 
     std::unique_ptr<IInsertValuesContainer> inputTraceInsertQueries = mInputTraceInsertQuery->CreateValuesContainer(9 * 30);
     std::unique_ptr<IInsertValuesContainer> jobTraceInsertQueries = mJobTraceInsertQuery->CreateValuesContainer(6 * 30);
@@ -545,9 +527,9 @@ void CHCDCTransferGen::UpdateActiveJobs(TickType now)
 
 
     //should firstly update all mNumActiveTransfers and then calculate bytesDownloaded/uploaded
-    SpaceType bytesDownloaded = (hotToCPULink->mBandwidthBytesPerSecond * tDelta);
-    if (!hotToCPULink->mIsThroughput)
-        bytesDownloaded /= static_cast<double>(hotToCPULink->mNumActiveTransfers) + 1;
+    SpaceType bytesDownloaded = (mHotToCPULink->mBandwidthBytesPerSecond * tDelta);
+    if (!mHotToCPULink->mIsThroughput)
+        bytesDownloaded /= static_cast<double>(mHotToCPULink->mNumActiveTransfers) + 1;
 
     // update downloading jobs before adding the new jobs
     JobInfoList::iterator jobIt = mDownloadingJobs.begin();
@@ -559,16 +541,16 @@ void CHCDCTransferGen::UpdateActiveJobs(TickType now)
         if (newSize >= inputFile->GetSize())
         {
             //download completed
-            hotToCPULink->mUsedTraffic += inputFile->GetSize() - job->mCurInputFileSize;
-            hotToCPULink->mNumActiveTransfers -= 1;
-            hotToCPULink->mNumDoneTransfers += 1;
+            mHotToCPULink->mUsedTraffic += inputFile->GetSize() - job->mCurInputFileSize;
+            mHotToCPULink->mNumActiveTransfers -= 1;
+            mHotToCPULink->mNumDoneTransfers += 1;
 
             job->mCurInputFileSize = inputFile->GetSize();
 
             inputTraceInsertQueries->AddValue(GetNewId());
             inputTraceInsertQueries->AddValue(job->mJobId);
-            inputTraceInsertQueries->AddValue(hotStorageElement->GetSite()->GetId());
-            inputTraceInsertQueries->AddValue(hotStorageElement->GetId());
+            inputTraceInsertQueries->AddValue(mHotStorageElement->GetSite()->GetId());
+            inputTraceInsertQueries->AddValue(mHotStorageElement->GetId());
             inputTraceInsertQueries->AddValue(inputFile->GetId());
             inputTraceInsertQueries->AddValue(job->mInputReplica->GetId());
             inputTraceInsertQueries->AddValue(job->mLastTime);
@@ -579,7 +561,7 @@ void CHCDCTransferGen::UpdateActiveJobs(TickType now)
 
             //insert job trace directly so that jobId of input trace points to a valid jobId
             jobTraceInsertQueries->AddValue(job->mJobId);
-            jobTraceInsertQueries->AddValue(hotStorageElement->GetSite()->GetId());
+            jobTraceInsertQueries->AddValue(mHotStorageElement->GetSite()->GetId());
             jobTraceInsertQueries->AddValue(job->mCreatedAt);
             jobTraceInsertQueries->AddValue(job->mQueuedAt);
             jobTraceInsertQueries->AddValue(now);
@@ -594,7 +576,7 @@ void CHCDCTransferGen::UpdateActiveJobs(TickType now)
         }
         else
         {
-            hotToCPULink->mUsedTraffic += bytesDownloaded;
+            mHotToCPULink->mUsedTraffic += bytesDownloaded;
             job->mCurInputFileSize = newSize;
         }
         ++jobIt;
@@ -603,12 +585,12 @@ void CHCDCTransferGen::UpdateActiveJobs(TickType now)
 
     // add new jobs
     mNumJobs += mNewJobs.size();
-    hotToCPULink->mNumActiveTransfers += mNewJobs.size();
+    mHotToCPULink->mNumActiveTransfers += mNewJobs.size();
     for(std::unique_ptr<SJobInfo>& job : mNewJobs)
     {
         //download just started
         job->mLastTime = now;
-        hotToCPULink->GetSrcStorageElement()->OnOperation(CStorageElement::GET);
+        mHotToCPULink->GetSrcStorageElement()->OnOperation(CStorageElement::GET);
     }
     mDownloadingJobs.splice(mDownloadingJobs.end(), std::move(mNewJobs));
 
@@ -626,19 +608,19 @@ void CHCDCTransferGen::UpdateActiveJobs(TickType now)
 
                 // unlock input replica at hot storage
                 job->mInputReplica->mUsageCounter -= 1;
-                if(job->mInputReplica->mUsageCounter == 0 && (hotStorageElement->GetLimit() > 0))
+                if(job->mInputReplica->mUsageCounter == 0 && (mHotStorageElement->GetLimit() > 0))
                     QueueHotReplicasDeletion(job->mInputReplica, now + 90 + static_cast<TickType>(job->mInputFile->GetSize()/MiB_TO_BYTES(500.0)));
 
-                //todo: consider cpuToOutputLink->mMaxNumActiveTransfers
+                //todo: consider mCPUToOutputLink->mMaxNumActiveTransfers
                 std::size_t numOutputReplicas = mNumOutputGen->GetValue(mSim->mRNGEngine);
-                cpuToOutputLink->mNumActiveTransfers += numOutputReplicas;
+                mCPUToOutputLink->mNumActiveTransfers += numOutputReplicas;
                 for (; numOutputReplicas > 0; --numOutputReplicas)
                 {
                     const SpaceType size = static_cast<SpaceType>(GiB_TO_BYTES(mOutputSizeGen->GetValue(mSim->mRNGEngine)));
                     SFile* outputFile = mSim->mRucio->CreateFile(size, now, SECONDS_PER_MONTH * 12);
-                    outputReplicas.emplace_back(cpuToOutputLink->GetDstStorageElement()->CreateReplica(outputFile, now));
+                    outputReplicas.emplace_back(mCPUToOutputLink->GetDstStorageElement()->CreateReplica(outputFile, now));
                     outputReplicas.back()->mUsageCounter += 1;
-                    cpuToOutputLink->GetSrcStorageElement()->OnOperation(CStorageElement::GET);
+                    mCPUToOutputLink->GetSrcStorageElement()->OnOperation(CStorageElement::GET);
                     assert(outputReplicas.back());
                 }
             }
@@ -650,9 +632,9 @@ void CHCDCTransferGen::UpdateActiveJobs(TickType now)
 
 
     // update uploads
-    SpaceType bytesUploaded = (cpuToOutputLink->mBandwidthBytesPerSecond * tDelta);
-    if(!cpuToOutputLink->mIsThroughput)
-        bytesUploaded /= static_cast<double>(cpuToOutputLink->mNumActiveTransfers) + 1;
+    SpaceType bytesUploaded = (mCPUToOutputLink->mBandwidthBytesPerSecond * tDelta);
+    if(!mCPUToOutputLink->mIsThroughput)
+        bytesUploaded /= static_cast<double>(mCPUToOutputLink->mNumActiveTransfers) + 1;
     
     jobIt = mUploadingJobs.begin();
     while(jobIt != mUploadingJobs.end())
@@ -665,13 +647,13 @@ void CHCDCTransferGen::UpdateActiveJobs(TickType now)
             SReplica* outputReplica = outputReplicas[idx];
 
             const SpaceType amount = outputReplica->Increase(bytesUploaded, now);
-            cpuToOutputLink->mUsedTraffic += amount;
+            mCPUToOutputLink->mUsedTraffic += amount;
 
             if (outputReplica->IsComplete())
             {
                 outputReplica->mUsageCounter -= 1;
-                cpuToOutputLink->mNumActiveTransfers -= 1;
-                cpuToOutputLink->mNumDoneTransfers += 1;
+                mCPUToOutputLink->mNumActiveTransfers -= 1;
+                mCPUToOutputLink->mNumDoneTransfers += 1;
 
                 outputTraceInsertQueries->AddValue(GetNewId());
                 outputTraceInsertQueries->AddValue(job->mJobId);
@@ -708,8 +690,6 @@ void CHCDCTransferGen::UpdateActiveJobs(TickType now)
 
 void CHCDCTransferGen::SubmitNewJobs(TickType now)
 {
-    CStorageElement* hotStorageElement = mColdToHotLink->GetDstStorageElement();
-
     if(mArchiveFilesPerPopularity.empty())
         return;
 
@@ -733,7 +713,7 @@ void CHCDCTransferGen::SubmitNewJobs(TickType now)
         do
         {
             inputFile = files[randomFileIdxCur];
-            inputReplica = inputFile->GetReplicaByStorageElement(hotStorageElement);
+            inputReplica = inputFile->GetReplicaByStorageElement(mHotStorageElement);
             randomFileIdxCur = (randomFileIdxCur + 1) % numFiles;
         } while ((randomFileIdxCur != randomFileIdxOrigin) && (mHotReplicaDeletions.count(inputReplica) > 0));
         

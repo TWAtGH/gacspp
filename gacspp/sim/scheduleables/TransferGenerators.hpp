@@ -94,10 +94,12 @@ public:
 
 
     // configuration data / initialised by config
+    CStorageElement* mHotStorageElement = nullptr;
+    CStorageElement* mColdStorageElement = nullptr;
+    CStorageElement* mArchiveStorageElement = nullptr;
+
     CNetworkLink* mArchiveToHotLink = nullptr;
     CNetworkLink* mArchiveToColdLink = nullptr;
-
-    CNetworkLink* mColdToHotLink = nullptr;
 
     CNetworkLink* mHotToCPULink = nullptr;
     CNetworkLink* mCPUToOutputLink = nullptr;
