@@ -65,11 +65,11 @@ bool CTestSim::SetupDefaults(const json& profileJson)
             return false;
         }
         heartbeat->mProccessDurations.push_back(transferGen);
-        mSchedule.push(transferGen);
+        mSchedule.emplace(transferGen);
 
         heartbeat->mTransferManagers.push_back(transferManager);
 
-        mSchedule.push(transferManager);
+        mSchedule.emplace(transferManager);
     }
 
     std::vector<CStorageElement*> storageElements;
@@ -142,7 +142,7 @@ bool CTestSim::SetupDefaults(const json& profileJson)
 
             heartbeat->mProccessDurations.push_back(dataGen);
 
-            mSchedule.push(dataGen);
+            mSchedule.emplace(dataGen);
         }
     }
     catch(const json::out_of_range& error)
@@ -171,9 +171,9 @@ bool CTestSim::SetupDefaults(const json& profileJson)
 
     auto billGen = std::make_shared<CBillingGenerator>(this);
     billGen->mName = "BillingGenerator";
-    mSchedule.push(billGen);
+    mSchedule.emplace(billGen);
     //mSchedule.push(reaper);
-    mSchedule.push(heartbeat);
+    mSchedule.emplace(heartbeat);
 
     return true;
 }

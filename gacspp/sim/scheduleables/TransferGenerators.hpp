@@ -62,7 +62,7 @@ public:
 
 
 
-class CHCDCTransferGen : public CScheduleable, public IStorageElementActionListener
+class CHCDCTransferGen : public CSchedulable, public IStorageElementActionListener
 {
 private:
     IBaseSim* mSim;
@@ -168,7 +168,7 @@ public:
 
 
 
-class CCloudBufferTransferGen : public CScheduleable, public IStorageElementActionListener
+class CCloudBufferTransferGen : public CSchedulable, public IStorageElementActionListener
 {
 private:
     IBaseSim* mSim;
@@ -203,7 +203,7 @@ public:
 
 
 
-class CJobIOTransferGen : public CScheduleable
+class CJobIOTransferGen : public CSchedulable
 {
 private:
     IBaseSim* mSim;
@@ -256,7 +256,7 @@ public:
 
 
 
-class CJobSlotTransferGen : public CScheduleable
+class CJobSlotTransferGen : public CSchedulable
 {
 private:
     IBaseSim* mSim;
@@ -285,7 +285,7 @@ public:
 
 
 
-class CCachedSrcTransferGen : public CScheduleable
+class CCachedSrcTransferGen : public CSchedulable
 {
 private:
     IBaseSim* mSim;
@@ -322,7 +322,7 @@ public:
 
 
 
-class CFixedTransferGen : public CScheduleable, public IStorageElementActionListener
+class CFixedTransferGen : public CSchedulable, public IStorageElementActionListener
 {
 private:
     IBaseSim* mSim;

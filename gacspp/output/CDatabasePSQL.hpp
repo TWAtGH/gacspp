@@ -1,6 +1,10 @@
 #pragma once
 
+#ifdef WITH_PSQL
+
 #include <libpq-fe.h>
+
+#endif
 
 #include "IDatabase.hpp"
 
@@ -11,8 +15,8 @@ namespace psql
 class CResult
 {
 private:
+#ifdef WITH_PSQL
     PGresult* mResult;
-
 public:
     CResult(PGresult* result);
 
@@ -22,7 +26,7 @@ public:
     CResult& operator=(CResult&&);
 
     ~CResult();
-
+#endif
     operator bool() const;
     std::string str() const;
 };
@@ -73,7 +77,10 @@ public:
 class CDatabase : public IDatabase
 {
 private:
+
+#ifdef WITH_PSQL
     PGconn* mConnection;
+#endif
     std::size_t mNumPreparerdQueries = 0;
 
 public:
@@ -89,8 +96,10 @@ public:
     virtual bool CommitAndBeginTransaction();
     virtual bool EndTransaction();
 
+#ifdef WITH_PSQL
     auto GetConnection() -> PGconn*
     {return mConnection;}
+#endif
 };
 
 }

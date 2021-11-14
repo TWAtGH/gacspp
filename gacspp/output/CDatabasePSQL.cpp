@@ -7,6 +7,7 @@
 namespace psql
 {
 
+#ifdef WITH_PSQL
 CResult::CResult(PGresult* result)
     : mResult(result)
 {}
@@ -29,21 +30,29 @@ CResult& CResult::operator=(CResult&& other)
     other.mResult = nullptr;
     return *this;
 }
+#endif
 
 CResult::operator bool() const
 {
+
+#ifdef WITH_PSQL
     if(mResult)
     {
         const auto status = PQresultStatus(mResult);
         if(status == PGRES_COMMAND_OK || status == PGRES_TUPLES_OK || status == PGRES_COPY_IN)
             return true;
     }
+#endif
     return false;
 }
 
 std::string CResult::str() const
 {
+#ifdef WITH_PSQL
     return std::string(PQresultErrorMessage(mResult));
+#else
+    return "";
+#endif
 }
 
 
@@ -108,6 +117,7 @@ bool CInsertValuesContainer::MergeIfPossible(std::unique_ptr<IInsertValuesContai
 
 auto CInsertValuesContainer::InsertValues() -> std::size_t
 {
+#ifdef WITH_PSQL
     PGconn* dbConnection = nullptr;
     {
         CDatabase* dbPSQL = dynamic_cast<CDatabase*>(mDB.get());
@@ -163,6 +173,9 @@ auto CInsertValuesContainer::InsertValues() -> std::size_t
         std::cout<<"Copy end failed: "<<resEnd<<std::endl;
 
     return (mValues.size() / mNumParameters);
+#else
+    return 0;
+#endif
 }
 
 
@@ -184,29 +197,39 @@ CDatabase::~CDatabase()
 
 bool CDatabase::Open(const std::string& params)
 {
+#ifdef WITH_PSQL
     mConnection = PQconnectdb(params.c_str());
     if(mConnection == nullptr)
         return false;
     return (PQstatus(mConnection) != CONNECTION_BAD);
+#else
+    return false;
+#endif
 }
 
 bool CDatabase::Close()
 {
+#ifdef WITH_PSQL
     if(mConnection)
     {
         PQfinish(mConnection);
         mConnection = nullptr;
     }
+#endif
     return true;
 }
 
 
 bool CDatabase::ExecuteQuery(const std::string& query)
 {
+#ifdef WITH_PSQL
     CResult res(PQexec(mConnection, query.c_str()));
     if(!res)
         std::cout<<"Query failed:"<<std::endl<<query<<std::endl<<res.str()<<std::endl;
     return (res == true);
+#else
+    return false;
+#endif
 }
 
 auto CDatabase::PrepareInsert(const std::shared_ptr<IDatabase>& db, const std::string& queryTpl, std::size_t numWildcards, char wildcard) -> std::shared_ptr<IPreparedInsert>
@@ -227,12 +250,13 @@ auto CDatabase::PrepareInsert(const std::shared_ptr<IDatabase>& db, const std::s
     }
 
     std::shared_ptr<CPreparedInsert> preparedInsert;
+#ifdef WITH_PSQL
     CResult res(PQprepare(mConnection, id.c_str(), queryTplStream.str().c_str(), numWildcards, nullptr));
     if(res)
         preparedInsert = std::make_shared<CPreparedInsert>(db, std::move(id), numWildcards);
     else
         std::cout<<"Preparing query failed:"<<std::endl<<queryTplStream.str()<<std::endl<<res.str()<<std::endl;
-
+#endif
     return preparedInsert;
 }
 

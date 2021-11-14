@@ -11,7 +11,7 @@ class CBaseTransferManager;
 class CStorageElement;
 
 
-class CDataGenerator : public CScheduleable
+class CDataGenerator : public CSchedulable
 {
 private:
     IBaseSim* mSim;
@@ -44,7 +44,7 @@ public:
 
 
 
-class CReaperCaller : public CScheduleable
+class CReaperCaller : public CSchedulable
 {
 private:
     CRucio *mRucio;
@@ -58,7 +58,7 @@ public:
 
 
 
-class CBillingGenerator : public CScheduleable
+class CBillingGenerator : public CSchedulable
 {
 private:
     std::shared_ptr<IPreparedInsert> mCloudBillInsertQuery;
@@ -74,7 +74,7 @@ public:
 
 
 
-class CHeartbeat : public CScheduleable
+class CHeartbeat : public CSchedulable
 {
 private:
     IBaseSim* mSim;
@@ -83,7 +83,7 @@ private:
     std::chrono::high_resolution_clock::time_point mTimeLastUpdate;
 
 public:
-    std::vector<std::weak_ptr<CScheduleable>> mProccessDurations;
+    std::vector<std::weak_ptr<CSchedulable>> mProccessDurations;
     std::vector<std::shared_ptr<CBaseTransferManager>> mTransferManagers;
 
 public:

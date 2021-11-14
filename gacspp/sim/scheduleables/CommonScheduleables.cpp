@@ -25,7 +25,7 @@ CDataGenerator::CDataGenerator( IBaseSim* sim,
                                 std::unique_ptr<IValueGenerator>&& fileLifetimeGen,
                                 const TickType tickFreq,
                                 const TickType startTick)
-    : CScheduleable(startTick),
+    : CSchedulable(startTick),
       mSim(sim),
       mNumFilesGen(std::move(numFilesGen)),
       mFileSizeGen(std::move(fileSizeGen)),
@@ -106,7 +106,7 @@ void CDataGenerator::OnUpdate(const TickType now)
 
 
 CReaperCaller::CReaperCaller(CRucio *rucio, const TickType tickFreq, const TickType startTick)
-    : CScheduleable(startTick),
+    : CSchedulable(startTick),
       mRucio(rucio),
       mTickFreq(tickFreq)
 {}
@@ -123,7 +123,7 @@ void CReaperCaller::OnUpdate(const TickType now)
 
 
 CBillingGenerator::CBillingGenerator(IBaseSim* sim, const TickType tickFreq, const TickType startTick)
-    : CScheduleable(startTick),
+    : CSchedulable(startTick),
       mSim(sim),
       mTickFreq(tickFreq)
 {
@@ -169,7 +169,7 @@ void CBillingGenerator::OnUpdate(const TickType now)
 
 
 CHeartbeat::CHeartbeat(IBaseSim* sim, const TickType tickFreq, const TickType startTick)
-    : CScheduleable(startTick),
+    : CSchedulable(startTick),
       mSim(sim),
       mTickFreq(tickFreq)
 {
@@ -216,7 +216,7 @@ void CHeartbeat::OnUpdate(const TickType now)
     std::size_t idx = 0;
     while(idx < mProccessDurations.size())
     {
-        std::shared_ptr<CScheduleable> scheduleable = mProccessDurations[idx].lock();
+        std::shared_ptr<CSchedulable> scheduleable = mProccessDurations[idx].lock();
         if (!scheduleable)
         {
             mProccessDurations.erase(mProccessDurations.begin() + idx);
@@ -231,9 +231,9 @@ void CHeartbeat::OnUpdate(const TickType now)
     statusOutput << "Sim stats:" << std::endl;
     statusOutput << indent << std::setw(maxW) << "Duration";
     statusOutput << ": " << std::setw(6) << timeDiff.count() << "s\n";
-    for(std::weak_ptr<CScheduleable> weakptr : mProccessDurations)
+    for(std::weak_ptr<CSchedulable> weakptr : mProccessDurations)
     {
-        std::shared_ptr<CScheduleable> scheduleable = weakptr.lock();
+        std::shared_ptr<CSchedulable> scheduleable = weakptr.lock();
         statusOutput << indent << std::setw(maxW) << scheduleable->mName;
         statusOutput << ": " << std::setw(6) << scheduleable->mUpdateDurationSummed.count();
         statusOutput << "s (" << std::setw(5) << (scheduleable->mUpdateDurationSummed.count() / timeDiff.count()) * 100 << "%)\n";

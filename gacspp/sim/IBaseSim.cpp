@@ -24,28 +24,29 @@ void IBaseSim::Run(TickType maxTick)
 {
     mCurrentTick = 0;
     mIsRunning = true;
-    while(mIsRunning && (mCurrentTick <= maxTick) && !mSchedule.empty())
+    ScheduleType::node_type curNode;
+    std::shared_ptr<CSchedulable> curEvent;
+    while (mIsRunning && (mCurrentTick <= maxTick) && !mSchedule.empty())
     {
-        std::shared_ptr<CScheduleable> element = mSchedule.top();
-        mSchedule.pop();
+        curNode = mSchedule.extract(mSchedule.begin());
+        curEvent = curNode.value();
 
-        assert(mCurrentTick <= element->mNextCallTick);
+        assert(mCurrentTick <= curEvent->mNextCallTick);
 
-        mCurrentTick = element->mNextCallTick;
-        element->OnUpdate(mCurrentTick);
-        if(element->mNextCallTick > mCurrentTick)
-            mSchedule.push(element);
+        mCurrentTick = curEvent->mNextCallTick;
+        curEvent->OnUpdate(mCurrentTick);
+
+        if (curEvent->mNextCallTick > mCurrentTick)
+            mSchedule.insert(std::move(curNode));
         else
-            element->Shutdown(mCurrentTick);
+            curEvent->Shutdown(mCurrentTick);
     }
 
     mIsRunning = false;
 
-    while(!mSchedule.empty())
-    {
-        mSchedule.top()->Shutdown(mCurrentTick);
-        mSchedule.pop();
-    }
+    for (auto& element : mSchedule)
+        element->Shutdown(mCurrentTick);
+    mSchedule.clear();
 
     mRucio->RemoveAllFiles(mCurrentTick);
 }

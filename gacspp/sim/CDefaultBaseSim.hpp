@@ -19,5 +19,5 @@ public:
     virtual bool SetupLinks(const json& profileJson);
 
     virtual auto CreateTransferManager(const json& transferManagerCfg) const -> std::shared_ptr<CBaseTransferManager>;
-    virtual auto CreateTransferGenerator(const json& transferGenCfg, const std::shared_ptr<CBaseTransferManager>& transferManager) -> std::shared_ptr<CScheduleable>;
+    virtual auto CreateTransferGenerator(const json& transferGenCfg, const std::shared_ptr<CBaseTransferManager>& transferManager) -> std::shared_ptr<CSchedulable>;
 };

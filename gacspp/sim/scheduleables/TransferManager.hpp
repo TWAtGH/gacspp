@@ -23,10 +23,10 @@ public:
 };
 
 
-class CBaseTransferManager : public CScheduleable
+class CBaseTransferManager : public CSchedulable
 {
 public:
-    using CScheduleable::CScheduleable;
+    using CSchedulable::CSchedulable;
 
     std::uint32_t mNumCompletedTransfers = 0;
     std::uint32_t mNumFailedTransfers = 0;

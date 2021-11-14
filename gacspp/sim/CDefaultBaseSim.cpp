@@ -375,9 +375,9 @@ static CNetworkLink* GetLinkChecked(CStorageElement* src, CStorageElement* dst)
     return link;
 }
 
-auto CDefaultBaseSim::CreateTransferGenerator(const json& transferGenCfg, const std::shared_ptr<CBaseTransferManager>& transferManager) -> std::shared_ptr<CScheduleable>
+auto CDefaultBaseSim::CreateTransferGenerator(const json& transferGenCfg, const std::shared_ptr<CBaseTransferManager>& transferManager) -> std::shared_ptr<CSchedulable>
 {
-    std::shared_ptr<CScheduleable> transferGen;
+    std::shared_ptr<CSchedulable> transferGen;
     try
     {
         const std::string typeStr = transferGenCfg.at("type").get<std::string>();

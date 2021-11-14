@@ -129,7 +129,7 @@ void CBufferedOnDeletionInsert::PreRemoveReplica(SReplica* replica, TickType now
 
 
 CHCDCTransferGen::CHCDCTransferGen(IBaseSim* sim, std::shared_ptr<CTransferManager> transferMgr, TickType tickFreq, TickType startTick)
-    : CScheduleable(startTick),
+    : CSchedulable(startTick),
     mSim(sim),
     mTransferMgr(std::move(transferMgr)),
     mTickFreq(tickFreq),
@@ -752,7 +752,7 @@ CCloudBufferTransferGen::CCloudBufferTransferGen(IBaseSim* sim,
                                                  std::shared_ptr<CTransferManager> transferMgr,
                                                  TickType tickFreq,
                                                  TickType startTick )
-    : CScheduleable(startTick),
+    : CSchedulable(startTick),
       mSim(sim),
       mTransferMgr(std::move(transferMgr)),
       mTickFreq(tickFreq)
@@ -884,7 +884,7 @@ CJobIOTransferGen::CJobIOTransferGen(IBaseSim* sim,
                                     std::shared_ptr<CTransferManager> transferMgr,
                                     TickType tickFreq,
                                     TickType startTick)
-    : CScheduleable(startTick),
+    : CSchedulable(startTick),
       mSim(sim),
       mTransferMgr(transferMgr),
       mTickFreq(tickFreq),
@@ -1151,7 +1151,7 @@ CJobSlotTransferGen::CJobSlotTransferGen(IBaseSim* sim,
                                          std::shared_ptr<CFixedTimeTransferManager> transferMgr,
                                          TickType tickFreq,
                                          TickType startTick )
-    : CScheduleable(startTick),
+    : CSchedulable(startTick),
       mSim(sim),
       mTransferMgr(transferMgr),
       mTickFreq(tickFreq)
@@ -1276,7 +1276,7 @@ CCachedSrcTransferGen::CCachedSrcTransferGen(IBaseSim* sim,
                                              TickType defaultReplicaLifetime,
                                              TickType tickFreq,
                                              TickType startTick)
-    : CScheduleable(startTick),
+    : CSchedulable(startTick),
       mSim(sim),
       mTransferMgr(transferMgr),
       mTickFreq(tickFreq),
@@ -1468,7 +1468,7 @@ CFixedTransferGen::CFixedTransferGen(IBaseSim* sim,
                     std::shared_ptr<CTransferManager> transferMgr,
                     TickType tickFreq,
                     TickType startTick)
-    : CScheduleable(startTick),
+    : CSchedulable(startTick),
       mSim(sim),
       mTransferMgr(transferMgr),
       mTickFreq(tickFreq)

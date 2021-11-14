@@ -26,10 +26,14 @@ COutput::~COutput()
 bool COutput::Initialise(const std::string& params, const std::size_t insertQueryBufferLen)
 {
     assert(mDB == nullptr);
-    if(params == ":dummydb:")
-        mDB = std::make_shared<dummydb::CDatabase>();
-    else
+
+#ifdef WITH_PSQL
+    if(params != ":dummydb:")
         mDB = std::make_shared<psql::CDatabase>();
+#endif
+    if(!mDB)
+        mDB = std::make_shared<dummydb::CDatabase>();
+        
 
     if(mDB->Open(params))
     {
