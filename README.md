@@ -3,6 +3,9 @@
 ## Overview
 GACSPP is a discrete event based simulation, which allows evaluating models combining grid and cloud storage resources.
 The simulation was used to evaluate the Hot/Cold Storage Data Carousel (HCDC) model.
+See [Simulation and Evaluation of Cloud Storage Caching for Data Intensive Science](https://link.springer.com/article/10.1007/s41781-021-00076-w).
+
+Also consider the automatically generated [code documentation](https://twatgh.github.io/)
 
 ## Dependencies
 The simulation was developed, tested, and used on CentOS8. However, it can also be builded and used on windows based platforms.
@@ -94,3 +97,4 @@ However, there are more keys worth mentioning from the `profile.json`.
 - `"maxTick"` defines the maximum time until the simulation will run
 - `"dataGens"` a list of objects, where each object describes a data generator. The attributes from the example files are straightforwardly mapped to the property documentation of the code.
 - `"transferCfgs"` a list of objects, where each objects contains configuration for a `"manager"` (transfer manager) and a `"generator"` (transfer generator)
+The latter options make it possible to configure default implemented events via configuration files.
