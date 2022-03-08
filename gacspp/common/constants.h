@@ -68,10 +68,10 @@ typedef std::uint64_t IdType;
  *
  * \section intro_sec Introduction
  *
- * This is the automaticly generated documentation of GACSPP.
+ * This is the automatically generated documentation of GACSPP.
  * The program entry point is at gacspp/sim/gacspp.cpp
  * There the CConfigManager will be instanciated to subsequently load config files, initialise the output system, and load a simulation profile.
- * Please also consider the first step infos provide in at github: https://github.com/TWAtGH/gacspp
+ * Please also consider the first step infos provide at github: https://github.com/TWAtGH/gacspp
  * 
  * You can use the navigation on this site to get an overview of the existing files in GACSPP and to explore the used classes.
  */
