@@ -120,7 +120,7 @@ void CStorageElement::OnOperation(OPERATION op)
 
 auto CStorageElement::CreateNetworkLink(CStorageElement* dstStorageElement, SpaceType bandwidthBytesPerSecond) -> CNetworkLink*
 {
-    auto result = mDstSiteIdToNetworkLinkIdx.insert({ dstStorageElement->mId, mNetworkLinks.size() });
+    auto result = mDstStorageElementIdToNetworkLinkIdx.insert({ dstStorageElement->mId, mNetworkLinks.size() });
     assert(result.second);
     mNetworkLinks.emplace_back(std::make_unique<CNetworkLink>(bandwidthBytesPerSecond, this, dstStorageElement));
     return mNetworkLinks.back().get();
@@ -162,8 +162,8 @@ void CStorageElement::OnIncreaseReplica(SReplica* replica, SpaceType amount, Tic
 
 auto CStorageElement::GetNetworkLink(const CStorageElement* dstStorageElement) const -> CNetworkLink*
 {
-    auto result = mDstSiteIdToNetworkLinkIdx.find(dstStorageElement->mId);
-    if (result == mDstSiteIdToNetworkLinkIdx.end())
+    auto result = mDstStorageElementIdToNetworkLinkIdx.find(dstStorageElement->mId);
+    if (result == mDstStorageElementIdToNetworkLinkIdx.end())
         return nullptr;
     return mNetworkLinks[result->second].get();
 }

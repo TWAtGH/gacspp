@@ -218,12 +218,12 @@ auto CExponentialRandomValueGenerator::GetValue(RNGEngineType& rngEngine) -> dou
 }
 
 CPoissonRandomValueGenerator::CPoissonRandomValueGenerator(const double mean)
-    : mWeibullRNGDistribution(mean)
+    : mPoissonRNGDistribution(mean)
 {}
 
 auto CPoissonRandomValueGenerator::GetValue(RNGEngineType& rngEngine) -> double
 {
-    return GetBetweenMaxMin(mWeibullRNGDistribution(rngEngine));
+    return GetBetweenMaxMin(mPoissonRNGDistribution(rngEngine));
 }
     
 CWeibullRandomValueGenerator::CWeibullRandomValueGenerator(const double k, const double lambda)

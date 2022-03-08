@@ -17,6 +17,9 @@
 #define NUM_REPEAR_THREADS 1
 
 
+/**
+* @brief Interal class that can be implemented in various ways. However, the basic purpose is to remove all expired files and replicas.
+*/
 class CReaper
 {
 private:
@@ -35,7 +38,22 @@ private:
 public:
     CReaper(CRucio* rucio);
     ~CReaper();
+
+    /**
+    * @brief method that can be executed in parallel by a thread to check certain parts of the file array for expired files
+    * 
+    * @param threadIdx the thread index
+    */
     void ReaperWorker(const std::size_t threadIdx);
+
+    /**
+    * @brief Executes the reaper removing all expired files from the passed in array
+    * 
+    * @param files the array to check for expired files
+    * @param now the current simulation time
+    * 
+    * @return the number of removed files
+    */
     auto RunReaper(std::vector<std::unique_ptr<SFile>>& files, TickType now) -> std::size_t;
 };
 

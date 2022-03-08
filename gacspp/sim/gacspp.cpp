@@ -1,7 +1,7 @@
 #include <iomanip>
 #include <iostream>
 
-#include "CTestSim.hpp"
+#include "CDefaultBaseSim.hpp"
 
 #include "common/CConfigManager.hpp"
 
@@ -120,7 +120,7 @@ int main(int argc, char** argv)
 
     {
         std::cout<<"Setting up sim..."<<std::endl;
-        std::unique_ptr<CTestSim> sim = std::make_unique<CTestSim>();
+        std::unique_ptr<CDefaultBaseSim> sim = std::make_unique<CDefaultBaseSim>();
         if(!sim->SetupDefaults(profileJson))
         {
             std::cout<<"Setting up sim failed"<<std::endl;

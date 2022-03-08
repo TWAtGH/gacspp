@@ -1,3 +1,13 @@
+/**
+ * @file   CDatabaseDummy.hpp
+ * @brief  Contains a dummy database implementation, which does not really output the data and just returns success.
+ *
+ * @author Tobias Wegner
+ * @date   March 2022
+ *
+ * Useful for testing
+ */
+
 #pragma once
 
 #include <sstream>
@@ -6,7 +16,9 @@
 
 namespace dummydb
 {
-
+/**
+* @brief Implementation of the interface with empty functions doing nothing
+*/
 class CInsertValuesContainer : public IInsertValuesContainer
 {
 public:
@@ -31,6 +43,9 @@ public:
     virtual auto InsertValues() -> std::size_t;
 };
 
+/**
+* @brief Implementation that returns a dummydb::CInsertValuesContainer
+*/
 class CPreparedInsert : public IPreparedInsert
 {
 public:
@@ -39,6 +54,10 @@ public:
     virtual auto CreateValuesContainer(std::size_t numReserveValues=0) -> std::unique_ptr<IInsertValuesContainer>;
 };
 
+
+/**
+* @brief Dummy database that returns success but does nothing in the background
+*/
 class CDatabase : public IDatabase
 {
 public:

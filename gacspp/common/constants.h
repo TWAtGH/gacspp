@@ -1,3 +1,20 @@
+/**
+ * @file   constants.h
+ * @brief  Provides commonly used constants and typedefs
+ *
+ * @author Tobias Wegner
+ * @date   March 2022
+ *
+ * The most important typedefs used in gacspp are SpaceType, TickType, and IdType. SpaceType
+ * is used to indicate that the variable will store values related to storage or data, e.g.,
+ * file sizes, storage volumes, or bandwidths.
+ * TickType is used to indicate that a variable is used to store values related to simulation
+ * time points.
+ * IdType is used for variables that store object IDs.
+ * By default, all three types are mapped to 64 bit unsigned integers.
+ *
+ */
+
 #pragma once
 
 #include <chrono>
@@ -31,6 +48,17 @@ typedef std::minstd_rand RNGEngineType;
 typedef std::chrono::high_resolution_clock::time_point TimePointType;
 typedef std::chrono::duration<double> DurationType;
 
+/**
+* @brief Type used to store values related to storage or data volumes.
+*/
 typedef std::uint64_t SpaceType;
+
+/**
+* @brief Type used to store values related to the simulation time.
+*/
 typedef std::uint64_t TickType;
+
+/**
+* @brief Type used to store object IDs.
+*/
 typedef std::uint64_t IdType;
